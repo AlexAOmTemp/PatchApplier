@@ -13,7 +13,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import Policy, Session
+from toolkit.core import Session
 from toolkit.core.models import Result
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -61,7 +61,7 @@ class NoNativeBackend(FilesystemBackend):
 
 def _run_with_backend(backend, patches):
     fmt = Format.load("default")
-    with Session(backend, fmt=fmt, tools=TOOL_MAP, policy=Policy()) as s:
+    with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
         return s.apply_patches(patches)
 
 

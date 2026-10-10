@@ -13,7 +13,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import Policy, Session
+from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.indexers.code import build_code_index
 from toolkit.tools import TOOL_MAP
@@ -112,8 +112,7 @@ def main():
         backend.write("CODE_INDEX.manifest.json", ci.manifest_json)
 
         fmt = Format.load("default")
-        policy = Policy()
-        with Session(backend, fmt=fmt, tools=TOOL_MAP, policy=policy) as s:
+        with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
             print("== depth=1: run -> step ==")
             r = s.apply_patches([
                 {"action": "symbol_graph", "arguments": {"qualname": "run"}},

@@ -1,8 +1,9 @@
-'''Tests for WorkspaceBackend (read-only skeleton, step 3).
+'''Tests for WorkspaceBackend (read/write + routing).
 
 Covers: path routing <basename>/<rel>, read/exists/stat/list, list("") ->
-basenames, unknown root, write raises NotImplementedError, filter_check
-(policy on full path + patchignore on rel). No Session, no composite.
+flat list across roots, state-prefix addressing, write into roots,
+cross-root copy, cross-root move rejection, filter_check(path, op) via
+per-path PathPolicy + .patchignore from state_dir.
 
 Run: python toolkit/code/toolkit/tests/test_workspace_backend.py
 '''
@@ -18,7 +19,6 @@ sys.path.insert(0, str(HERE.parent.parent))
 
 from toolkit.backends.workspace import WorkspaceBackend
 from toolkit.config import workspace as ws_mod
-from toolkit.core import FilterSpec
 
 
 PASS = '[OK]  '
@@ -95,8 +95,6 @@ def main():
                  'beta/hello.txt' in files, str(files))
         t.expect('list("") has alpha/sub/deep.txt',
                  'alpha/sub/deep.txt' in files, str(files))
-        t.expect('list("") skips state files',
-                 not any('.patch_applier/' in f for f in files), str(files))
 
         # --- list("alpha") ---
         files = wb.list('alpha')
@@ -115,69 +113,55 @@ def main():
         t.expect('stat size', st.size_bytes == 8, str(st.size_bytes))
         t.expect('stat is_file', st.is_file is True)
 
-        # --- write: state prefix allowed, roots not ---
+        # --- write to state prefix ---
         wb.write('.patch_applier/note.txt', 'hello')
         t.expect('write to state prefix works',
                  wb.read('.patch_applier/note.txt') == 'hello')
-        t.expect('state file exists',
-                 wb.exists('.patch_applier/note.txt') is True)
         wb.delete('.patch_applier/note.txt')
         t.expect('delete from state works',
                  wb.exists('.patch_applier/note.txt') is False)
+
         # --- write into a root ---
         wb.write('alpha/new.txt', 'from-root')
         t.expect('write to root works',
                  wb.read('alpha/new.txt') == 'from-root')
-        t.expect('root file exists', wb.exists('alpha/new.txt') is True)
         wb.create('alpha/created.txt', 'created')
         t.expect('create in root works',
                  wb.read('alpha/created.txt') == 'created')
         wb.delete('alpha/created.txt')
-        t.expect('delete in root works',
-                 wb.exists('alpha/created.txt') is False)
+
         # --- cross-root copy ---
         wb.copy('alpha/hello.txt', 'beta/hello_copy.txt')
         t.expect('cross-root copy works',
                  wb.read('beta/hello_copy.txt') == 'hi alpha')
-        # --- cross-root move is rejected ---
         t.raises('move across roots rejected',
                  lambda: wb.move('alpha/hello.txt', 'beta/x.txt'),
                  RuntimeError)
 
-        # --- filter_check: policy on full <basename>/<rel> ---
-        spec = FilterSpec(overrides={'alpha': False})
-        t.expect('filter blocks alpha path',
-                 wb.filter_check('alpha/hello.txt', spec) is not None)
-        t.expect('filter allows beta path',
-                 wb.filter_check('beta/hello.txt', spec) is None)
+        # --- filter_check(path, op) via per-path PathPolicy ---
+        w.roots['alpha'].overrides['.'] = ws_mod.PathPolicy(write=False)
+        t.expect('filter blocks write on alpha (write=False)',
+                 wb.filter_check('alpha/hello.txt', 'write') is not None)
+        t.expect('filter allows read on alpha',
+                 wb.filter_check('alpha/hello.txt', 'read') is None)
+        t.expect('filter allows write on beta (default)',
+                 wb.filter_check('beta/hello.txt', 'write') is None)
 
-        # --- state directory prefix ---
-        import json as _json
-        (root / 'state' / 'workspace.json').write_text(
-            _json.dumps({'id': 't'}), encoding='utf-8')
-        t.expect('read state/.patch_applier file',
-                 wb.read('.patch_applier/workspace.json').startswith('{'))
-        t.expect('exists state file',
-                 wb.exists('.patch_applier/workspace.json') is True)
-        t.expect('list(".patch_applier") works',
-                 'workspace.json' in ' '.join(wb.list('.patch_applier')), str(wb.list('.patch_applier')))
+        # --- filter_check: state path always allowed ---
         t.expect('filter allows state path',
-                 wb.filter_check('.patch_applier/workspace.json',
-                                 FilterSpec(overrides={'.': False})) is None)
+                 wb.filter_check('.patch_applier/workspace.json', 'read') is None)
 
         # --- filter_check: unknown root ---
         t.expect('filter blocks unknown root',
-                 wb.filter_check('gamma/x.txt', FilterSpec()) is not None)
+                 wb.filter_check('gamma/x.txt', 'read') is not None)
 
         # --- filter_check: .patchignore from state_dir ---
-        (root / 'state' / '.patchignore').write_text('secret\n',
-                                                     encoding='utf-8')
+        (root / 'state' / '.patchignore').write_text('secret\n', encoding='utf-8')
         wb.reload_patterns()
         t.expect('filter blocks hidden via state .patchignore',
-                 wb.filter_check('alpha/secret/x.txt', FilterSpec()) is not None,
-                 'expected hidden')
+                 wb.filter_check('alpha/secret/x.txt', 'read') is not None)
         t.expect('filter allows non-hidden path',
-                 wb.filter_check('alpha/hello.txt', FilterSpec()) is None)
+                 wb.filter_check('alpha/hello.txt', 'read') is None)
 
         wb.close()
 

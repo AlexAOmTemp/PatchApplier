@@ -87,7 +87,7 @@ def _make_session():
         native_tools_allow=native.get("allow") or None,
     )
     backend = CompositeBackend([("fs", fs), ("mcp", mcp)])
-    return Session(backend, fmt=fmt, tools=TOOL_MAP, policy=None)
+    return Session(backend, fmt=fmt, tools=TOOL_MAP)
 
 
 def _skip(reason: str) -> int:

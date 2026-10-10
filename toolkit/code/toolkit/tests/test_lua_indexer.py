@@ -18,7 +18,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import Policy, Session
+from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.indexers.lua_runner import build_lua_index
 from toolkit.tools import TOOL_MAP
@@ -205,7 +205,7 @@ def main():
         fs_root.mkdir()
         fmt = Format.load("default")
         with Session(FilesystemBackend(fs_root), fmt=fmt,
-                     tools=TOOL_MAP, policy=Policy()) as s:
+                     tools=TOOL_MAP) as s:
             res = s.apply_patches([
                 {"action": "rebuild_lua_code_index", "arguments": {}}
             ])[0]
@@ -216,7 +216,7 @@ def main():
         print()
         print("== tool: rebuild_lua_code_index ok ==")
         be3 = FakeMCPBackend(_one_chunk([ITEM_MATH, ITEM_FORMULA]), root)
-        with Session(be3, fmt=fmt, tools=TOOL_MAP, policy=Policy()) as s:
+        with Session(be3, fmt=fmt, tools=TOOL_MAP) as s:
             res = s.apply_patches([
                 {"action": "rebuild_lua_code_index",
                  "arguments": {"output": "IDX.md"}}
@@ -232,7 +232,7 @@ def main():
 
         # Second rebuild -> [v2]
         be3._chunks = _one_chunk([ITEM_MATH])
-        with Session(be3, fmt=fmt, tools=TOOL_MAP, policy=Policy()) as s:
+        with Session(be3, fmt=fmt, tools=TOOL_MAP) as s:
             res2 = s.apply_patches([
                 {"action": "rebuild_lua_code_index",
                  "arguments": {"output": "IDX.md"}}

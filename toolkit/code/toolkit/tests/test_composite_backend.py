@@ -77,7 +77,7 @@ class FakeBackend:
     def move(self, src, dst):
         self._log("move", src, dst=dst)
 
-    def filter_check(self, path, spec):
+    def filter_check(self, path, op):
         self._log("filter", path)
         return None
 
@@ -158,12 +158,11 @@ def main():
 
     print()
     print("== filter delegates ==")
-    from toolkit.core import FilterSpec
     fs.calls.clear(); mcp.calls.clear()
-    comp.filter_check("toolkit/x.py", FilterSpec())
+    comp.filter_check("toolkit/x.py", "read")
     t.expect("filter fs path -> fs", any(c[0]=="filter" for c in fs.calls))
     fs.calls.clear(); mcp.calls.clear()
-    comp.filter_check("ReplicatedStorage.X", FilterSpec())
+    comp.filter_check("ReplicatedStorage.X", "read")
     t.expect("filter mcp path -> mcp", any(c[0]=="filter" for c in mcp.calls))
 
     print()

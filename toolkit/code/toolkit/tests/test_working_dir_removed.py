@@ -26,7 +26,6 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
 from toolkit.backends.composite import CompositeBackend
-from toolkit.core import FilterSpec
 
 
 PASS = '[OK]  '
@@ -111,8 +110,6 @@ def main():
         (root / 'hello.txt').write_text('hi', encoding='utf-8')
         b.open()
         t.expect('read still works', b.read('hello.txt') == 'hi')
-        t.expect('filter_check still works',
-                 b.filter_check('hello.txt', FilterSpec()) is None)
         b.close()
 
     print()

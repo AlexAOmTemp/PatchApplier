@@ -1,8 +1,8 @@
 '''Tests for config/workspace.py — the multi-root Workspace model.
 
 Covers: unique basename enforcement, nesting rejection, reserved-name
-collision, JSON round-trip, add_root validation, save/load. No Session,
-no backend — pure model + disk I/O.
+collision, JSON round-trip, add_root validation, save/load, per-path
+policy overrides. No Session, no backend — pure model + disk I/O.
 
 Run: python toolkit/code/toolkit/tests/test_workspace.py
 '''
@@ -73,11 +73,9 @@ def main():
         name = ws.add_root(w, str(root / 'src'))
         t.expect('add_root returns basename', name == 'src', name)
         t.expect('roots has src', 'src' in w.roots)
-        t.expect('policy default for src',
-                 w.policy['src'].read and w.policy['src'].write
-                 and w.policy['src'].index_docs
-                 and w.policy['src'].index_py
-                 and w.policy['src'].index_lua)
+        p = w.policy_for('src', '')
+        t.expect('default policy for src all-True',
+                 p.read and p.write and p.index_docs and p.index_py and p.index_lua)
 
         # --- basename collision ---
         ws.add_root(w, str(root / 'a' / 'toolkit'))
@@ -90,8 +88,6 @@ def main():
                  lambda: ws.add_root(w, str(root / 'src' / 'inner')))
 
         # --- reserved Roblox service ---
-        # Only fires if core.paths exposes ROBLOX_SERVICES. Probe for one
-        # of the common names, create a dir with that basename, try to add.
         probe_svc = None
         try:
             from toolkit.core.paths import ROBLOX_SERVICES
@@ -111,13 +107,24 @@ def main():
         # --- validate: name does not match basename ---
         bad = ws.Workspace(id='x', name='x')
         bad.roots['notmatching'] = ws.Root(path=str(root / 'src'))
-        bad.policy['notmatching'] = ws.RootPolicy()
         t.raises('key must match path basename',
                  lambda: ws.validate(bad))
 
+        # --- per-path policy in overrides ---
+        r_src = w.roots['src']
+        r_src.overrides['.'] = ws.PathPolicy(write=False, index_py=False)
+        r_src.overrides['docs/generated'] = ws.PathPolicy(read=False)
+        pol_root = w.policy_for('src', '')
+        pol_gen = w.policy_for('src', 'docs/generated/x.md')
+        pol_nested = w.policy_for('src', 'docs/generated')
+        t.expect('root default write=False', pol_root.write is False)
+        t.expect('root default read=True', pol_root.read is True)
+        t.expect('root default index_py=False', pol_root.index_py is False)
+        t.expect('override subpath read=False', pol_gen.read is False)
+        t.expect('override inherits to child', pol_nested.read is False)
+        t.expect('override child write from default', pol_gen.write is False)
+
         # --- round-trip ---
-        w.policy['src'].write = False
-        w.policy['src'].index_py = False
         w.format = {'preset': 'default'}
         w.mcp = {'native_tools': {'enabled': True}}
         as_dict = ws.to_dict(w)
@@ -126,22 +133,21 @@ def main():
         t.expect('round-trip name', w2.name == w.name)
         t.expect('round-trip roots',
                  set(w2.roots.keys()) == set(w.roots.keys()))
-        t.expect('round-trip policy flags',
-                 w2.policy['src'].write is False
-                 and w2.policy['src'].index_py is False
-                 and w2.policy['src'].read is True
-                 and w2.policy['src'].index_lua is True)
+        t.expect('round-trip override preserved',
+                 'docs/generated' in w2.roots['src'].overrides)
+        t.expect('round-trip default write=False',
+                 w2.policy_for('src', '').write is False)
         t.expect('round-trip format', w2.format == w.format)
         t.expect('round-trip mcp', w2.mcp == w.mcp)
 
-        # --- from_dict fills missing policy ---
+        # --- from_dict of bare root (no overrides) -> all-True ---
         partial = {
             'id': 'abc', 'name': 'p',
             'roots': {'src': {'path': str(root / 'src')}},
         }
         w3 = ws.from_dict(partial)
-        t.expect('from_dict fills missing policy',
-                 'src' in w3.policy and w3.policy['src'].read)
+        t.expect('from_dict empty overrides -> all True',
+                 w3.policy_for('src', '').read is True)
 
         # --- save / load to state dir ---
         state = root / 'state'
@@ -152,8 +158,8 @@ def main():
         w4 = ws.load(state)
         t.expect('load returns Workspace', w4 is not None)
         t.expect('loaded id matches', w4 is not None and w4.id == w.id)
-        t.expect('loaded policy write=False kept',
-                 w4 is not None and w4.policy['src'].write is False)
+        t.expect('loaded default write=False kept',
+                 w4 is not None and w4.policy_for('src', '').write is False)
 
         # --- load from empty dir ---
         empty = root / 'empty-state'
@@ -163,7 +169,6 @@ def main():
         # --- save refuses invalid workspace ---
         bad2 = ws.Workspace(id='y', name='y')
         bad2.roots['a'] = ws.Root(path=str(root / 'src'))
-        bad2.policy['a'] = ws.RootPolicy()
         ok = ws.save(bad2, state)
         t.expect('save invalid returns False', ok is False)
 

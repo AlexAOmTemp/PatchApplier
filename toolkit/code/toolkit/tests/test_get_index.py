@@ -14,7 +14,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import Policy, Session
+from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
 from toolkit.tools.index import GetIndexTool
@@ -41,7 +41,7 @@ class T:
 def _run(root: Path, patches: list[dict]):
     backend = FilesystemBackend(root)
     fmt = Format.load("default")
-    with Session(backend, fmt=fmt, tools=TOOL_MAP, policy=Policy()) as s:
+    with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
         return s.apply_patches(patches)
 
 

@@ -20,7 +20,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from toolkit.backends.composite import CompositeBackend
 from toolkit.backends.filesystem import FilesystemBackend
-from toolkit.core.models import Policy
 from toolkit.core.session import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -111,7 +110,7 @@ def main():
 
         # 3. FS op through Session works
         fmt = Format.load("default", None)
-        s = Session(cb, fmt=fmt, tools=TOOL_MAP, policy=Policy())
+        s = Session(cb, fmt=fmt, tools=TOOL_MAP)
         try:
             s.__enter__()
         except Exception as e:
