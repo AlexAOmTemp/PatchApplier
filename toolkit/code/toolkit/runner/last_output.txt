@@ -1,179 +1,61 @@
-[recon] ✓ create_file: Файл создан: toolkit/code/manual/_recon.py (47 стр., 1450 Б)
+[cleanup-script] ✓ create_file: Файл создан: toolkit/code/manual/_cleanup.py (31 стр., 913 Б)
 
-[run] ✓ run_python: exit=0  duration=34ms
+[do-cleanup] ✓ run_python: exit=0  duration=38ms
 --- stdout ---
-=== toolkit/.patch_applier.json ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier.json
-exists: True
-size: 1497
----
-{
-  "exec": {
-    "allow_module_mode": true,
-    "child_encoding": "utf-8",
-    "default_timeout": 60,
-    "enabled": true,
-    "env_deny_patterns": [
-      "*_TOKEN",
-      "*_KEY",
-      "*_SECRET",
-      "AWS_*",
-      "GITHUB_*"
-    ],
-    "env_passthrough": [
-      "PATH",
-      "SYSTEMROOT",
-      "COMSPEC",
-      "PATHEXT",
-      "TEMP",
-      "TMP",
-      "HOME",
-      "USERPROFILE",
-      "APPDATA",
-      "LOCALAPPDATA",
-      "PYTHONPATH",
-      "PYTHONIOENCODING",
-      "PYTHONUTF8",
-      "LANG",
-      "LC_ALL"
-    ],
-    "interpreter": null,
-    "max_output_bytes": 200000,
-    "max_timeout": 600
-  },
-  "format": {},
-  "format_preset": "default",
-  "mcp": {
-    "auto_switch": true,
-    "bridge_script": null,
-    "call_timeout": 180,
-    "command": "python -u",
-    "max_retries": 6,
-    "mcp_args": "/c cd /d %LOCALAPPDATA%\\Roblox && .\\mcp.bat",
-    "mcp_command": "cmd.exe",
-    "native_tools": {
-      "allow": [],
-      "enabled": true
-    },
-    "preflight": true,
-    "ready_timeout": 120,
-    "retry_delay": 1.0,
-    "studio_timeout": 60
-  },
-  "project_dir": "D:/Programs/UnityAiDevSystem/PatchAppliers/PatchApplier",
-  "recent_projects": [
-    "D:/Programs/UnityAiDevS
+root:  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier
+stale: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier  exists=True
+keep:  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\.patch_applier  exists=True
+  removing .index_meta.json
+  removing INDEX.md
+  removing INDEX.md.version
+removed D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier
+stale exists after: False
 
-=== toolkit/.patch_applier/ ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier
-exists: True
----
-  [F] .index_meta.json  (28853 B)
-  [F] INDEX.md  (16625 B)
-  [F] INDEX.md.version  (10 B)
+[dec-sum] ✓ set_annotation: toolkit/docs/DECISIONS.md: annotation обновлён
 
-=== toolkit/runtime/ ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\runtime
-exists: True
----
-  [D] logs  (0 B)
-  [D] state  (0 B)
+[wb5-doc] ✓ insert_at_anchor: после L126 в toolkit/docs/WORKSPACE_BACKEND.md — +2 стр., +673 Б
 
-=== toolkit/.patchignore ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patchignore
-exists: True
-size: 823
----
-# .patchignore — like .gitignore, but for the toolkit.
-#
-# Each line is a glob (*, ?, [seq]) matched against every directory
-# segment of a path. A path is hidden if any of its segments matches
-# a pattern. Prefix with ! to un-hide; the last matching pattern wins.
-#
-# Hidden paths are refused by the toolkit (read / write / index), and
-# not shown in the policy tree unless "show hidden" is on.
-#
-# To fully open a project, delete every non-comment line, or use
-# "Reset to default" / "Open all" in the toolkit settings dialog.
+[commit] ✓ run_python: exit=0  duration=192ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master e43d565] cleanup: remove stale toolkit/.patch_applier, doc state-write exception
+ 9 files changed, 315 insertions(+), 47 deletions(-)
+ create mode 100644 toolkit/code/manual/_cleanup.py
+ create mode 100644 toolkit/code/manual/_recon.py
 
-# Dot-directories: .git, .venv, .pytest_cache, ...
-.*
-# ...except this file itself, so it stays readable in the tree.
-# (`.patch_applier` is hardcoded as service and needs no entry here.)
-!.patchignore
-!.mcpignore
+[verify] ✓ get_status: ## Session
+project:  PatchApplier
+backend:  composite
+luau:     mcp
+format:   default
+exec:     enabled  (sys.executable)
+native:   enabled  ((no allowlist -> all))
 
-# Non-dot build noise.
-__pycache__
-node_modules
-venv
+## Indexes
+docs  .patch_applier/INDEX.md  [v320]  25.3 KB  20 files
+code  .patch_applier/CODE_INDEX.md  [v365]  121.3 KB  162 modules
+lua  .patch_applier/CODE_INDEX_LUA.md  [v200]  7.4 KB  22 modules
 
+## Policy Filesystem
+(root)   [RWI]
 
-=== .patchignore (root) ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\.patchignore
-exists: True
-size: 761
----
-# .patchignore — like .gitignore, but for the toolkit.
-#
-# Each line is a glob (*, ?, [seq]) matched against every directory
-# segment of a path. A path is hidden if any of its segments matches
-# a pattern. Prefix with ! to un-hide; the last matching pattern wins.
-#
-# Hidden paths are refused by the toolkit (read / write / index), and
-# not shown in the policy tree unless "show hidden" is on.
-#
-# To fully open a project, delete every non-comment line, or use
-# "Reset to default" / "Open all" in the toolkit settings dialog.
++ auto-closed: dotdirs, __pycache__, node_modules, .venv  (not shown)
+  to open a hidden path: set + on the dir itself or its named ancestor
+## MCP
+scope:    Roblox scene + Luau code
+access:   unrestricted (DataModel is not path-filtered)
+[timing] user (6 actions): 0.24s
 
-# Dot-directories: .git, .venv, .pytest_cache, ...
-.*
-# ...and this file itself, so it stays readable in the tree.
-!.patchignore
-!.mcpignore
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v321] [~2, ⇅6]
+  ~ toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L87, 4.2 KB) — Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта).
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L96–L131, 3.3 KB, ⚠ no summary)
 
-# Non-dot build noise.
-__pycache__
-node_modules
-venv
-_reference
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1121) [v366] [+1]
+  + toolkit/code/manual/_cleanup.py  (31 стр., 0.9 KB)
 
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v201] [без изменений]
+[timing] auto-rebuild (3 actions): 0.89s
 
-=== .patch_applier/ (root) ===
-path: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\.patch_applier
-exists: True
----
-  [F] .index_meta.json  (42305 B)
-  [F] .mcpignore  (705 B)
-  [D] .patch_applier  (0 B)
-  [F] .patchignore  (823 B)
-  [F] bridge_log.jsonl  (3960611 B)
-  [F] CODE_INDEX.manifest.json  (1072320 B)
-  [F] CODE_INDEX.md  (124053 B)
-  [F] CODE_INDEX.md.version  (12 B)
-  [F] CODE_INDEX_LUA.manifest.json  (13044 B)
-  [F] CODE_INDEX_LUA.md  (7564 B)
-  [F] CODE_INDEX_LUA.md.version  (12 B)
-  [F] config.json  (548 B)
-  [F] INDEX.md  (25926 B)
-  [F] INDEX.md.version  (12 B)
-  [F] outputs.json  (43429 B)
-  [F] patch.json  (16918 B)
-  [F] workspace.json  (374 B)
-
-=== summary ===
-repo root: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier
-  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\.patch_applier\workspace.json: True
-  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier\workspace.json: False
-[timing] user (2 actions): 0.04s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v320] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1121) [v365] [+1]
-  + toolkit/code/manual/_recon.py  (47 стр., 1.4 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v200] [без изменений]
-[timing] auto-rebuild (3 actions): 0.90s
-
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.93s
+##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.14s

@@ -1,6 +1,8 @@
-.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v320] [без изменений]
+.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v321] [~2, ⇅6]
+  ~ toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L87, 4.2 KB) — Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта).
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L96–L131, 3.3 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1121) [v365] [+1]
-  + toolkit/code/manual/_recon.py  (47 стр., 1.4 KB)
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1121) [v366] [+1]
+  + toolkit/code/manual/_cleanup.py  (31 стр., 0.9 KB)
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v200] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v201] [без изменений]

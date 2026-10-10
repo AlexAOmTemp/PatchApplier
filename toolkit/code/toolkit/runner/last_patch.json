@@ -1,23 +1,20 @@
-[{"id": "cleanup-script", "action": "create_file",
-  "arguments": {"file_path": "toolkit/code/manual/_cleanup.py",
-    "file_content": "\"\"\"One-shot cleanup: remove stale toolkit/.patch_applier/ directory.\n\nThat directory was the state location when `project_dir` was\nPatchApplier/toolkit/. Now `project_dir` is PatchApplier/ and state lives\nin PatchApplier/.patch_applier/. The old one contains only INDEX.md and\nits sidecar — leftover from a pre-workspace run. Safe to remove.\n\"\"\"\nfrom __future__ import annotations\n\nimport shutil\nfrom pathlib import Path\n\n\nROOT = Path(__file__).resolve().parents[3]\nSTALE = ROOT / \"toolkit\" / \".patch_applier\"\nKEEP = ROOT / \".patch_applier\"\n\n\nprint(f\"root:  {ROOT}\")\nprint(f\"stale: {STALE}  exists={STALE.exists()}\")\nprint(f\"keep:  {KEEP}  exists={KEEP.exists()}\")\n\nif STALE.exists() and STALE != KEEP:\n    for f in STALE.iterdir():\n        print(f\"  removing {f.name}\")\n    shutil.rmtree(STALE)\n    print(f\"removed {STALE}\")\nelse:\n    print(\"nothing to remove\")\n\nprint(f\"stale exists after: {STALE.exists()}\")\n"}}]
+[{"id": "probe", "action": "create_file",
+  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt",
+                "file_content": "probe\n"}}]
 
-[{"id": "do-cleanup", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_cleanup.py"}}]
+[{"id": "probe-read", "action": "read_file",
+  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt",
+                "escape": "none", "numbered": false}}]
 
-[{"id": "dec-sum", "action": "set_annotation",
+[{"id": "probe-del", "action": "delete_file",
+  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt"}}]
+
+[{"id": "dec-fix", "action": "insert_at_anchor",
   "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
-                "address": {"section_number": "2.5"},
-                "text": "Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта)."}}]
-
-[{"id": "wb5-doc", "action": "insert_at_anchor",
-  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
-    "anchor": "**State-каталог — захардкоженная политика.**",
-    "position": "after",
-    "new_content": "\n\n**Write в state-префикс — всегда разрешён.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня только если путь под `<basename>/`. Путь под `.patch_applier/` (state-префикс) идёт в отдельный FS-бэкенд state и разрешён всегда — это нужно индексным тулам (`rebuild_index`, `rebuild_code_index`), которые пишут свои артефакты в state. Cross-root `move` запрещён (`RuntimeError`), cross-root `copy` разрешён (обе стороны локальные). См. `DECISIONS.md §2.5`."}}]
+    "anchor": "**Обратной совместимости нет.**",
+    "position": "before",
+    "new_content": "**Workspace refactor — модель.** Multi-root workspace вместо однокорневого проекта. `project_dir` = папка проекта, `state_dir` = `<project>/.patch_applier/` сбоку, `roots` в `workspace.json` — набор FS-каталогов с уникальными basename'ами. Адресация путей `<basename>/<rel>`, state-префикс `.patch_applier/<rel>`. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`. История: `§2.5`.\n\n**Workspace refactor — реализация (шаги 1–4, 6).** `config/workspace.py` (модель + JSON + валидация, 23/23), `backends/workspace.py` (`WorkspaceBackend` — routing, read/write в корни, state-префикс, `list_roots()`, `list(\"\")` = плоский список файлов с префиксами, 35/35), интеграция в CLI `_create_backend` + GUI `_build_backend_for_config`, `workspace.json` создаётся вручную. `working_dir` удалён из `FilesystemBackend` (приватный `_root`). «Один write-корень» отменён — пишут все корни с `write=true`.\n\n**Workspace refactor — что открыто.** Шаг 5 (multi-root индексаторы — формально покрыт тестом `test_workspace_backend` с двумя корнями; реальный multi-root проект не заводили). Шаг 7 (GUI-диалог создания/открытия проекта — сейчас GUI требует существующий `workspace.json`). См. `§2.5`.\n\n"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "cleanup: remove stale toolkit/.patch_applier, doc state-write exception"]}}]
-
-[{"id": "verify", "action": "get_status", "arguments": {}}]
+                "args": ["commit", "session end: workspace refactor steps 1-4+6 done, DECISIONS recorded"]}}]
