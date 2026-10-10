@@ -1,52 +1,52 @@
-[sw-mod] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/gui/settings_window.py (181 стр., 5884 Б)
+[tv] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/tree_view.py (+23 стр., +950 Б)
 
-[app-shim] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+[sw] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/settings_window.py (+30 стр., +1027 Б)
 
-[smoke-gui] ✓ run_python: exit=0  duration=181ms
+[smoke-gui] ✓ run_python: exit=0  duration=175ms
 --- stdout ---
 [OK]   toolkit.runner.gui.app imported
 [OK]   all expected attributes present
 === gui smoke OK ===
 
-[smoke] ✓ run_python: exit=0  duration=81ms
+[test-tv] ✓ run_python: exit=0  duration=207ms
 --- stdout ---
-[OK]   toolkit.core
-[OK]   toolkit.core.models
-[OK]   toolkit.core.patcher
-[OK]   toolkit.core.session
-[OK]   toolkit.config
-[OK]   toolkit.config.workspace
-[OK]   toolkit.backends
-[OK]   toolkit.backends.filesystem
-[OK]   toolkit.backends.workspace
-[OK]   toolkit.backends.composite
-[OK]   toolkit.backends.mcp
-[OK]   toolkit.indexers
-[OK]   toolkit.indexers.doc
-[OK]   toolkit.indexers.code
-[OK]   toolkit.tools
-[OK]   toolkit.tools.index
-[OK]   toolkit.tools.status
-[OK]   toolkit.runner.projects
+[OK]   render ok (hidden filtered)
+[OK]   overrides starts empty
+[OK]   override created for code
+[OK]   read inverted from effective (True -> False)
+[OK]   other flags stayed at effective (write=True)
+[OK]   read flipped back to True
+[OK]   write now False
+[OK]   read unaffected
+[OK]   nested override created
+[OK]   nested index_py inverted (True -> False)
+[OK]   render with show_hidden ok
 
-=== all imports OK ===
+=== 11 ok, 0 failed ===
 
 [commit] ✓ run_python: exit=0  duration=165ms
 --- stdout ---
 [add rc=0]
 [commit rc=0]
-[master a886c42] settings_window module with per-root tabs
- 6 files changed, 356 insertions(+), 388 deletions(-)
- create mode 100644 toolkit/code/toolkit/runner/gui/settings_window.py
-[timing] user (5 actions): 0.46s
+[master 26b3e95] settings window: tree glyphs, legend, virtual root, copy name
+ 6 files changed, 167 insertions(+), 210 deletions(-)
+[timing] user (5 actions): 0.56s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v369] [без изменений]
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v373] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1123) [v415] [+1]
-  + toolkit/code/toolkit/runner/gui/settings_window.py  (181 стр., 5.7 KB)
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1125) [v419] [~2, ⇅15]
+  ~ toolkit/code/toolkit/runner/gui/settings_window.py  (+30 стр., +1.0 KB)
+  ~ toolkit/code/toolkit/runner/gui/tree_view.py  (+23 стр., +0.9 KB)
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: _make_copyable_entry  [function]  L45–L56
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: _make_copyable_entry._show  [function]  L51–L55
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L35–L181 → L59–L211
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree  [class]  L46–L191 → L57–L214
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.__init__  [method]  L49–L75 → L60–L86
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.render  [method]  L79–L92 → L90–L105
+      ~ ... и ещё 3
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v244] [без изменений]
-[timing] auto-rebuild (3 actions): 0.85s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v248] [без изменений]
+[timing] auto-rebuild (3 actions): 0.82s
 
 ##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.31s
+[timing] total: 1.37s

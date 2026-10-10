@@ -16,11 +16,17 @@ Click semantics (see docs/GUI_PROJECT_SETTINGS.md section 2.2):
 Returning a cell to dot (removing the whole override) is a separate
 Ctrl+click gesture - not implemented in this pass.
 
+Hidden rows. A directory matched by `.patchignore` is a hard deny: all
+five flags show a fixed minus and do not respond to clicks. The same
+rule was in the old settings dialog (hidden = R-.W-.I-); we restore it.
+An override on a hidden path (if one exists from before the pattern was
+added) is ignored while the row is hidden - the file is closed anyway.
+
 The topmost row is the virtual root, keyed "." in overrides. It holds
 the default policy for the whole root; children inherit from it.
 
-Directory rows use tree connectors (├── └── │) so nesting is visible
-without counting indents.
+Directory rows use tree connectors (TEE, ELBOW, PIPE) so nesting is
+visible without counting indents.
 """
 from __future__ import annotations
 
@@ -46,8 +52,6 @@ _ROOT_FG = "#404040"
 _STATE_GLYPH = {None: "\u00b7", True: "+", False: "\u2212"}
 _STATE_FG = {None: "#888888", True: "#307030", False: "#c03030"}
 
-# Tree drawing pieces. For each child: connector (├── / └──),
-# and continuation for descendants (│   or four spaces).
 _TEE = "\u251c\u2500\u2500 "
 _ELBOW = "\u2514\u2500\u2500 "
 _PIPE = "\u2502   "
@@ -62,6 +66,7 @@ class PolicyTree(tk.Frame):
         self._root = root
         self._overrides = root.overrides  # mutate in place, same object
         self._row_widgets: dict[str, dict] = {}
+        self._hidden_paths: set[str] = set()
         self._root_label = Path(root.path).name or "[root]"
 
         self._container = tk.Frame(self, bd=1, relief="sunken")
@@ -93,13 +98,13 @@ class PolicyTree(tk.Frame):
         for w in self._inner.winfo_children():
             w.destroy()
         self._row_widgets.clear()
+        self._hidden_paths = {p for p, h in paths if h}
 
         tree = build_tree(paths)
         if not show_hidden:
             tree = filter_hidden(tree)
 
         self._make_header_row()
-        # Virtual root row: the whole root's default policy.
         self._make_row(".", display_text=f"[{self._root_label}]",
                        hidden=False, root_row=True)
         self._render_children(tree, prefix="", path_prefix="")
@@ -128,16 +133,13 @@ class PolicyTree(tk.Frame):
 
     def _render_children(self, nodes: list[dict],
                          prefix: str, path_prefix: str) -> None:
-        """prefix: visible tree glyphs for this level.
-
-        path_prefix: the logical rel-path prefix, joined with '/'.
-        """
         last = len(nodes) - 1
         for i, node in enumerate(nodes):
             is_last = (i == last)
             connector = _ELBOW if is_last else _TEE
             display = prefix + connector + node["name"]
-            path = f"{path_prefix}/{node['name']}" if path_prefix else node["name"]
+            path = (f"{path_prefix}/{node['name']}"
+                    if path_prefix else node["name"])
             self._make_row(path, display_text=display,
                            hidden=bool(node.get("hidden")))
             if node.get("children"):
@@ -187,6 +189,12 @@ class PolicyTree(tk.Frame):
     # --- state --------------------------------------------------------
 
     def _flag_state(self, rel_path: str, flag_key: str) -> bool | None:
+        # Hidden = hard deny: `.patchignore` closes all five flags. The
+        # same rule applied in the pre-workspace settings dialog. An
+        # override carried over from before the pattern was added does
+        # not open the row; the file is closed anyway.
+        if rel_path in self._hidden_paths:
+            return False
         pol = self._overrides.get(rel_path)
         if pol is None:
             return None
@@ -201,14 +209,14 @@ class PolicyTree(tk.Frame):
         return handler
 
     def _cycle(self, rel_path: str, flag_key: str) -> None:
+        if rel_path in self._hidden_paths:
+            return
         cur = self._overrides.get(rel_path)
         if cur is None:
-            # dot -> create override: start from effective, invert clicked flag
             eff = self._effective(rel_path)
             new = eff.copy()
             setattr(new, flag_key, not bool(getattr(eff, flag_key)))
             self._overrides[rel_path] = new
         else:
-            # + <-> - : flip only this flag
             setattr(cur, flag_key, not bool(getattr(cur, flag_key)))
         self._refresh_row(rel_path)

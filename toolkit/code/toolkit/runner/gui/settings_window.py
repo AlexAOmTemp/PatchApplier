@@ -1,11 +1,10 @@
 """Project settings window: name, root tabs, per-path policy.
 
 Opened from File -> Project settings. Edits an in-memory Workspace and
-writes on OK; Cancel discards. Replaces the placeholder dialog and the
-old `open_settings_dialog` (removed earlier).
+writes on OK; Cancel discards.
 
 Currently here:
-  - project name (Entry, right-click to copy)
+  - project name (Entry, right-click or Ctrl+C to copy)
   - one tab per root, each with a PolicyTree
   - Add root / Remove root
   - Show hidden toggle
@@ -43,7 +42,15 @@ _LEGEND = (
 
 
 def _make_copyable_entry(entry: tk.Entry) -> None:
-    """Right-click menu on an Entry: copy the current value."""
+    """Right-click menu + layout-independent Ctrl+C / Ctrl+A on an Entry.
+
+    Tk binds <<Copy>> to the keysym 'c' (Latin). On a Russian keyboard
+    layout the physical C key produces Cyrillic 'с' (keysym
+    Cyrillic_es), so the default binding does not fire. We add an
+    explicit handler on Control-KeyPress keyed on the physical keycode
+    (which is layout-independent on Windows) and generate the virtual
+    <<Copy>> event ourselves. Same for Ctrl+A / select-all.
+    """
     menu = tk.Menu(entry, tearoff=0)
     menu.add_command(label="\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c",
                      command=lambda: pyperclip.copy(entry.get()))
@@ -54,6 +61,28 @@ def _make_copyable_entry(entry: tk.Entry) -> None:
         finally:
             menu.grab_release()
     entry.bind("<Button-3>", _show)
+
+    _COPY_KEYCODES = {67}    # physical C on Windows
+    _SELECT_ALL_KEYCODES = {65}   # physical A on Windows
+    _COPY_KEYSYMS = {"c", "cyrillic_es"}
+    _SELECT_ALL_KEYSYMS = {"a", "cyrillic_ef"}
+
+    def _ctrl(event):
+        kc = getattr(event, "keycode", None)
+        ks = (event.keysym or "").lower()
+        if kc in _COPY_KEYCODES or ks in _COPY_KEYSYMS:
+            try:
+                entry.event_generate("<<Copy>>")
+            except Exception:
+                pyperclip.copy(entry.get())
+            return "break"
+        if kc in _SELECT_ALL_KEYCODES or ks in _SELECT_ALL_KEYSYMS:
+            entry.select_range(0, "end")
+            entry.icursor("end")
+            return "break"
+        return None
+
+    entry.bind("<Control-KeyPress>", _ctrl, add="+")
 
 
 def open_project_settings(parent, project_dir: Path,
@@ -72,8 +101,8 @@ def open_project_settings(parent, project_dir: Path,
     dlg.title("Project settings")
     dlg.transient(parent)
     dlg.grab_set()
-    dlg.geometry("880x620")
-    dlg.minsize(740, 520)
+    dlg.geometry("700x560")
+    dlg.minsize(600, 460)
 
     main = tk.Frame(dlg, padx=12, pady=12)
     main.pack(fill="both", expand=True)

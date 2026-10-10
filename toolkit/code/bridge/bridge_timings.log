@@ -4092,3 +4092,14 @@
 2026-10-10T23:11:26.087298  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.002s
 2026-10-10T23:11:27.274557  [bridge.timing] calls=1 preflight=0.021s call_min=0.065s call_max=0.065s call_sum=0.065s total=0.087s
 2026-10-10T23:11:27.426308  [bridge.timing] calls=1 preflight=0.000s call_min=0.059s call_max=0.059s call_sum=0.059s total=0.060s
+2026-10-10T23:13:24.138833  [bridge.timing] calls=1 preflight=0.000s call_min=0.067s call_max=0.067s call_sum=0.067s total=0.068s
+2026-10-10T23:13:33.326417  [bridge.timing] calls=1 preflight=0.002s call_min=0.001s call_max=0.001s call_sum=0.001s total=0.003s
+2026-10-10T23:13:34.426593  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.001s
+2026-10-10T23:13:35.528166  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.002s
+2026-10-10T23:13:36.720982  [bridge.timing] calls=1 preflight=0.026s call_min=0.066s call_max=0.066s call_sum=0.066s total=0.092s
+2026-10-10T23:13:36.855444  [bridge.timing] calls=1 preflight=0.000s call_min=0.058s call_max=0.058s call_sum=0.058s total=0.059s
+2026-10-10T23:17:42.744383  [bridge.timing] calls=1 preflight=0.001s call_min=0.001s call_max=0.001s call_sum=0.001s total=0.002s
+2026-10-10T23:17:43.844905  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.001s
+2026-10-10T23:17:44.946094  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.001s
+2026-10-10T23:17:46.147661  [bridge.timing] calls=1 preflight=0.035s call_min=0.065s call_max=0.065s call_sum=0.065s total=0.101s
+2026-10-10T23:17:46.332978  [bridge.timing] calls=1 preflight=0.000s call_min=0.070s call_max=0.070s call_sum=0.070s total=0.071s
