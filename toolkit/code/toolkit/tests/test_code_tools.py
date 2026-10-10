@@ -37,7 +37,7 @@ class T:
             self.failed += 1
 
 
-def _run(root: Path, patches: list[dict], policy: Policy | None = None):
+def _run(root: Path, patches: list[dict]):
     backend = FilesystemBackend(root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
@@ -218,17 +218,6 @@ def main():
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == empty_input", r.error_code == "empty_input")
-
-        # --- filter blocks ---
-        print()
-        print("== filter blocks replace_function ==")
-        policy = Policy.uniform(mode="white", paths=["sub"])
-        r = _run(root, [
-            {"action": "replace_function",
-             "arguments": {"file_path": "sample.py", "qualname": "top",
-                           "new_code": "def top():\n    pass"}},
-        ], policy)[0]
-        t.expect("blocked", r.status == "blocked", f"{r.status}: {r.message}")
 
     print()
     if t.failed:

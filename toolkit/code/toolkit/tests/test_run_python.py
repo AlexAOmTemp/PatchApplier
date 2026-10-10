@@ -37,7 +37,7 @@ class T:
             self.failed += 1
 
 
-def _run(root: Path, patches: list[dict], policy: Policy | None = None):
+def _run(root: Path, patches: list[dict]):
     backend = FilesystemBackend(root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:

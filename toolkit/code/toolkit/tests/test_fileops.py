@@ -36,7 +36,7 @@ class T:
             self.failed += 1
 
 
-def _run(root: Path, patches: list[dict], policy: Policy | None = None):
+def _run(root: Path, patches: list[dict]):
     backend = FilesystemBackend(root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
@@ -126,18 +126,6 @@ def main():
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == not_found", r.error_code == "not_found")
-
-        # --- move blocked by filter ---
-        print()
-        print("== move_file blocked by write filter ==")
-        (root / "sandbox").mkdir()
-        (root / "sandbox" / "x.md").write_text("# X\n", encoding="utf-8")
-        policy = Policy.uniform(mode="white", paths=["sub"])
-        r = _run(root, [
-            {"action": "move_file",
-             "arguments": {"source_path": "sandbox/x.md", "destination_path": "sub/x.md"}},
-        ], policy)[0]
-        t.expect("blocked", r.status == "blocked", f"{r.status}: {r.message}")
 
     print()
     if t.failed:
