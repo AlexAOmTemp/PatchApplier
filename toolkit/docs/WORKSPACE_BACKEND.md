@@ -221,18 +221,18 @@ CompositeBackend
 
 Работа не «в одном патче» — по одному модулю, с прогоном тестов между шагами.
 ## 11. Порядок работы
-1. **Дизайн.** — Готово (`WORKSPACE.md`, `WORKSPACE_BACKEND.md`).
+1. **Дизайн.** ✅ **Готово** (`WORKSPACE.md`, `WORKSPACE_BACKEND.md`).
 
 2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → приватный `_root`. `CompositeBackend.working_dir` — chain `_root → working_dir → None`. `RebuildLuaCodeIndexTool` — через chain. Тест `test_working_dir_removed.py` (9/9).
 
-3. **`WorkspaceBackend` read-only.** ✅ **Готово.** `open/close/is_alive/read/exists/stat/list/filter_check`, routing `<basename>/<rel>`, `list("")` → basenames. Тест `test_workspace_backend.py` (22/22). В рантайм не подключён.
+3. **`WorkspaceBackend` read-only.** ✅ **Готово.** `open/close/is_alive/read/exists/stat/list/filter_check`, routing `<basename>/<rel>`, `list("")` → плоский список файлов с префиксами, `list_roots()` → basenames, state-префикс `.patch_applier/`. Тест `test_workspace_backend.py` (29/29).
 
-4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` как единственного FS-бэкенда. **Однокорневая модель удаляется целиком:** поля `project_dir` и `recent_projects` из tool-wide config, `resolve_state_dir` / `STATE_DIR` из `config/loader.py`, fallback на `FilesystemBackend(project_dir)` при отсутствии `workspace.json`. Загрузка проекта — по пути из `recent.json`.
+4. **Интеграция в `CompositeBackend`.** ✅ **Готово.** CLI `_create_backend` + GUI `_build_backend_for_config` строят `WorkspaceBackend` из `workspace.json`. `config.loader.load_workspace(cfg)`. Никакого fallback на старую модель. GUI File menu (New/Open/Recent/Project settings) работает.
 
-5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.
+5. **Индексаторы под multi-root.** ⚠️ **Формально работает.** `rebuild_*` ходят по `list("")`, который возвращает плоский список с префиксами `<basename>/<rel>`. На одном корне проверено. На двух — только `test_workspace_backend.py`, живого проекта не заводили.
 
-6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`. Все write-методы `WorkspaceBackend` включаются.
+6. **Write (шаг 4 из WORKSPACE.md).** ✅ **Готово.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня. Кросс-root `move` запрещён (`RuntimeError`), кросс-root `copy` разрешён через `FilesystemBackend.copy_to`. State-префикс — всегда RW.
 
-7. **GUI (шаг 5 из WORKSPACE.md).** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`.
+7. **GUI (шаг 5 из WORKSPACE.md).** ⚠️ **Частично.** File menu + Project settings (roots, флаги, add/remove, rename) — **готово**. Дерево файлов по корням (7.3) — **открыто**. Редактор per-path overrides — **открыто**.
 
-Каждый шаг самодостаточен, откатывается.
+Плюс отдельно: **P1-фиксы тулов** (`insert_at_anchor` + `\n`, `replace_between` EOL-нормализация) — открыты, см. `TOOL_PRACTICE.md §8`.

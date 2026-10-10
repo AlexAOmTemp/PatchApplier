@@ -1,96 +1,87 @@
-[pre-commit] ✓ run_python: exit=0  duration=156ms
+[dec] ✓ read_file: toolkit/docs/DECISIONS.md L61–L90
+61: '### Workspace refactor\r\n'
+62: '\r\n'
+63: '<!-- summary: Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта). -->\r\n'
+64: '**Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.\r\n'
+65: '\r\n'
+66: '**Сделано (шаги 1–4 + 6):**\r\n'
+67: '\r\n'
+68: '- **Шаг 1 — дизайн.** `WORKSPACE.md` + `WORKSPACE_BACKEND.md`. Все открытые вопросы закрыты.\r\n'
+69: '- **Шаг 2 — `config/workspace.py`.** `Workspace` + `Root` + `RootPolicy` + JSON round-trip + валидация. Тест `test_workspace.py` (23/23).\r\n'
+70: '- **Шаг 2.5 — `working_dir` refactor.** Публичный `FilesystemBackend.working_dir` → `_root`. `CompositeBackend.working_dir` — property через chain. Тест `test_working_dir_removed.py` (9/9). Урок: `getattr(obj, name, default)` не спасает, когда атрибут **есть**, но вернул None — нужен chain через `or`.\r\n'
+71: '- **Шаг 3 — `backends/workspace.py`.** `WorkspaceBackend` с routing `<basename>/<rel>`, `list_roots()`, `filter_check` (policy на полном пути + `.patchignore` из `state_dir`), state-префикс `.patch_applier/` для state-файлов. Тест `test_workspace_backend.py` (33/33).\r\n'
+72: '- **Шаг 4 — интеграция.** CLI `_create_backend` + GUI `_build_backend_for_config` строят `WorkspaceBackend` из `workspace.json`. `config.loader.load_workspace(cfg)`. Ошибка, если `workspace.json` нет — никакого fallback на старую модель.\r\n'
+73: '- **Шаг 6 (частично) — write в корни.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня. `move/copy` — кросс-корень запрещён для move, разрешён для copy (через `FilesystemBackend.copy_to`). State-префикс — всегда RW. Policy-проверка — на `Patcher` через `filter_check`, не в backend.\r\n'
+74: '\r\n'
+75: '**Ключевые решения сессии:**\r\n'
+76: '\r\n'
+77: '- **`list("")`** — все файлы всех корней с префиксами `<basename>/<rel>`. Это контракт для индексаторов. `list_roots()` — basenames. State внутри корня исключается через `_state_rel_for`.\r\n'
+78: '- **State-префикс `.patch_applier/`** — адресуется наравне с корнями. В фильтре всегда OK (захардкоженная политика). В `list("")` не попадает.\r\n'
+79: '- **Никаких external/embedded.** Один алгоритм: пользователь выбирает папку проекта, туда кладётся `workspace.json`, `.patchignore`, `.mcpignore`, индексы, `runtime/`. `recent.json` — единственное место про «последнее».\r\n'
+80: '\r\n'
+81: '**Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.\r\n'
+82: '\r\n'
+83: '**Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.\r\n'
+84: '\r\n'
+85: '**Открыто:**\r\n'
+86: '\r\n'
+87: '- **Шаг 5 — индексаторы под multi-root.** Формально уже работают через `list("")`, но это one-root → many. Мёрдж нескольких корней и `router.py` — не проверены.\r\n'
+88: '- **Шаг 7 — GUI.** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`. Сейчас GUI требует существующий `workspace.json`.\r\n'
+89: "- **Root внутри state.** Сейчас `state_dir` (`.patch_applier/`) физически внутри корня `toolkit/`. Работает через `_state_rel_for`, но некрасиво. Возможно, стоит переопределить root'ы (`toolkit/code/`, `toolkit/docs/`) или перенести state наружу.\r\n"
+90: '## 2. Открыто\r\n'
+
+[log] ✓ run_python: exit=0  duration=62ms
 --- stdout ---
-[add rc=0]
-[commit rc=0]
-[master ed6e2e2] pre-model: 5-flag per-path policy refactor
- 4 files changed, 461 insertions(+), 317 deletions(-)
+9683bc9 docs: session tool-practice notes (TOOL_PRACTICE.md)
+31f8d07 B1b-6: restore FS filter_check no-op (anchor miss)
+c107c8e B1b-5: restore FS filter_check no-op, drop stale policy tests
+0cbca7c B1b-4: restore classmethod, fix policy-override semantics in tests
+046ed81 B1b-3: tests migrated to 5-flag model, policy tests removed
+57f32b9 B2: runner/cli + gui/app cleaned of Policy/policy_io
+1a567db B1b-1: indexers + tools + status under 5-flag model
+4ef6c41 B1a: cut FilterSpec/Policy, 5-flag filter_check(path, op)
+ed6e2e2 pre-model: 5-flag per-path policy refactor
+afcb02b step 7.2: project settings dialog (roots add/remove/toggle, rename)
+e095b6e step 7.1 refactor: move project logic to runner/projects.py
+4662925 step 7.1: File menu with New/Open/Recent project, recent.json
+83d5ecf final: gitignore state, rename DECISIONS section, doc git hygiene
+e1cbe1e session end: workspace refactor steps 1-4+6 done, DECISIONS recorded
+e43d565 cleanup: remove stale toolkit/.patch_applier, doc state-write exception
+6d1c61f step 6 partial: write into workspace roots, cross-root copy
+17337f5 step 4 complete: WorkspaceBackend wired + list("") fixed
+014ba10 step 4: WorkspaceBackend wired into CLI+GUI, workspace.json created
+bb7f2bf docs: single project folder model, no external/embedded
+6f09f07 step 3 complete: WorkspaceBackend read-only + working_dir refactor
+032411a after working_dir refactor
+ab09954 before refactor
+f64221b first commit
 
-[ws-rewrite] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/config/workspace.py (+23 стр., +762 Б)
 
-[wsb-filter] ✓ read_file: toolkit/code/toolkit/backends/workspace.py L220–L280
-220: '        .version files — and is hardcoded RW in the old model too\n'
-221: '        (see WORKSPACE_BACKEND.md §5).\n'
-222: '        """\n'
-223: '        name, rel = self._split(path)\n'
-224: '        if name != patchignore.STATE_DIR:\n'
-225: '            return None\n'
-226: '        if self._state_fs is None:\n'
-227: '            raise FileNotFoundError("state backend not open")\n'
-228: '        return self._state_fs, rel\n'
+[wb11] ✓ read_file: toolkit/docs/WORKSPACE_BACKEND.md [## 11. Порядок работы]
+223: '## 11. Порядок работы\n'
+224: '1. **Дизайн.** — Готово (`WORKSPACE.md`, `WORKSPACE_BACKEND.md`).\n'
+225: '\n'
+226: '2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → приватный `_root`. `CompositeBackend.working_dir` — chain `_root → working_dir → None`. `RebuildLuaCodeIndexTool` — через chain. Тест `test_working_dir_removed.py` (9/9).\n'
+227: '\n'
+228: '3. **`WorkspaceBackend` read-only.** ✅ **Готово.** `open/close/is_alive/read/exists/stat/list/filter_check`, routing `<basename>/<rel>`, `list("")` → basenames. Тест `test_workspace_backend.py` (22/22). В рантайм не подключён.\n'
 229: '\n'
-230: '\n'
-231: '    # --- write (enabled in step 6) -----------------------------------------\n'
-232: '\n'
-233: '    def write(self, path: str, content: str) -> None:\n'
-234: '        target = self._state_write_target(path)\n'
-235: '        if target is not None:\n'
-236: '            fb, rel = target\n'
-237: '            fb.write(rel, content)\n'
-238: '            return\n'
-239: '        _, rel, fb = self._resolve_root(path)\n'
-240: '        fb.write(rel, content)\n'
-241: '\n'
-242: '    def create(self, path: str, content: str,\n'
-243: '               class_name: str = "ModuleScript") -> None:\n'
-244: '        target = self._state_write_target(path)\n'
-245: '        if target is not None:\n'
-246: '            fb, rel = target\n'
-247: '            fb.write(rel, content)\n'
-248: '            return\n'
-249: '        _, rel, fb = self._resolve_root(path)\n'
-250: '        fb.write(rel, content)\n'
-251: '\n'
-252: '    def delete(self, path: str) -> None:\n'
-253: '        target = self._state_write_target(path)\n'
-254: '        if target is not None:\n'
-255: '            fb, rel = target\n'
-256: '            fb.delete(rel)\n'
-257: '            return\n'
-258: '        _, rel, fb = self._resolve_root(path)\n'
-259: '        fb.delete(rel)\n'
-260: '\n'
-261: '    def move(self, src: str, dst: str) -> None:\n'
-262: '        s_name, s_rel = self._split(src)\n'
-263: '        d_name, d_rel = self._split(dst)\n'
-264: '        # Both ends must be in the same logical storage: state or the same root.\n'
-265: '        if s_name == patchignore.STATE_DIR or d_name == patchignore.STATE_DIR:\n'
-266: '            if s_name != d_name:\n'
-267: '                raise RuntimeError(\n'
-268: '                    f"move across state/root ({s_name} -> {d_name}) is not supported"\n'
-269: '                )\n'
-270: '            if self._state_fs is None:\n'
-271: '                raise FileNotFoundError("state backend not open")\n'
-272: '            self._state_fs.move(s_rel, d_rel)\n'
-273: '            return\n'
-274: '        if s_name != d_name:\n'
-275: '            raise RuntimeError(\n'
-276: '                f"move across roots ({s_name} -> {d_name}) is not supported"\n'
-277: '            )\n'
-278: '        _, _, fb = self._resolve_root(src)\n'
-279: '        fb.move(s_rel, d_rel)\n'
-280: '\n'
+230: '4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` как единственного FS-бэкенда. **Однокорневая модель удаляется целиком:** поля `project_dir` и `recent_projects` из tool-wide config, `resolve_state_dir` / `STATE_DIR` из `config/loader.py`, fallback на `FilesystemBackend(project_dir)` при отсутствии `workspace.json`. Загрузка проекта — по пути из `recent.json`.\n'
+231: '\n'
+232: '5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.\n'
+233: '\n'
+234: '6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`. Все write-методы `WorkspaceBackend` включаются.\n'
+235: '\n'
+236: '7. **GUI (шаг 5 из WORKSPACE.md).** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`.\n'
+237: '\n'
+238: 'Каждый шаг самодостаточен, откатывается.\n'
+[timing] user (3 actions): 0.07s
 
-[rb] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 165, символов: 1152) [v376] [~1, ⇅7]
-  ~ toolkit/code/toolkit/config/workspace.py  (+23 стр., +0.8 KB)
-      + toolkit/code/toolkit/config/workspace.py :: PathPolicy  [class]  L51–L71
-      + toolkit/code/toolkit/config/workspace.py :: PathPolicy.to_dict  [method]  L61–L62
-      + toolkit/code/toolkit/config/workspace.py :: PathPolicy.from_dict  [method]  L64–L68
-      + ... и ещё 3
-      - toolkit/code/toolkit/config/workspace.py :: RootPolicy  [class]  L59–L66
-      - toolkit/code/toolkit/config/workspace.py :: _policy_to_dict  [function]  L209–L216
-      - toolkit/code/toolkit/config/workspace.py :: _policy_from_dict  [function]  L219–L226
-      ~ toolkit/code/toolkit/config/workspace.py :: Root  [class]  L47–L56 → L74–L108
-      ~ toolkit/code/toolkit/config/workspace.py :: Workspace  [class]  L69–L81 → L111–L129
-      ~ toolkit/code/toolkit/config/workspace.py :: _is_nested  [function]  L95–L108 → L143–L152
-      ~ ... и ещё 6
-[timing] user (4 actions): 0.93s
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 21, без summary: 147) [v347] [без изменений]
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v331] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1089) [v396] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 165, символов: 1152) [v377] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v226] [без изменений]
+[timing] auto-rebuild (3 actions): 0.80s
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v211] [без изменений]
-[timing] auto-rebuild (3 actions): 0.86s
-
-##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.79s
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.87s

@@ -60,7 +60,7 @@
 
 ### Workspace refactor
 
-<!-- summary: Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта). -->
+<!-- summary: Завершён. Однокорневая модель удалена целиком; единая модель Workspace с пятью флагами PathPolicy (read / write / index_docs / index_py / index_lua) и per-path overrides. Шаги 1-4, 6 закрыты. GUI: File menu + Project settings + recent.json. Открыто: 7.3 (дерево файлов), редактор per-path, multi-root smoke, P1-фиксы тулов. -->
 **Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.
 
 **Сделано (шаги 1–4 + 6):**
@@ -82,11 +82,18 @@
 
 **Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.
 
-**Открыто:**
+**Модель policy — пять флагов (не три).** `PathPolicy` (`read` / `write` / `index_docs` / `index_py` / `index_lua`) вместо старого `FilterSpec`. Каждый root имеет `overrides: dict[path, PathPolicy]`; ключ `.` — дефолт root'а, остальные ключи — относительные пути внутри. Nearest-match. Override — **полная замена**, не частичный мерж. Старые `FilterSpec` / `Policy` / `RootPolicy` удалены целиком.
 
-- **Шаг 5 — индексаторы под multi-root.** Формально уже работают через `list("")`, но это one-root → many. Мёрдж нескольких корней и `router.py` — не проверены.
-- **Шаг 7 — GUI.** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`. Сейчас GUI требует существующий `workspace.json`.
-- **Root внутри state.** Сейчас `state_dir` (`.patch_applier/`) физически внутри корня `toolkit/`. Работает через `_state_rel_for`, но некрасиво. Возможно, стоит переопределить root'ы (`toolkit/code/`, `toolkit/docs/`) или перенести state наружу.
+**Открыто (следующие сессии):**
+
+- **Дерево файлов в GUI (7.3).** Сейчас GUI не имеет file explorer вообще. Нужен design-док перед кодом.
+- **Редактор per-path overrides.** Сейчас Project settings работает только с per-root default. Path-level — через `workspace.json` руками.
+- **Multi-root smoke на живом проекте.** Формально покрыто `test_workspace_backend.py`, но 2+ roots в реальном проекте не запускали.
+- **Шаг 5 (индексаторы).** Работают через `list("")` — контракт один-в-многие. На двух корнях не проверяли.
+- **P1-фиксы тулов** (`insert_at_anchor` + `\n`, `replace_between` EOL). См. `TOOL_PRACTICE.md §8`.
+- **Уборка:** временные `_recon.py` / `_cleanup.py` / `_final_cleanup.py` / `_git_status.py`; устаревшие symbol-tools из `TOOL_MAP`.
+
+**Root внутри state.** Сейчас `state_dir` (`.patch_applier/`) физически внутри корня `toolkit/`. Работает через `_state_rel_for`, но при создании нового проекта через GUI root'ы будут отдельные, state — сбоку.
 ## 2. Открыто
 
 <!-- summary: Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. -->
