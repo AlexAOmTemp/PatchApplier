@@ -79,6 +79,114 @@ def create_project(folder: str | Path, name: str,
     return layout
 
 
+def load_workspace(folder: str | Path,
+                   state_subdir: str = DEFAULT_STATE_SUBDIR):
+    """Load the Workspace for a project folder; raise NotAProject if absent."""
+    from ..config import workspace as _ws
+    layout = assert_project(folder, state_subdir)
+    w = _ws.load(layout.state_dir)
+    if w is None:
+        raise NotAProject(str(layout.workspace_path))
+    return w
+
+
+def save_workspace(folder: str | Path, w,
+                   state_subdir: str = DEFAULT_STATE_SUBDIR) -> None:
+    """Save a Workspace; validate happens inside _ws.save.
+
+    Raises ValueError on validation failure (nested roots, duplicate
+    basename, reserved name).
+    """
+    from ..config import workspace as _ws
+    layout = resolve_layout(folder, state_subdir)
+    if not _ws.save(w, layout.state_dir):
+        # _ws.save returns False when validate() raised; run validate
+        # again to surface the concrete reason to the caller.
+        _ws.validate(w)
+        raise RuntimeError("failed to write workspace.json")
+
+
+def list_roots(folder: str | Path, state_subdir: str = DEFAULT_STATE_SUBDIR):
+    """Return a list of dicts: {name, path, include, exclude, policy}.
+
+    Policy is a plain dict (read/write/index_docs/index_py/index_lua).
+    """
+    w = load_workspace(folder, state_subdir)
+    out = []
+    for name in w.root_names():
+        r = w.roots[name]
+        p = w.policy.get(name)
+        out.append({
+            "name": name,
+            "path": r.path,
+            "include": list(r.include),
+            "exclude": list(r.exclude),
+            "policy": {
+                "read": bool(p.read) if p else True,
+                "write": bool(p.write) if p else True,
+                "index_docs": bool(p.index_docs) if p else True,
+                "index_py": bool(p.index_py) if p else True,
+                "index_lua": bool(p.index_lua) if p else True,
+            },
+        })
+    return out
+
+
+def add_root(folder: str | Path, root_path: str,
+             state_subdir: str = DEFAULT_STATE_SUBDIR) -> str:
+    """Add a root. Returns its derived name.
+
+    Raises ValueError (nested / duplicate basename / reserved name /
+    path missing) on failure. Saves on success.
+    """
+    from ..config import workspace as _ws
+    p = Path(root_path).resolve()
+    if not p.is_dir():
+        raise ValueError(f"path is not a directory: {p}")
+    w = load_workspace(folder, state_subdir)
+    name = _ws.add_root(w, str(p))
+    save_workspace(folder, w, state_subdir)
+    return name
+
+
+def remove_root(folder: str | Path, name: str,
+                state_subdir: str = DEFAULT_STATE_SUBDIR) -> None:
+    """Remove a root by name. No-op if absent. Saves on success."""
+    w = load_workspace(folder, state_subdir)
+    if name in w.roots:
+        del w.roots[name]
+        w.policy.pop(name, None)
+        save_workspace(folder, w, state_subdir)
+
+
+def update_root_policy(folder: str | Path, name: str,
+                       flags: dict,
+                       state_subdir: str = DEFAULT_STATE_SUBDIR) -> None:
+    """Update a root's policy flags. `flags` is a partial dict.
+
+    Accepted keys: read / write / index_docs / index_py / index_lua.
+    Missing keys are left unchanged. Saves on success.
+    """
+    from ..config.workspace import RootPolicy
+    w = load_workspace(folder, state_subdir)
+    if name not in w.roots:
+        raise KeyError(f"no such root: {name!r}")
+    cur = w.policy.get(name) or RootPolicy()
+    for k in ("read", "write", "index_docs", "index_py", "index_lua"):
+        if k in flags:
+            setattr(cur, k, bool(flags[k]))
+    w.policy[name] = cur
+    save_workspace(folder, w, state_subdir)
+
+
+def rename_project(folder: str | Path, new_name: str,
+                   state_subdir: str = DEFAULT_STATE_SUBDIR) -> None:
+    """Rename the workspace. Saves on success."""
+    w = load_workspace(folder, state_subdir)
+    w.name = str(new_name)
+    save_workspace(folder, w, state_subdir)
+
+
 def assert_project(folder: str | Path,
                    state_subdir: str = DEFAULT_STATE_SUBDIR) -> ProjectLayout:
     """Return the layout or raise NotAProject. Does not modify anything."""
