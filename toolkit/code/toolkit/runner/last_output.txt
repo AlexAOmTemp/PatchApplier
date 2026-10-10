@@ -1,49 +1,13 @@
-[test] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_multi_root_smoke.py (157 стр., 6111 Б)
+[doc] ✓ create_file: Файл создан: toolkit/docs/GUI_TREE.md (155 стр., 9596 Б)
 
-[run] ✓ run_python: exit=0  duration=117ms
+[commit] ✗ run_python: exit=2  duration=39ms
 --- stdout ---
-[OK]   list includes alpha/a.py
-[OK]   list includes beta/b.py
-[OK]   list includes alpha/a.md
-[OK]   list includes beta/b.md
+unknown subcommand: docs: GUI_TREE.md design for 7.3 file tree
+[timing] user (2 actions): 0.04s
 
-== rebuild_index (docs) ==
-[1] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 2, без summary: 0) [v1] [создан, 2 файлов, 15 строк]
-  + alpha/a.md
-  + beta/b.md
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 170) [v354] [+1]
+  + ## toolkit/docs/GUI_TREE.md  (155 стр., 9.4 KB, mtime 2026-10-10 22:29)
+[timing] auto-rebuild (1 actions): 0.03s
 
-[OK]   rebuild_index ok
-[OK]   INDEX has alpha/a.md
-[OK]   INDEX has beta/b.md
-[OK]   INDEX does NOT have bare a.md without prefix
-
-== rebuild_code_index ==
-[1] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 2, символов: 2) [v1] [создан, 16 строк]
-
-[OK]   rebuild_code_index ok
-[OK]   CODE_INDEX has alpha/a.py
-[OK]   CODE_INDEX has beta/b.py
-[OK]   alpha_fn symbol
-[OK]   beta_fn symbol
-
-== disable beta → beta gone from index ==
-[1] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 1, без summary: 0) [v2] [-1]
-  - ## beta/b.md  (6 стр., 0.1 KB, mtime 2026-10-10 22:27)
-
-[OK]   rebuild after disable ok
-[OK]   beta gone from INDEX
-[OK]   alpha still in INDEX
-
-=== 16 ok, 0 failed ===
-[timing] user (2 actions): 0.12s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 22, без summary: 155) [v352] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1096) [v400] [+1]
-  + toolkit/code/toolkit/tests/test_multi_root_smoke.py  (157 стр., 6.0 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v230] [без изменений]
-[timing] auto-rebuild (3 actions): 0.84s
-
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.96s
+##RESULT:{"ok": 2, "errors": 1, "skipped": 0, "failed": [2], "blocked": []}
+[timing] total: 0.07s
