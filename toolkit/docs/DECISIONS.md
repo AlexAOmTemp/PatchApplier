@@ -80,6 +80,8 @@
 
 **Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.
 
+**P1-фиксы тулов (следующая сессия после Workspace).** `insert_at_anchor` — auto-`\n` между anchor и `new_content`, чтобы не склеивать строки (`from a import b` + `from c import d` → сломанный синтаксис). `replace_between` — EOL-нормализация anchor'ов, чтобы LF-anchor находился в CRLF-файле. Оба фикса — из `TOOL_PRACTICE.md §8`, регрессии в `test_tool_edge_cases.py`. См. также §2.5.
+
 **Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.
 
 **Модель policy — пять флагов (не три).** `PathPolicy` (`read` / `write` / `index_docs` / `index_py` / `index_lua`) вместо старого `FilterSpec`. Каждый root имеет `overrides: dict[path, PathPolicy]`; ключ `.` — дефолт root'а, остальные ключи — относительные пути внутри. Nearest-match. Override — **полная замена**, не частичный мерж. Старые `FilterSpec` / `Policy` / `RootPolicy` удалены целиком.
