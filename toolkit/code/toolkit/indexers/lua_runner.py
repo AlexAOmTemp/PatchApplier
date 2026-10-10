@@ -194,15 +194,14 @@ def _render_index(
 def build_lua_index(
     backend: Backend,
     roots: list[str] | None = None,
-    filter_spec=None,
     project_dir: Path | None = None,
 ) -> LuaIndexResult:
     """Build the Lua index via one or more execute_luau calls.
 
-    `roots` and `filter_spec` are accepted for backwards compatibility
-    with the old Python-side bulk path but ignored: roots are fixed in
-    the Lua driver, and Roblox paths are not subject to path policy
-    (see DECISIONS.md).
+    `roots` is accepted for backwards compatibility with the old
+    Python-side bulk path but ignored: roots are fixed in the Lua
+    driver. Roblox paths are not subject to path policy (see
+    DECISIONS.md).
     """
     if not _LUA_PARSER.is_file() or not _LUA_DRIVER.is_file():
         raise RuntimeError(

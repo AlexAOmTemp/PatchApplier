@@ -1,12 +1,13 @@
 """Session status tool.
 
-Compact "where am I" call for an LLM starting a session or checking the
+Compact "where I am" call for an LLM starting a session or checking the
 world after a config change. Returns three sections: session info, index
 status, and effective path policy. Pure text, no JSON.
 
-Policy flags are R/W/I — a letter means the role is allowed for that path,
-absence means denied. Flags are computed via FilterSpec.resolve(), so
-inheritance from parent paths is already baked in.
+Policy flags are R / W / Id / Ip / Il — a letter present means the flag
+is allowed for that path. For filesystem roots the policy comes from the
+WorkspaceBackend's Workspace (per-root and per-path PathPolicy); for MCP
+there is no path policy.
 
 Only indexes whose owning backend is enabled are reported: docs/code need
 the filesystem backend, lua needs the MCP (Roblox) backend.
@@ -46,7 +47,6 @@ class GetStatusTool:
 
     _context: dict = {}
 
-    @classmethod
     def set_context(
         cls,
         *,
@@ -59,7 +59,6 @@ class GetStatusTool:
         native_tools_enabled: bool = False,
         native_tools_allow: list | None = None,
         index_paths: dict | None = None,
-        policy: Any = None,
         backends_enabled: set | None = None,
     ) -> None:
         cls._context = {
@@ -76,7 +75,6 @@ class GetStatusTool:
                 "code": "CODE_INDEX.md",
                 "lua": "CODE_INDEX_LUA.md",
             }),
-            "policy": policy,
             "backends_enabled": set(backends_enabled or {"filesystem"}),
         }
 
@@ -120,7 +118,7 @@ class GetStatusTool:
         if "indexes" in secs:
             blocks.append(self._render_indexes(backend))
         if "policy" in secs:
-            blocks.append(self._render_policy())
+            blocks.append(self._render_policy(backend))
 
         return Result(
             status="ok",
@@ -212,65 +210,63 @@ class GetStatusTool:
 
     # --- policy -----------------------------------------------------------
 
-    def _render_policy(self) -> str:
-            ctx = self._context
-            policy = ctx.get("policy")
-            enabled = ctx.get("backends_enabled") or {"filesystem"}
+    def _render_policy(self, backend: Backend) -> str:
+        ctx = self._context
+        enabled = ctx.get("backends_enabled") or {"filesystem"}
 
-            blocks: list[str] = []
+        blocks: list[str] = []
 
-            if "filesystem" in enabled:
-                all_paths: set[str] = set()
-                for role in ("read", "write", "index"):
-                    spec = getattr(policy, role, None) if policy else None
-                    if spec is None:
-                        continue
-                    ov = getattr(spec, "overrides", None) or {}
-                    all_paths.update(ov.keys())
-                all_paths.discard(".")
-                fs_paths = sorted(all_paths)
+        if "filesystem" in enabled:
+            ws = getattr(backend, "ws", None)
+            if ws is None:
                 blocks.append("## Policy Filesystem")
-                blocks.extend(self._render_policy_rows(policy, fs_paths))
-                # Informational line: dotdirs and noise dirs are closed by
-                # the backend (not listed in overrides) so the report does
-                # not drown in __pycache__ rows. The line makes it clear
-                # that the absence of such paths above is by design, not
-                # an omission.
+                blocks.append("(no workspace on this backend)")
+            else:
+                blocks.append("## Policy Filesystem")
+                blocks.extend(self._render_policy_rows(ws))
                 blocks.append("")
                 blocks.append("+ auto-closed: dotdirs, __pycache__, node_modules, .venv  (not shown)")
                 blocks.append("  to open a hidden path: set + on the dir itself or its named ancestor")
 
-            if "mcp" in enabled:
-                luau = ctx.get("luau_mode") or "mcp"
-                scope = "Roblox scene + Luau code" if luau == "mcp" else "Roblox scene"
-                blocks.append("## MCP")
-                blocks.append(f"scope:    {scope}")
-                blocks.append("access:   unrestricted (DataModel is not path-filtered)")
+        if "mcp" in enabled:
+            luau = ctx.get("luau_mode") or "mcp"
+            scope = "Roblox scene + Luau code" if luau == "mcp" else "Roblox scene"
+            blocks.append("## MCP")
+            blocks.append(f"scope:    {scope}")
+            blocks.append("access:   unrestricted (DataModel is not path-filtered)")
 
-            if not blocks:
-                return "## Policy\n(no backends enabled)"
-            return "\n".join(blocks)
+        if not blocks:
+            return "## Policy\n(no backends enabled)"
+        return "\n".join(blocks)
 
-    def _render_policy_rows(self, policy: Any, extra_paths: list[str]) -> list[str]:
-        entries: list[tuple[str, str]] = [("(root)", self._flags_for(policy, "."))]
-        for p in extra_paths:
-            entries.append((p, self._flags_for(policy, p)))
+    def _render_policy_rows(self, ws) -> list[str]:
+        """One row per root: name and effective default flags.
 
-        width = max(len(name) for name, _ in entries)
-        return [f"{name.ljust(width)}   [{flags}]" for name, flags in entries]
+        Explicit per-path overrides (keys other than ".") are listed beneath
+        the root when present.
+        """
+        rows: list[str] = []
+        for name in ws.root_names():
+            root = ws.roots[name]
+            default = ws.policy_for(name, "")
+            rows.append(f"{name.ljust(24)}   {self._flags_for(default)}")
+            extras = [k for k in root.overrides.keys() if k != "."]
+            for p in sorted(extras):
+                pol = root.overrides[p]
+                rows.append(f"  {p.ljust(22)}   {self._flags_for(pol)}")
+        if not rows:
+            return ["(no roots)"]
+        return rows
 
-    def _flags_for(self, policy: Any, path: str) -> str:
-        if policy is None:
-            return "RWI"
-        flags = ""
-        for letter, role in (("R", "read"), ("W", "write"), ("I", "index")):
-            spec = getattr(policy, role, None)
-            if spec is None:
-                flags += letter
-                continue
+    def _flags_for(self, pol) -> str:
+        """[R W Id Ip Il] with letters present only for True flags."""
+        tokens = []
+        for letter, key in (("R", "read"), ("W", "write"),
+                            ("Id", "index_docs"), ("Ip", "index_py"),
+                            ("Il", "index_lua")):
             try:
-                if spec.resolve(path):
-                    flags += letter
+                if bool(getattr(pol, key)):
+                    tokens.append(letter)
             except Exception:
                 pass
-        return flags
+        return "[" + " ".join(tokens) + "]" if tokens else "[-]"

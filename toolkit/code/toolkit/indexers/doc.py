@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..core.backend import Backend
-from ..core.models import FilterSpec, Section
+from ..core.models import Section
 from ..formats import Format
 from ..formats.renderer import FileIndex, PREAMBLE, render_index
 
@@ -22,7 +22,6 @@ def build_index(
     fmt: Format,
     *,
     docs_dir: str = "",
-    filter_spec: FilterSpec | None = None,
     skip_files: set[str] | None = None,
     meta_path: str | None = None,
 ) -> BuildResult:
@@ -42,10 +41,8 @@ def build_index(
         name = path.rsplit("/", 1)[-1]
         if name in skip:
             continue
-        if filter_spec is not None:
-            err = backend.filter_check(path, filter_spec)
-            if err:
-                continue
+        if backend.filter_check(path, "index_docs"):
+            continue
         try:
             text = backend.read(path)
         except Exception:

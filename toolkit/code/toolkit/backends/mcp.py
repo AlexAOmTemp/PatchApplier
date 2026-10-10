@@ -32,7 +32,7 @@ import threading
 import time
 from pathlib import Path
 
-from ..core.models import FilterSpec, FileStat
+from ..core.models import FileStat
 
 
 DEFAULT_READY_TIMEOUT = 90.0

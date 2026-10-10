@@ -15,8 +15,8 @@ from .loader import (
     workspaces_root,
 )
 from .workspace import (
+    PathPolicy,
     Root,
-    RootPolicy,
     Workspace,
     add_root,
     from_dict,
@@ -33,7 +33,7 @@ __all__ = [
     "config_path", "load", "save", "load_workspace",
     "read_recent", "add_recent_file", "recent_path",
     "add_recent", "parse_csv", "workspaces_root",
-    "Root", "RootPolicy", "Workspace",
+    "PathPolicy", "Root", "Workspace",
     "new_id", "add_root", "validate_workspace",
     "from_dict", "to_dict",
     "load_workspace", "save_workspace", "workspace_file",

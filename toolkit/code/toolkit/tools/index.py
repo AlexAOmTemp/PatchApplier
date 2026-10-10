@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.backend import Backend
-from ..core.models import FilterSpec, Result
+from ..core.models import Result
 from ..formats import Format
 from pathlib import Path
 
@@ -16,7 +16,7 @@ from ..indexers.diff import diff_index, diff_code_index
 
 class RebuildIndexTool:
     name = "rebuild_index"
-    op = "index"
+    op = "index_docs"
     path_args: list[str] = []
     path_list_args: list[str] = []
 
@@ -34,7 +34,6 @@ class RebuildIndexTool:
         docs_dir: str | None = None,
         output: str | None = None,
         skip_files: list[str] | None = None,
-        _index_spec: FilterSpec | None = None,
         **_: Any,
     ) -> Result:
         if fmt is None:
@@ -64,7 +63,6 @@ class RebuildIndexTool:
             result = build_index(
                 backend, fmt,
                 docs_dir=dd,
-                filter_spec=_index_spec,
                 skip_files=set(skip_files) if skip_files else default_skip,
                 meta_path=meta_path,
             )
@@ -95,7 +93,7 @@ class RebuildIndexTool:
 
 class RebuildCodeIndexTool:
     name = "rebuild_code_index"
-    op = "index"
+    op = "index_py"
     path_args: list[str] = []
     path_list_args: list[str] = []
 
@@ -118,7 +116,6 @@ class RebuildCodeIndexTool:
         manifest_output: str | None = None,
         skip_files: list[str] | None = None,
         skip_dirs: list[str] | None = None,
-        _index_spec: FilterSpec | None = None,
         **_: Any,
     ) -> Result:
         cd = code_dir or ""
@@ -138,7 +135,6 @@ class RebuildCodeIndexTool:
             result = build_code_index(
                 backend,
                 root=cd,
-                filter_spec=_index_spec,
                 skip_files=set(skip_files) if skip_files else None,
                 skip_dirs=set(skip_dirs) if skip_dirs else None,
             )
@@ -329,7 +325,7 @@ class GetIndexTool:
 
 class RebuildLuaCodeIndexTool:
     name = "rebuild_lua_code_index"
-    op = "index"
+    op = "index_lua"
     path_args: list[str] = []
     path_list_args: list[str] = []
 
@@ -351,7 +347,6 @@ class RebuildLuaCodeIndexTool:
         manifest_output: str | None = None,
         roots: list[str] | None = None,
         local_root: str | None = None,
-        _index_spec: FilterSpec | None = None,
         **_: Any,
     ) -> Result:
         # Luau bulk index runs inside Studio via the bridge. Filesystem
@@ -391,7 +386,6 @@ class RebuildLuaCodeIndexTool:
             result = build_lua_code_index(
                 backend,
                 roots=roots,
-                filter_spec=_index_spec,
                 project_dir=local_dir,
             )
         except Exception as e:

@@ -186,30 +186,4 @@ class FilesystemBackend:
         d.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(s, d)
 
-    # --- filter -----------------------------------------------------------
 
-    def filter_check(self, path: str, spec: FilterSpec) -> str | None:
-        try:
-            target = self._resolve(path)
-            rel = target.relative_to(self._root)
-        except (PermissionError, ValueError):
-            return f"Путь вне проекта: {path}"
-        rel_str = str(rel).replace("\\", "/")
-
-        # Service dir (`.patch_applier`) is hardcoded: the toolkit's own
-        # state. Always accessible for R/W so index / MCP tools can reach
-        # their files, regardless of policy or .patchignore. The tree shows
-        # it with fixed R+/W+/I- cells.
-        if patchignore.is_state_path(rel_str):
-            return None
-
-        # Hidden by .patchignore: blocked before the policy is consulted,
-        # unless the caller added an explicit True override for the path or
-        # one of its named ancestors. That is how the user opens a specific
-        # hidden dir from the tree without touching the pattern file.
-        if patchignore.path_hidden(rel_str, self._patterns) and not _explicitly_allowed(spec, rel_str):
-            return f"Скрытая папка: {path}"
-
-        if spec.resolve(rel_str):
-            return None
-        return f"Запрещено политикой: {path}"

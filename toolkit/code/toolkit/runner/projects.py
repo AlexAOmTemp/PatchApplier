@@ -109,24 +109,27 @@ def save_workspace(folder: str | Path, w,
 def list_roots(folder: str | Path, state_subdir: str = DEFAULT_STATE_SUBDIR):
     """Return a list of dicts: {name, path, include, exclude, policy}.
 
-    Policy is a plain dict (read/write/index_docs/index_py/index_lua).
+    `policy` reports the root's default policy (the "." override), one
+    flag per key: read, write, index_docs, index_py, index_lua. An empty
+    root has no "." override and yields all-True.
     """
+    from ..config.workspace import PathPolicy
     w = load_workspace(folder, state_subdir)
     out = []
     for name in w.root_names():
         r = w.roots[name]
-        p = w.policy.get(name)
+        p = r.overrides.get(".") or PathPolicy()
         out.append({
             "name": name,
             "path": r.path,
             "include": list(r.include),
             "exclude": list(r.exclude),
             "policy": {
-                "read": bool(p.read) if p else True,
-                "write": bool(p.write) if p else True,
-                "index_docs": bool(p.index_docs) if p else True,
-                "index_py": bool(p.index_py) if p else True,
-                "index_lua": bool(p.index_lua) if p else True,
+                "read": bool(p.read),
+                "write": bool(p.write),
+                "index_docs": bool(p.index_docs),
+                "index_py": bool(p.index_py),
+                "index_lua": bool(p.index_lua),
             },
         })
     return out
@@ -155,27 +158,28 @@ def remove_root(folder: str | Path, name: str,
     w = load_workspace(folder, state_subdir)
     if name in w.roots:
         del w.roots[name]
-        w.policy.pop(name, None)
         save_workspace(folder, w, state_subdir)
 
 
 def update_root_policy(folder: str | Path, name: str,
                        flags: dict,
                        state_subdir: str = DEFAULT_STATE_SUBDIR) -> None:
-    """Update a root's policy flags. `flags` is a partial dict.
+    """Update a root's default policy flags. `flags` is a partial dict.
 
     Accepted keys: read / write / index_docs / index_py / index_lua.
-    Missing keys are left unchanged. Saves on success.
+    Missing keys are left unchanged. Sets the "." override (the root
+    default) and saves.
     """
-    from ..config.workspace import RootPolicy
+    from ..config.workspace import PathPolicy, ALL_FLAGS
     w = load_workspace(folder, state_subdir)
     if name not in w.roots:
         raise KeyError(f"no such root: {name!r}")
-    cur = w.policy.get(name) or RootPolicy()
-    for k in ("read", "write", "index_docs", "index_py", "index_lua"):
+    root = w.roots[name]
+    cur = root.overrides.get(".") or PathPolicy()
+    for k in ALL_FLAGS:
         if k in flags:
             setattr(cur, k, bool(flags[k]))
-    w.policy[name] = cur
+    root.overrides["."] = cur
     save_workspace(folder, w, state_subdir)
 
 

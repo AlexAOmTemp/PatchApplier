@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass
 
 from ..core.backend import Backend
-from ..core.models import FilterSpec, Module
+from ..core.models import Module
 from ..formats import CodeFormat
 from ..formats.renderer import render_code_index
 
@@ -86,7 +86,6 @@ def build_code_index(
     backend: Backend,
     *,
     root: str = "",
-    filter_spec: FilterSpec | None = None,
     skip_files: set[str] | None = None,
     skip_dirs: set[str] | None = None,
 ) -> CodeIndexResult:
@@ -100,10 +99,8 @@ def build_code_index(
     for path in paths:
         if not _keep(path, skip_f, skip_d):
             continue
-        if filter_spec is not None and filter_spec.is_active():
-            err = backend.filter_check(path, filter_spec)
-            if err:
-                continue
+        if backend.filter_check(path, "index_py"):
+            continue
         try:
             text = backend.read(path)
         except Exception:
