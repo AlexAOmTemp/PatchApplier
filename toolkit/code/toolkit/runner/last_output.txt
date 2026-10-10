@@ -1,156 +1,52 @@
-[r1] ✓ read_unit: def _menu_project_settings() -> None:
-    """Open the project settings dialog (roots + policies + name)."""
+[sw-mod] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/gui/settings_window.py (181 стр., 5884 Б)
 
-[r2] ✓ read_unit:     proj = CONFIG.get("project_dir", "").strip()
-    if not proj:
-        messagebox.showwarning(
-            "\u041d\u0435\u0442 \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
-            "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0438\u043b\u0438 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0440\u043e\u0435\u043a\u0442 (File).",
-            parent=root,
-        )
-        return
-    state_subdir = _cfg.resolve_state_dir(CONFIG)
-    try:
-        w = _projects.load_workspace(proj, state_subdir)
-    except _projects.NotAProject:
-        messagebox.showerror(
-            "\u041d\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
-            f"\u0412 {proj} \u043d\u0435\u0442 workspace.json",
-            parent=root,
-        )
-        return
+[app-shim] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
 
-    dlg = tk.Toplevel(root)
-    dlg.title("Project settings")
-    dlg.transient(root)
-    dlg.grab_set()
-    dlg.geometry("760x460")
-    dlg.minsize(700, 420)
+[smoke-gui] ✓ run_python: exit=0  duration=181ms
+--- stdout ---
+[OK]   toolkit.runner.gui.app imported
+[OK]   all expected attributes present
+=== gui smoke OK ===
 
-    main = tk.Frame(dlg, padx=12, pady=12)
-    main.pack(fill="both", expand=True)
+[smoke] ✓ run_python: exit=0  duration=81ms
+--- stdout ---
+[OK]   toolkit.core
+[OK]   toolkit.core.models
+[OK]   toolkit.core.patcher
+[OK]   toolkit.core.session
+[OK]   toolkit.config
+[OK]   toolkit.config.workspace
+[OK]   toolkit.backends
+[OK]   toolkit.backends.filesystem
+[OK]   toolkit.backends.workspace
+[OK]   toolkit.backends.composite
+[OK]   toolkit.backends.mcp
+[OK]   toolkit.indexers
+[OK]   toolkit.indexers.doc
+[OK]   toolkit.indexers.code
+[OK]   toolkit.tools
+[OK]   toolkit.tools.index
+[OK]   toolkit.tools.status
+[OK]   toolkit.runner.projects
 
-    name_row = tk.Frame(main)
-    name_row.pack(fill="x", pady=(0, 8))
-    tk.Label(name_row, text="Project name:").pack(side="left")
-    name_var = tk.StringVar(value=w.name)
-    tk.Entry(name_row, textvariable=name_var).pack(side="left", fill="x", expand=True, padx=(8, 0))
+=== all imports OK ===
 
-    tk.Label(main, text=f"Folder: {proj}", anchor="w", fg="#666").pack(fill="x")
+[commit] ✓ run_python: exit=0  duration=165ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master a886c42] settings_window module with per-root tabs
+ 6 files changed, 356 insertions(+), 388 deletions(-)
+ create mode 100644 toolkit/code/toolkit/runner/gui/settings_window.py
+[timing] user (5 actions): 0.46s
 
-    tk.Label(main, text="Roots:", anchor="w").pack(fill="x", pady=(10, 2))
-    cols = ("name", "path", "R", "W", "Id", "Ip", "Il")
-    tree = ttk.Treeview(main, columns=cols, show="headings", height=8)
-    for c, w_ in zip(cols, (120, 380, 32, 32, 36, 36, 36)):
-        tree.heading(c, text=c)
-        tree.column(c, width=w_, anchor="w" if c in ("name", "path") else "center")
-    tree.pack(fill="both", expand=True)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v369] [без изменений]
 
-    def _reload_roots() -> None:
-        for row in tree.get_children():
-            tree.delete(row)
-        try:
-            roots = _projects.list_roots(proj, state_subdir)
-        except Exception as e:
-            messagebox.showerror("Error", str(e), parent=dlg)
-            return
-        for r in roots:
-            p = r["policy"]
-            tree.insert("", "end", iid=r["name"], values=(
-                r["name"], r["path"],
-                "\u2713" if p["read"] else "\u2715",
-                "\u2713" if p["write"] else "\u2715",
-                "\u2713" if p["index_docs"] else "\u2715",
-                "\u2713" if p["index_py"] else "\u2715",
-                "\u2713" if p["index_lua"] else "\u2715",
-            ))
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1123) [v415] [+1]
+  + toolkit/code/toolkit/runner/gui/settings_window.py  (181 стр., 5.7 KB)
 
-    _reload_roots()
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v244] [без изменений]
+[timing] auto-rebuild (3 actions): 0.85s
 
-    def _add_root() -> None:
-        folder = filedialog.askdirectory(title="Root folder", parent=dlg)
-        if not folder:
-            return
-        try:
-            _projects.add_root(proj, folder, state_subdir)
-        except ValueError as e:
-            messagebox.showerror("Cannot add root", str(e), parent=dlg)
-            return
-        except Exception as e:
-            messagebox.showerror("Error", str(e), parent=dlg)
-            return
-        _reload_roots()
-
-    def _remove_root() -> None:
-        sel = tree.selection()
-        if not sel:
-            return
-        name = sel[0]
-        if not messagebox.askyesno(
-                "Remove root",
-                f"Remove root {name!r} from this project?\n"
-                "Files on disk are not touched.",
-                parent=dlg):
-            return
-        try:
-            _projects.remove_root(proj, name, state_subdir)
-        except Exception as e:
-            messagebox.showerror("Error", str(e), parent=dlg)
-            return
-        _reload_roots()
-
-    def _toggle_flag(flag_key: str) -> None:
-        sel = tree.selection()
-        if not sel:
-            return
-        name = sel[0]
-        try:
-            roots = {r["name"]: r for r in _projects.list_roots(proj, state_subdir)}
-        except Exception:
-            return
-        cur = roots.get(name)
-        if cur is None:
-            return
-        new_val = not bool(cur["policy"][flag_key])
-        try:
-            _projects.update_root_policy(proj, name, {flag_key: new_val}, state_subdir)
-        except Exception as e:
-            messagebox.showerror("Error", str(e), parent=dlg)
-            return
-        _reload_roots()
-        try:
-            tree.selection_set(name)
-        except Exception:
-            pass
-
-    ctrl_row = tk.Frame(main)
-    ctrl_row.pack(fill="x", pady=(6, 0))
-    tk.Button(ctrl_row, text="Add root\u2026", command=_add_root).pack(side="left")
-    tk.Button(ctrl_row, text="Remove", command=_remove_root).pack(side="left", padx=(6, 0))
-    tk.Label(ctrl_row, text="   Toggle:").pack(side="left", padx=(12, 0))
-    for label, key in (("R", "read"), ("W", "write"),
-                       ("Id", "index_docs"), ("Ip", "index_py"),
-                       ("Il", "index_lua")):
-        tk.Button(ctrl_row, text=label, width=3,
-                  command=(lambda k=key: _toggle_flag(k))).pack(side="left", padx=(2, 0))
-
-    btn_row = tk.Frame(main)
-    btn_row.pack(fill="x", pady=(12, 0))
-
-    def _ok() -> None:
-        new_name = name_var.get().strip()
-        if new_name and new_name != w.name:
-            try:
-                _projects.rename_project(proj, new_name, state_subdir)
-            except Exception as e:
-                messagebox.showerror("Error", str(e), parent=dlg)
-                return
-        dlg.destroy()
-        _switch_project(proj, new_name or None)
-
-    tk.Button(btn_row, text="OK", command=_ok, width=10).pack(side="right")
-    tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(side="right", padx=(0, 6))
-[timing] user (2 actions): 0.03s
-
-##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.03s
+##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.31s

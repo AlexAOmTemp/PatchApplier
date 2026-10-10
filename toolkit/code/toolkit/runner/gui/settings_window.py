@@ -1,26 +1,28 @@
 """Project settings window: name, root tabs, per-path policy.
 
-Opened from File -> Project settings. Replaces the placeholder dialog and
-the old `open_settings_dialog` (removed in an earlier step). The window
-edits an in-memory Workspace and writes on OK; Cancel discards.
+Opened from File -> Project settings. Edits an in-memory Workspace and
+writes on OK; Cancel discards. Replaces the placeholder dialog and the
+old `open_settings_dialog` (removed earlier).
 
-What is here now:
-  - project name (Entry)
-  - one tab per root, each containing a PolicyTree widget
+Currently here:
+  - project name (Entry, right-click to copy)
+  - one tab per root, each with a PolicyTree
   - Add root / Remove root
-  - show hidden checkbox
+  - Show hidden toggle
+  - legend below the tabs
   - OK / Cancel
 
-What is deferred (see docs/GUI_PROJECT_SETTINGS.md):
+Deferred (see docs/GUI_PROJECT_SETTINGS.md):
   - .patchignore / .mcpignore editors
   - index / MCP / exec toggles
-  - per-path overrides beyond what PolicyTree handles
 """
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
+
+import pyperclip
 
 from ...config import patchignore as _pi
 from ...config.loader import scan_subdirs
@@ -32,6 +34,28 @@ from .tree_view import PolicyTree
 _MAX_DEPTH = 3
 
 
+_LEGEND = (
+    "R = read (читать)   W = write (писать)   "
+    "Id = index docs (.md)   Ip = index py (.py)   Il = index lua (.luau)\n"
+    "\u00b7 inherit   + allow   \u2212 deny   "
+    "Click cycles the cell; the topmost [root] row sets the root's default policy."
+)
+
+
+def _make_copyable_entry(entry: tk.Entry) -> None:
+    """Right-click menu on an Entry: copy the current value."""
+    menu = tk.Menu(entry, tearoff=0)
+    menu.add_command(label="\u041a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u0442\u044c",
+                     command=lambda: pyperclip.copy(entry.get()))
+
+    def _show(event):
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+    entry.bind("<Button-3>", _show)
+
+
 def open_project_settings(parent, project_dir: Path,
                           state_subdir: str,
                           on_save=None) -> None:
@@ -39,7 +63,7 @@ def open_project_settings(parent, project_dir: Path,
 
     Raises `projects.NotAProject` if the folder has no workspace.json.
     `on_save` is called after a successful save with the new name (or
-    None if unchanged) — the caller restarts the session there.
+    None if unchanged) - the caller restarts the session there.
     """
     w = load_workspace(project_dir, state_subdir)
     state_dir = project_dir / state_subdir
@@ -48,8 +72,8 @@ def open_project_settings(parent, project_dir: Path,
     dlg.title("Project settings")
     dlg.transient(parent)
     dlg.grab_set()
-    dlg.geometry("860x580")
-    dlg.minsize(720, 480)
+    dlg.geometry("880x620")
+    dlg.minsize(740, 520)
 
     main = tk.Frame(dlg, padx=12, pady=12)
     main.pack(fill="both", expand=True)
@@ -59,8 +83,9 @@ def open_project_settings(parent, project_dir: Path,
     name_row.pack(fill="x", pady=(0, 6))
     tk.Label(name_row, text="Project name:").pack(side="left")
     name_var = tk.StringVar(value=w.name)
-    tk.Entry(name_row, textvariable=name_var).pack(
-        side="left", fill="x", expand=True, padx=(8, 0))
+    name_entry = tk.Entry(name_row, textvariable=name_var)
+    name_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
+    _make_copyable_entry(name_entry)
 
     tk.Label(main, text=f"Folder: {project_dir}", anchor="w",
              fg="#666").pack(fill="x")
@@ -156,9 +181,14 @@ def open_project_settings(parent, project_dir: Path,
     tk.Checkbutton(ctrl, text="Show hidden", variable=show_hidden_var).pack(
         side="right")
 
+    # --- legend -------------------------------------------------------
+    legend = tk.Label(main, text=_LEGEND, anchor="w", justify="left",
+                      fg="#666", font=("Consolas", 9))
+    legend.pack(fill="x", pady=(8, 0))
+
     # --- buttons ------------------------------------------------------
     btn_row = tk.Frame(main)
-    btn_row.pack(fill="x", pady=(12, 0))
+    btn_row.pack(fill="x", pady=(10, 0))
 
     def _ok() -> None:
         new_name = name_var.get().strip()

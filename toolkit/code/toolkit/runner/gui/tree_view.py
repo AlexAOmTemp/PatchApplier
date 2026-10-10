@@ -1,7 +1,7 @@
 """Tk widget: scrollable directory list with five policy flags per row.
 
-A row = one directory (relative path inside a root). Five cells on the
-right edge: R / W / Id / Ip / Il. Each cell cycles through three states:
+A row = one directory. Five cells on the right: R / W / Id / Ip / Il.
+Each cell cycles through three states:
 
     dot     no override at this path (inherit)
     +       override exists, this flag is True
@@ -14,15 +14,18 @@ Click semantics (see docs/GUI_PROJECT_SETTINGS.md section 2.2):
     -    ->  +        flip to True (only this flag)
 
 Returning a cell to dot (removing the whole override) is a separate
-Ctrl+click gesture - not implemented in this pass. The widget is
-read/write: it mutates root.overrides in place, so the caller reads
-back the same object it passed in.
+Ctrl+click gesture - not implemented in this pass.
 
-Not wired into app.py yet. See settings_window.py (next step).
+The topmost row is the virtual root, keyed "." in overrides. It holds
+the default policy for the whole root; children inherit from it.
+
+Directory rows use tree connectors (├── └── │) so nesting is visible
+without counting indents.
 """
 from __future__ import annotations
 
 import tkinter as tk
+from pathlib import Path
 
 from ...config.workspace import PathPolicy, Root
 from .tree import build_tree, filter_hidden
@@ -39,8 +42,16 @@ FLAG_COLUMNS = (
 _MONO = ("Consolas", 10)
 _BG_HOVER = "#e6e6e6"
 _HIDDEN_FG = "#a02020"
+_ROOT_FG = "#404040"
 _STATE_GLYPH = {None: "\u00b7", True: "+", False: "\u2212"}
 _STATE_FG = {None: "#888888", True: "#307030", False: "#c03030"}
+
+# Tree drawing pieces. For each child: connector (├── / └──),
+# and continuation for descendants (│   or four spaces).
+_TEE = "\u251c\u2500\u2500 "
+_ELBOW = "\u2514\u2500\u2500 "
+_PIPE = "\u2502   "
+_SPACE = "    "
 
 
 class PolicyTree(tk.Frame):
@@ -50,8 +61,8 @@ class PolicyTree(tk.Frame):
         super().__init__(parent)
         self._root = root
         self._overrides = root.overrides  # mutate in place, same object
-        self._paths: list[tuple[str, bool]] = []
         self._row_widgets: dict[str, dict] = {}
+        self._root_label = Path(root.path).name or "[root]"
 
         self._container = tk.Frame(self, bd=1, relief="sunken")
         self._container.pack(fill="both", expand=True)
@@ -86,10 +97,12 @@ class PolicyTree(tk.Frame):
         tree = build_tree(paths)
         if not show_hidden:
             tree = filter_hidden(tree)
-        self._paths = paths
 
         self._make_header_row()
-        self._render_children(tree, prefix="")
+        # Virtual root row: the whole root's default policy.
+        self._make_row(".", display_text=f"[{self._root_label}]",
+                       hidden=False, root_row=True)
+        self._render_children(tree, prefix="", path_prefix="")
 
     def overrides(self) -> dict[str, PathPolicy]:
         """Return the live overrides dict (mutated in place)."""
@@ -110,17 +123,29 @@ class PolicyTree(tk.Frame):
             lbl = tk.Label(row, text=label, font=_MONO, width=2,
                            bg=self._bg(), fg="#306030")
             lbl.pack(side="left", padx=(0, 2))
-        tk.Label(row, text="  path", font=_MONO, bg=self._bg(), fg="#306030",
+        tk.Label(row, text="path", font=_MONO, bg=self._bg(), fg="#306030",
                  anchor="w").pack(side="left", fill="x", expand=True)
 
-    def _render_children(self, nodes: list[dict], prefix: str) -> None:
-        for node in nodes:
-            path = f"{prefix}/{node['name']}" if prefix else node["name"]
-            self._make_row(path, hidden=bool(node.get("hidden")))
-            if node.get("children"):
-                self._render_children(node["children"], prefix=path)
+    def _render_children(self, nodes: list[dict],
+                         prefix: str, path_prefix: str) -> None:
+        """prefix: visible tree glyphs for this level.
 
-    def _make_row(self, rel_path: str, hidden: bool = False) -> None:
+        path_prefix: the logical rel-path prefix, joined with '/'.
+        """
+        last = len(nodes) - 1
+        for i, node in enumerate(nodes):
+            is_last = (i == last)
+            connector = _ELBOW if is_last else _TEE
+            display = prefix + connector + node["name"]
+            path = f"{path_prefix}/{node['name']}" if path_prefix else node["name"]
+            self._make_row(path, display_text=display,
+                           hidden=bool(node.get("hidden")))
+            if node.get("children"):
+                cont = prefix + (_SPACE if is_last else _PIPE)
+                self._render_children(node["children"], cont, path)
+
+    def _make_row(self, rel_path: str, display_text: str,
+                  hidden: bool = False, root_row: bool = False) -> None:
         bg = self._bg()
         row = tk.Frame(self._inner, bg=bg)
         row.pack(fill="x", anchor="w")
@@ -135,11 +160,9 @@ class PolicyTree(tk.Frame):
                 cell.bind("<Button-1>", self._cell_click(rel_path, key))
             cells[key] = cell
 
-        name = rel_path.rsplit("/", 1)[-1]
-        indent = "    " * rel_path.count("/")
-        text_label = tk.Label(row, text=indent + name, font=_MONO,
-                              bg=bg, fg=(_HIDDEN_FG if hidden else "black"),
-                              anchor="w", justify="left")
+        fg = _HIDDEN_FG if hidden else (_ROOT_FG if root_row else "black")
+        text_label = tk.Label(row, text=display_text, font=_MONO,
+                              bg=bg, fg=fg, anchor="w", justify="left")
         text_label.pack(side="left", fill="x", expand=True)
 
         widgets = [row, text_label] + list(cells.values())

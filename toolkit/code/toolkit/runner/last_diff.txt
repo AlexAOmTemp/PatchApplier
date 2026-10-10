@@ -1,7 +1,1 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v368] [~2, ⇅15]
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §2. Что в окне (L15–L66, 4.1 KB, ⚠ no summary)
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §2.2 Каталоги (roots) — центральный блок (L23–L43, 2.4 KB, ⚠ no summary)
-
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 166, символов: 1120) [v414] [без изменений]
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v243] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v247] [без изменений]
