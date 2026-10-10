@@ -1,45 +1,35 @@
-[tv] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/tree_view.py (+16 стр., +478 Б)
+[sw] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/settings_window.py (+52 стр., +1806 Б)
 
-[tv-test] ✓ replace_in_file: toolkit/code/toolkit/tests/test_tree_view.py: заменено 1 вхожд. (последнее) — +32 стр., +1440 Б
-
-[run-tv] ✓ run_python: exit=0  duration=251ms
+[smoke-gui] ✓ run_python: exit=0  duration=189ms
 --- stdout ---
-[OK]   render ok (hidden filtered)
-[OK]   overrides starts empty
-[OK]   override created for code
-[OK]   read inverted from effective (True -> False)
-[OK]   other flags stayed at effective (write=True)
-[OK]   read flipped back to True
-[OK]   write now False
-[OK]   read unaffected
-[OK]   nested override created
-[OK]   nested index_py inverted (True -> False)
-[OK]   render with show_hidden ok
-[OK]   render with 2 flags ok
-[OK]   Id cell absent when index_docs off
-[OK]   R cell present
-[OK]   W cell present
-[OK]   Id cell present after enable
-[OK]   Ip still absent
-[OK]   override set on index_docs
-[OK]   override survived hide+show cycle
+[OK]   toolkit.runner.gui.app imported
+[OK]   all expected attributes present
+=== gui smoke OK ===
 
-=== 19 ok, 0 failed ===
-[timing] user (3 actions): 0.26s
+[commit] ✓ run_python: exit=0  duration=166ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master 25d7949] settings: sources-first, visibility inline, reactive columns
+ 7 files changed, 321 insertions(+), 216 deletions(-)
+[timing] user (3 actions): 0.36s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v383] [без изменений]
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v384] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1141) [v429] [~1, ⇅5]
-  ~ toolkit/code/toolkit/runner/gui/tree_view.py  (+16 стр., +0.5 KB)
-      + toolkit/code/toolkit/runner/gui/tree_view.py :: _all_flags  [function]  L61–L62
-      + toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.set_active_flags  [method]  L102–L104
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree  [class]  L61–L222 → L65–L238
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.__init__  [method]  L64–L91 → L68–L98
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.render  [method]  L95–L110 → L106–L123
-      ~ ... и ещё 6
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1145) [v430] [~1, ⇅17]
+  ~ toolkit/code/toolkit/runner/gui/settings_window.py  (+52 стр., +1.8 KB)
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._active_flags  [function]  L324–L332
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._sync_visibility_buttons  [function]  L469–L475
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._sync_roots_visibility  [function]  L477–L490
+      + ... и ещё 2
+      - toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._sync_mcp_btn  [function]  L443–L446
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L185–L512 → L198–L564
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._render_tab  [function]  L226–L240 → L334–L349
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._rebuild_tabs  [function]  L242–L254 → L351–L363
+      ~ ... и ещё 2
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v258] [без изменений]
-[timing] auto-rebuild (3 actions): 0.84s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v259] [без изменений]
+[timing] auto-rebuild (3 actions): 0.82s
 
 ##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.10s
+[timing] total: 1.18s

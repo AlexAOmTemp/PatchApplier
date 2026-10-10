@@ -1,12 +1,1 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v383] [без изменений]
-
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1141) [v429] [~1, ⇅5]
-  ~ toolkit/code/toolkit/runner/gui/tree_view.py  (+16 стр., +0.5 KB)
-      + toolkit/code/toolkit/runner/gui/tree_view.py :: _all_flags  [function]  L61–L62
-      + toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.set_active_flags  [method]  L102–L104
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree  [class]  L61–L222 → L65–L238
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.__init__  [method]  L64–L91 → L68–L98
-      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.render  [method]  L95–L110 → L106–L123
-      ~ ... и ещё 6
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v258] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v261] [без изменений]

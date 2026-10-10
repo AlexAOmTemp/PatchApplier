@@ -277,9 +277,13 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     exec_hint.pack(side="left", padx=(8, 0))
 
     # Row 3: MCP + Hide modules button (right-aligned)
+    # Label adapts to Luau source: when code comes from disk (Rojo), the
+    # bridge is only used for the scene; when code goes through .Source,
+    # it carries both. Neutral fallback while both are off.
+    mcp_label_var = tk.StringVar(value="MCP (Roblox bridge)")
     r_mcp = tk.Frame(src)
     r_mcp.pack(fill="x", pady=(4, 0))
-    tk.Checkbutton(r_mcp, text="MCP (Roblox scene + code)", variable=mcp_var,
+    tk.Checkbutton(r_mcp, textvariable=mcp_label_var, variable=mcp_var,
                    anchor="w").pack(side="left")
     mi_btn = tk.Button(r_mcp, text="Hide modules\u2026",
                        command=lambda: _open_mi(), width=14)
@@ -494,12 +498,25 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         for name in w.root_names():
             _render_tab(name)
 
+    def _sync_mcp_label():
+        mcp = bool(mcp_var.get())
+        rojo = bool(rojo_var.get())
+        if mcp and luau_var.get() == "mcp":
+            mcp_label_var.set("MCP (Roblox bridge: scene + code)")
+        elif mcp and luau_var.get() == "rojo":
+            mcp_label_var.set("MCP (Roblox bridge: scene only)")
+        elif mcp:
+            mcp_label_var.set("MCP (Roblox bridge)")
+        else:
+            mcp_label_var.set("MCP (Roblox bridge)")
+
     def _sync_all():
         _sync_exec_state()
         _sync_luau_state()
         _sync_visibility_buttons()
         _sync_roots_visibility()
         _sync_tree_columns()
+        _sync_mcp_label()
 
     docs_var.trace_add("write", lambda *_: _sync_all())
     py_var.trace_add("write", lambda *_: _sync_all())
