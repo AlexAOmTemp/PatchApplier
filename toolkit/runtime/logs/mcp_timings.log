@@ -1,0 +1,103 @@
+2026-10-04T22:36:01.654531  [mcp.timing] invoke_many: calls=36 write_patch=0.000s write_accept=0.000s wait=2.529s total=2.529s
+2026-10-04T22:36:02.416991  [mcp.timing] invoke_many: calls=11 write_patch=0.000s write_accept=0.000s wait=0.758s total=0.758s
+2026-10-04T22:36:03.378808  [mcp.timing] invoke_many: calls=13 write_patch=0.000s write_accept=0.000s wait=0.960s total=0.961s
+2026-10-04T22:36:06.213548  [lua.index.timing] list=0.404s read=6.887s parse=0.203s render=0.002s total=7.496s modules=260 sources=260
+2026-10-04T23:02:36.543699  [mcp.timing] invoke_many: calls=1 write_patch=0.001s write_accept=0.000s wait=0.252s total=0.253s
+2026-10-04T23:04:15.539864  [mcp.timing] invoke_many: calls=1 write_patch=0.001s write_accept=0.000s wait=0.352s total=0.353s
+2026-10-04T23:05:31.398009  [mcp.timing] invoke_many: calls=1 write_patch=0.001s write_accept=0.000s wait=0.151s total=0.152s
+2026-10-05T10:41:10.787465  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:41:10.787918  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T10:41:10.788537  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:45:33.869176  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:45:33.869637  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T10:45:33.870301  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:50:50.908751  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:50:50.909192  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T10:50:50.909800  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:53:38.515198  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:53:38.515653  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T10:53:38.516281  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:56:44.790836  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T10:56:44.791291  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T10:56:44.791914  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T13:37:51.334182  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T13:37:51.334624  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T13:37:51.335237  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T13:54:47.432910  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T13:54:47.433363  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T13:54:47.434010  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:28:08.894024  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:28:08.894479  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:28:08.895094  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:35:32.258228  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:35:32.258709  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:35:32.259324  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:41:45.466869  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:41:45.467339  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:41:45.467974  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:45:50.150287  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:45:50.150738  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:45:50.151369  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:46:08.507024  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:46:08.507478  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:46:08.508091  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:47:59.569856  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T14:47:59.570322  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T14:47:59.570955  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T15:58:15.112157  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T15:58:15.112626  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T15:58:15.113280  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:07:11.823259  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:07:11.823734  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T16:07:11.824378  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:19:03.710833  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:19:03.711393  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T16:19:03.712078  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:34:42.773822  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:34:42.774364  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T16:34:42.775041  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:46:52.860648  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T16:46:52.861128  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T16:46:52.861780  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T17:01:09.634586  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T17:01:09.635058  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T17:01:09.635718  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T17:48:09.440749  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T17:48:09.441238  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T17:48:09.441871  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:22:18.338398  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:22:18.338852  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T18:22:18.339480  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:25:17.809397  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:25:17.809859  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T18:25:17.810529  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:48:36.459525  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:48:36.459978  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T18:48:36.460599  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:49:37.123724  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:49:37.124228  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T18:49:37.124890  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:50:15.063642  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T18:50:15.064121  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T18:50:15.064819  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:27:26.679680  [lua.index.timing] list=0.000s read=0.000s parse=0.001s render=0.000s total=0.001s modules=4 sources=4
+2026-10-05T19:27:26.680169  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T19:27:26.680886  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:28:35.868399  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:28:35.868868  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T19:28:35.869829  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:35:11.831356  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:35:11.831836  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T19:35:11.832501  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:35:45.996062  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=0 sources=0
+2026-10-05T19:38:03.960552  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=0 sources=0
+2026-10-05T19:40:46.882041  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:40:46.882528  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=2 sources=2
+2026-10-05T19:40:46.883171  [lua.index.timing] list=0.000s read=0.000s parse=0.000s render=0.000s total=0.000s modules=4 sources=4
+2026-10-05T19:43:10.096013  [mcp.timing] invoke_many: calls=36 write_patch=0.000s write_accept=0.000s wait=2.447s total=2.447s
+2026-10-05T19:43:10.865115  [mcp.timing] invoke_many: calls=11 write_patch=0.001s write_accept=0.000s wait=0.764s total=0.765s
+2026-10-05T19:43:11.777906  [mcp.timing] invoke_many: calls=13 write_patch=0.000s write_accept=0.000s wait=0.911s total=0.912s
+2026-10-05T19:43:14.612359  [lua.index.timing] list=0.404s read=6.762s parse=0.203s render=0.002s total=7.371s modules=260 sources=260
+2026-10-06T19:22:26.212347  [mcp.timing] invoke_many: calls=15 write_patch=0.000s write_accept=0.000s wait=1.113s total=1.114s
+2026-10-06T19:22:26.720267  [mcp.timing] invoke_many: calls=7 write_patch=0.000s write_accept=0.000s wait=0.506s total=0.506s
+2026-10-06T19:22:27.631959  [mcp.timing] invoke_many: calls=13 write_patch=0.000s write_accept=0.000s wait=0.910s total=0.911s

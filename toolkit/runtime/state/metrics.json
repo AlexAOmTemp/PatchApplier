@@ -1,0 +1,50 @@
+{
+  "since": 1791626376.4806795,
+  "updated": 1791626443.6533878,
+  "counts": {
+    "rebuild_index": {
+      "ok": 2
+    },
+    "rebuild_code_index": {
+      "ok": 2
+    },
+    "rebuild_lua_code_index": {
+      "ok": 2
+    },
+    "list_units": {
+      "ok": 1
+    },
+    "read_unit": {
+      "ok": 1,
+      "error": 2
+    },
+    "read_file": {
+      "ok": 2
+    },
+    "symbol_graph": {
+      "ok": 1
+    },
+    "grep": {
+      "ok": 1
+    },
+    "run_python": {
+      "error": 1,
+      "ok": 1
+    },
+    "file_stat": {
+      "ok": 1
+    },
+    "replace_in_file": {
+      "ok": 1
+    }
+  },
+  "errors": {
+    "read_unit": {
+      "not_found": 1,
+      "block_out_of_range": 1
+    },
+    "run_python": {
+      "nonzero_exit": 1
+    }
+  }
+}

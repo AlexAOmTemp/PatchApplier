@@ -1,0 +1,21 @@
+{
+  "_comment": "Default format: HTML-comment annotations, dotted numbering.",
+  "heading": {
+    "prefix": "#",
+    "min_level": 2,
+    "max_level": 8
+  },
+  "numbering": {
+    "pattern": "^\\d+(?:\\.\\d+)*\\.?",
+    "trailing_dot": true
+  },
+  "annotations": {
+    "open": "<!--",
+    "close": "-->",
+    "case_sensitive": false,
+    "summary":  { "keyword": "summary" },
+    "tags":     { "keyword": "tags" },
+    "large_ok": { "keyword": "large-ok", "bare": true },
+    "flat":     { "keyword": "flat",     "bare": true }
+  }
+}

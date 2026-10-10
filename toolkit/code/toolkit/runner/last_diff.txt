@@ -1,0 +1,6 @@
+.patch_applier/INDEX.md (файлов: 18, без summary: 84) [v254] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 153, символов: 1023) [v305] [~1, ⇅4]
+  ~ toolkit/code/manual/metrics_report.py  (+1 стр., +0.0 KB)
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 39, символов: 154) [v157] [без изменений]

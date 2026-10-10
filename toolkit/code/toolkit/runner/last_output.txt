@@ -1,0 +1,43 @@
+[fix] ✓ replace_in_file: toolkit/code/manual/metrics_report.py: заменено 1 вхожд. (последнее) — +1 стр., +44 Б
+
+[run] ✓ run_python: exit=0  duration=30ms
+--- stdout ---
+=== metrics ===
+since:   2026-10-10 12:59:36
+updated: 2026-10-10 13:00:42
+total actions: 14
+
+top actions (share, errors):
+  read_unit                    3  ( 21.4%)   err/block: 66.7%
+  read_file                    2  ( 14.3%)   err/block:  0.0%
+  rebuild_index                1  (  7.1%)   err/block:  0.0%
+  rebuild_code_index           1  (  7.1%)   err/block:  0.0%
+  rebuild_lua_code_index       1  (  7.1%)   err/block:  0.0%
+  list_units                   1  (  7.1%)   err/block:  0.0%
+  symbol_graph                 1  (  7.1%)   err/block:  0.0%
+  grep                         1  (  7.1%)   err/block:  0.0%
+  run_python                   1  (  7.1%)   err/block: 100.0%
+  file_stat                    1  (  7.1%)   err/block:  0.0%
+  replace_in_file              1  (  7.1%)   err/block:  0.0%
+
+buckets:
+  unit model                       4  ( 28.6%)
+  text escape hatch                1  (  7.1%)
+  old symbol model                 0  (  0.0%)
+  other (indexes, exec, ...)       9  ( 64.3%)
+
+errors by action:
+  read_unit: not_found (1), block_out_of_range (1)
+  run_python: nonzero_exit (1)
+[timing] user (2 actions): 0.03s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 18, без summary: 84) [v254] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 153, символов: 1023) [v305] [~1, ⇅4]
+  ~ toolkit/code/manual/metrics_report.py  (+1 стр., +0.0 KB)
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 39, символов: 154) [v157] [без изменений]
+[timing] auto-rebuild (3 actions): 0.78s
+
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.81s

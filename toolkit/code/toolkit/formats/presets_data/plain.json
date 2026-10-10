@@ -1,0 +1,21 @@
+{
+  "_comment": "Plain format: headings only, no annotations.",
+  "heading": {
+    "prefix": "#",
+    "min_level": 2,
+    "max_level": 8
+  },
+  "numbering": {
+    "pattern": "^\\d+(?:\\.\\d+)*\\.?",
+    "trailing_dot": true
+  },
+  "annotations": {
+    "open": null,
+    "close": null,
+    "case_sensitive": false,
+    "summary":  null,
+    "tags":     null,
+    "large_ok": null,
+    "flat":     null
+  }
+}
