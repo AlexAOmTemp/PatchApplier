@@ -1,12 +1,3 @@
-[{"id": "smoke-fix", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/_smoke_gui.py",
-    "search": "    for name in (\"run\", \"_switch_project\", \"_menu_new_project\",\n                 \"_menu_open_project\", \"_menu_project_settings\",\n                 \"open_settings_dialog\"):",
-    "replace": "    for name in (\"run\", \"_switch_project\", \"_menu_new_project\",\n                 \"_menu_open_project\", \"_menu_project_settings\"):",
-    "search_repr": false}}]
-
-[{"id": "smoke-gui", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
-
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "remove obsolete settings button and placeholder"]}}]
+                "args": ["commit", "pure tree logic and tests"]}}]

@@ -1,27 +1,51 @@
-[del-btn] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — -3 стр., -118 Б
+[tree-mod] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/gui/tree.py (102 стр., 3555 Б)
 
-[del-fn] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — -18 стр., -663 Б
+[test] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_tree.py (142 стр., 4831 Б)
 
-[grep-check] ✓ grep: Совпадений не найдено: 'open_settings_dialog|Настройки'
-
-[smoke-gui] ✗ run_python: exit=1  duration=187ms
+[run] ✓ run_python: exit=0  duration=37ms
 --- stdout ---
-[OK]   toolkit.runner.gui.app imported
-[FAIL] missing attribute: open_settings_dialog
+[OK]   empty input -> empty output
+[OK]   two top-level nodes
+[OK]   first is code
+[OK]   second is docs
+[OK]   both have empty children
+[OK]   code node has 2 children
+[OK]   code/bridge child
+[OK]   code/toolkit child
+[OK]   code/toolkit has backends
+[OK]   docs has no children
+[OK]   auto-create a
+[OK]   auto-create a/b
+[OK]   auto-create a/b/c
+[OK]   duplicate prefix merged, not added twice
+[OK]   merged node is code
+[OK]   order preserved (not alphabetical)
+[OK]   backslash path splits correctly
+[OK]   leading/trailing slashes ignored
+[OK]   double slash ignored
+[OK]   filter removes .git
+[OK]   filter keeps code
+[OK]   filter keeps docs
+[OK]   docs/generated removed
+[OK]   drop removed from a
+[OK]   keep still under a
+[OK]   flatten matches input
 
-[doc-upd] ✓ replace_in_file: toolkit/docs/GUI_PROJECT_SETTINGS.md: заменено 1 вхожд. (последнее) — -2 стр., +38 Б
+=== 26 ok, 0 failed ===
 
 [commit] ✗ run_python: exit=2  duration=38ms
 --- stdout ---
-unknown subcommand: gui: remove obsolete settings button and placeholder
-[timing] user (6 actions): 0.23s
+unknown subcommand: gui: pure tree logic (runner/gui/tree.py) + tests
+[timing] user (4 actions): 0.08s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v358] [~2, ⇅3]
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §7. Открытые вопросы (L130–L172, 2.9 KB, ⚠ no summary)
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §4. Что делать с кнопкой ⚙ в правом панели (L153–L158, 0.8 KB, ⚠ no summary)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v361] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1095) [v404] [без изменений]
-[timing] auto-rebuild (2 actions): 0.71s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1102) [v407] [+2]
+  + toolkit/code/toolkit/runner/gui/tree.py  (102 стр., 3.5 KB)
+  + toolkit/code/toolkit/tests/test_tree.py  (142 стр., 4.7 KB)
 
-##RESULT:{"ok": 6, "errors": 2, "skipped": 0, "failed": [4, 6], "blocked": []}
-[timing] total: 0.94s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v236] [без изменений]
+[timing] auto-rebuild (3 actions): 0.82s
+
+##RESULT:{"ok": 6, "errors": 1, "skipped": 0, "failed": [4], "blocked": []}
+[timing] total: 0.90s
