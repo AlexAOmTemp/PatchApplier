@@ -1,7 +1,7 @@
-"""Filesystem backend — reads/writes local files under a working directory.
+"""Filesystem backend — reads/writes local files under one root directory.
 
-All paths are relative to working_dir. Sandbox enforcement: any path that
-resolves outside working_dir is rejected before I/O.
+All paths are relative to the root. Sandbox enforcement: any path that
+resolves outside the root is rejected before I/O.
 
 Hiding: `.patchignore` in the project root holds gitignore-like patterns.
 A path is hidden if any of its segments (or a path prefix) matches a
@@ -41,7 +41,10 @@ def _explicitly_allowed(spec: FilterSpec, rel_str: str) -> bool:
 
 class FilesystemBackend:
     def __init__(self, working_dir: str | Path):
-        self.working_dir = Path(working_dir).resolve()
+        # Public constructor takes `working_dir` for legacy compatibility;
+        # internally it is stored as a private root. All path resolution
+        # and sandbox enforcement use self._root.
+        self._root = Path(working_dir).resolve()
         self._opened = False
         # Populated on `open()` — empty until then means nothing hidden.
         self._patterns: list[tuple[str, bool]] = []
@@ -49,12 +52,12 @@ class FilesystemBackend:
     # --- lifecycle --------------------------------------------------------
 
     def open(self) -> None:
-        if not self.working_dir.exists():
-            raise RuntimeError(f"working_dir не существует: {self.working_dir}")
-        if not self.working_dir.is_dir():
-            raise RuntimeError(f"working_dir не директория: {self.working_dir}")
-        patchignore.ensure_default(self.working_dir)
-        self._patterns = patchignore.read(self.working_dir)
+        if not self._root.exists():
+            raise RuntimeError(f"working_dir не существует: {self._root}")
+        if not self._root.is_dir():
+            raise RuntimeError(f"working_dir не директория: {self._root}")
+        patchignore.ensure_default(self._root)
+        self._patterns = patchignore.read(self._root)
         self._opened = True
 
     def close(self) -> None:
@@ -70,15 +73,15 @@ class FilesystemBackend:
         manually) so the running session picks up the new rules without a
         full restart.
         """
-        self._patterns = patchignore.read(self.working_dir)
+        self._patterns = patchignore.read(self._root)
 
     # --- helpers ----------------------------------------------------------
 
     def _resolve(self, path: str) -> Path:
         """Resolve a relative path against working_dir and enforce sandbox."""
-        target = (self.working_dir / path).resolve()
+        target = (self._root / path).resolve()
         try:
-            target.relative_to(self.working_dir)
+            target.relative_to(self._root)
         except ValueError:
             raise PermissionError(f"Путь вне проекта: {path}")
         return target
@@ -133,7 +136,7 @@ class FilesystemBackend:
         )
 
     def list(self, root: str = "", glob: str = "*") -> list[str]:
-        base = self._resolve(root) if root else self.working_dir
+        base = self._resolve(root) if root else self._root
         if not base.exists():
             return []
         out: list[str] = []
@@ -141,7 +144,7 @@ class FilesystemBackend:
             if not p.is_file():
                 continue
             try:
-                out.append(str(p.relative_to(self.working_dir)).replace("\\", "/"))
+                out.append(str(p.relative_to(self._root)).replace("\\", "/"))
             except ValueError:
                 continue
         return out
@@ -152,7 +155,7 @@ class FilesystemBackend:
         Reads contents to count lines; non-decodable files fall back to 0
         lines. Order matches `list` (sorted).
         """
-        base = self._resolve(root) if root else self.working_dir
+        base = self._resolve(root) if root else self._root
         if not base.exists():
             return []
         rows: list[tuple[str, int, int]] = []
@@ -160,7 +163,7 @@ class FilesystemBackend:
             if not p.is_file():
                 continue
             try:
-                rel = str(p.relative_to(self.working_dir)).replace("\\", "/")
+                rel = str(p.relative_to(self._root)).replace("\\", "/")
             except ValueError:
                 continue
             try:
@@ -196,7 +199,7 @@ class FilesystemBackend:
     def filter_check(self, path: str, spec: FilterSpec) -> str | None:
         try:
             target = self._resolve(path)
-            rel = target.relative_to(self.working_dir)
+            rel = target.relative_to(self._root)
         except (PermissionError, ValueError):
             return f"Путь вне проекта: {path}"
         rel_str = str(rel).replace("\\", "/")

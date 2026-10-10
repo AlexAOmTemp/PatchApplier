@@ -476,5 +476,5 @@ class CompositeBackend:
     def working_dir(self):
         for name, backend in self._pairs:
             if name == "fs":
-                return getattr(backend, "working_dir", None)
+                return getattr(backend, "_root", None) or getattr(backend, "working_dir", None)
         return None

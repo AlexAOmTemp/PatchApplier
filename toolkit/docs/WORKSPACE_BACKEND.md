@@ -41,7 +41,33 @@ class WorkspaceBackend:
 
 **`filter_check` убран из протокола.** Раньше он проверял `FilterSpec` на уровне backend'а, дублируя `Policy`. Теперь policy — забота `Patcher`. Подробности в §5.
 
-**`working_dir` убран из протокола.** Был корнем проекта; с multi-root нет одного корня. Кому нужен `cwd` для `run_python` — использует `<basename>/rel`. Кому нужно писать индексы — `state/<rel>`.
+**`working_dir` — концепция удаляется, не адаптируется.** В старой модели `project_dir` = `working_dir` = имя проекта = место state. Одно поле играло три роли, потому что проект был один каталог. В новой модели роли разъезжаются:
+
+| Роль | Где живёт |
+|---|---|
+| Имя проекта | `Workspace.name` |
+| Рабочие каталоги | `Workspace.roots` (список) |
+| Место для state | `state_dir` (отдельная сущность) |
+
+`working_dir` (единственное число) не может играть роль (2) — каталогов несколько. И не может играть роль (3) — state теперь отдельная сущность. Оставлять его «для совместимости» значит иметь два источника истины, которые рано или поздно разойдутся.
+
+**Уточнение: внутренний корень FS-бэкенда остаётся, публичный `working_dir` уходит.**
+
+`FilesystemBackend` продолжает знать свою директорию — без этого `_resolve` не преобразует `rel` в абсолютный путь. Меняется только видимость: раньше `working_dir` был публичным и к нему лезли `CompositeBackend`, тулы, раннеры; теперь корень — приватная деталь FS-бэкенда, наружу торчит только `WorkspaceBackend.roots`. Резолв не усложняется: каждый FS-бэкенд резолвит относительный путь у себя, `WorkspaceBackend` раздаёт по basename'у (dict-lookup, O(1)).
+
+**Удаляется публичный `working_dir` и его использования:**
+
+- `FilesystemBackend.working_dir` — публичный атрибут; внутри остаётся приватный `_root`.
+- `CompositeBackend.working_dir` (property-прокси) — удаляется.
+- Тулы, которым нужен «где писать» — берут `state_dir` из `Workspace`.
+- Тулы, которым нужен «относительно чего» — работают с явными путями `<basename>/<rel>`.
+
+**Кто заменяет старые использования:**
+
+- `RebuildLuaCodeIndexTool` — `local_dir = state_dir` (из `workspace.json`), не из `backend.working_dir`.
+- `run_python` — `cwd`: родитель `script`-файла (для `script=`) либо `state_dir` (для `module=`). Пользователь может указать `cwd` явно — тогда проверка «внутри одного из roots».
+- GUI-дерево — вместо одного корня вкладка на каждый `roots[name]`.
+- CLI `--working-dir` — принимается, но маппится в первый корень workspace или явно указанный `<basename>`.
 
 ## 3. Routing
 
@@ -172,28 +198,38 @@ CompositeBackend
 5. `working_dir` — убран из протокола. Кому нужен `cwd` — `<basename>/rel`; кому индексы — `state/<rel>`. Закрыт.
 
 ## 10. Рефакторинг Backend-протокола
-
 Этот шаг включает рефакторинг старого кода (чистота важнее совместимости):
 
-- **`core/backend.py`** — из `Backend`-протокола убрать `filter_check`.
-- **`backends/filesystem.py`** — убрать `filter_check` и `working_dir` (из публичного API).
-- **`backends/mcp.py`** — убрать `filter_check` (был no-op).
-- **`backends/composite.py`** — убрать `filter_check`, `working_dir`.
-- **`core/patcher.py`** — `_filter_paths` переписать; проверка policy переезжает сюда.
-- **`tools/index.py`** — `RebuildLuaCodeIndexTool` переписать: `local_dir` больше не из `backend.working_dir`, а из `state_dir` workspace-конфига.
-- **`tools/shell.py`** — `run_python`: `script` и `cwd` — `<basename>/rel`, проверка «внутри этого корня».
-- **Тесты:** `test_policy.py`, `test_live_studio.py`, `test_run_python.py` — обновить под новую форму.
+**Backend-протокол и реализации:**
+
+- **`core/backend.py`** — `filter_check` остаётся (см. §5: он делает больше, чем policy-проверку — sandbox, state-dir exemption, patchignore с explicit-override). `working_dir` в протоколе нет и не было.
+- **`backends/filesystem.py`** — удалить `working_dir` (атрибут и все использования внутри). `_resolve` берёт абсолютный путь явно, а не через working_dir. Публичный `working_dir` тоже убрать.
+- **`backends/composite.py`** — property `working_dir` **фиксится** (не удаляется) на этом шаге: смотрит `_root` (новое) → `working_dir` (legacy) → None. Удаление property переносится на шаг 3, когда `WorkspaceBackend` появится и сможет отдавать корень явно.
+
+**Тулы и раннеры:**
+
+- **`tools/index.py`** — `RebuildLuaCodeIndexTool.execute`: `local_dir` больше не из `backend.working_dir`, а из `state_dir` workspace-конфига. Параметр `local_root` — из `Workspace`, не из backend.
+- **`tools/shell.py`** — `run_python`: `script` и `cwd` — явные пути. Проверка «внутри проекта» — «внутри одного из `Workspace.roots`». `cwd` по умолчанию — родитель `script`-файла; для `module=` — `state_dir`.
+- **`runner/cli.py`** — `_resolve_working_dir` маппится в первый `Workspace.roots` или явно указанный `<basename>`.
+- **`runner/gui/app.py`** — `working_dir` для дерева заменяется на `Workspace.roots` (вкладка на корень, как в `WORKSPACE.md §8`).
+
+**Тесты:**
+
+- `test_policy.py` — `filter_check` остаётся, тест не меняется концептуально (только если сигнатура `_explicitly_allowed` поменяется — не меняется).
+- `test_composite_backend.py` — убрать `working_dir` из `FakeBackend`, если используется.
+- `test_live_studio.py` — обновить точки, где `working_dir` вызывается.
+- `test_run_python.py` — обновить ожидания по `cwd`.
+
+**Что не делаем в этом шаге:** multi-root policy (это шаг 5 в §11). Пока `Policy` в `Session` — плоская, пути проверяются как строки. Резолв `<basename>/rel` → `RootPolicy` — отдельная задача.
 
 Работа не «в одном патче» — по одному модулю, с прогоном тестов между шагами.
-
 ## 11. Порядок работы
-
 1. **Дизайн (этот документ).** — Готово.
-2. **Рефакторинг `Backend`-протокола.** Убрать `filter_check`, `working_dir`. Обновить `Patcher`, тесты.
-3. **`WorkspaceBackend` read-only.** `open/close/is_alive/read/exists/stat/list`. Резолв путей `<basename>/rel` + `state/<rel>`.
-4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии workspace.
-5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат.
+2. **Удаление `working_dir`.** Из `FilesystemBackend`, `CompositeBackend`, тулов (`index.py`, `shell.py`), раннеров (`cli.py`, `gui/app.py`). Тулы получают пути явно — из `state_dir` или из переданного корня. Тесты обновляются. **Этот шаг подготовительный: не вводит WorkspaceBackend, только убирает легаси-концепцию.** Старая однокорневая модель продолжает работать через `project_dir` (передаётся в FS-бэкенд как единственный путь).
+3. **`WorkspaceBackend` read-only.** `open/close/is_alive/read/exists/stat/list/filter_check`. Резолв путей `<basename>/rel`. `filter_check` сохраняет ту же логику (sandbox + state exemption + patchignore + policy) — но с multi-root sandbox: «путь внутри любого из корней».
+4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json` в state-каталоге. Старая модель (single-root) остаётся как fallback для проектов без workspace.
+5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.
 6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`.
-7. **GUI (шаг 5 из WORKSPACE.md).**
+7. **GUI (шаг 5 из WORKSPACE.md).** Вкладки по корням.
 
-Каждый шаг самодостаточен, откатывается.
+Каждый шаг самодостаточен, откатывается. Шаг 2 можно сделать отдельным независимым коммитом до того, как взяться за WorkspaceBackend.

@@ -1,7 +1,1 @@
-.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v288] [~4, ⇅6]
-  ~ toolkit/docs/WORKSPACE.md §7. State: external vs embedded (L135–L166, 3.5 KB, ⚠ stale) — State — каталог с workspace.json, индексами, .patchignore/.mcpignore, runtime. По умолчанию external (<toolkit_root>/runtime/workspaces/<id>). Embedded — пользователь кладёт куда хочет. Никакого реестра, только recent.json.
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §3. Routing (L46–L63, 2.1 KB, ⚠ no summary)
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L70–L103, 2.6 KB, ⚠ no summary)
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §7. State dir — где что лежит (L126–L154, 1.8 KB, ⚠ no summary)
-
-.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v289] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v182] [без изменений]

@@ -370,7 +370,7 @@ class RebuildLuaCodeIndexTool:
         if local_root:
             local_dir = Path(local_root)
         else:
-            local_dir = Path(getattr(backend, "working_dir", "."))
+            local_dir = Path(getattr(backend, "_root", None) or getattr(backend, "working_dir", None) or ".")
 
         out_name = output or self._default_output or "CODE_INDEX_LUA.md"
         manifest_name = (manifest_output or self._default_manifest

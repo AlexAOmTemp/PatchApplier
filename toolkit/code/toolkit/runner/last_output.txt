@@ -1,22 +1,5 @@
-[wb-s3] ✓ replace_between: L50–L61 → L50–L61 в toolkit/docs/WORKSPACE_BACKEND.md — +0 стр., +193 Б
+[rb] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v182] [без изменений]
+[timing] user (1 actions): 0.10s
 
-[wb-s5] ✓ replace_between: L100–L102 → L100–L103 в toolkit/docs/WORKSPACE_BACKEND.md — +1 стр., +594 Б
-
-[wb-s7] ✓ replace_unit: toolkit/docs/WORKSPACE_BACKEND.md: replace_unit применён
-
-[wb-s10] ✓ replace_in_file: toolkit/docs/WORKSPACE_BACKEND.md: заменено 1 вхожд. (последнее) — +0 стр., -2 Б
-
-[ws7-drop] ✓ replace_between: L159–L161 → L159–L160 в toolkit/docs/WORKSPACE.md — -1 стр., +165 Б
-
-[rebuild] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v288] [~4, ⇅6]
-  ~ toolkit/docs/WORKSPACE.md §7. State: external vs embedded (L135–L166, 3.5 KB, ⚠ stale) — State — каталог с workspace.json, индексами, .patchignore/.mcpignore, runtime. По умолчанию external (<toolkit_root>/runtime/workspaces/<id>). Embedded — пользователь кладёт куда хочет. Никакого реестра, только recent.json.
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §3. Routing (L46–L63, 2.1 KB, ⚠ no summary)
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L70–L103, 2.6 KB, ⚠ no summary)
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §7. State dir — где что лежит (L126–L154, 1.8 KB, ⚠ no summary)
-[timing] user (6 actions): 0.04s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v289] [без изменений]
-[timing] auto-rebuild (1 actions): 0.03s
-
-##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.07s
+##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.10s

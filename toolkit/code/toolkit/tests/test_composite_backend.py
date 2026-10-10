@@ -39,7 +39,6 @@ class FakeBackend:
         self.calls = []
         self._alive = False
         self.files = {}
-        self.working_dir = Path("/fake")
 
     def _log(self, op, path, **kw):
         self.calls.append((op, path, kw))
