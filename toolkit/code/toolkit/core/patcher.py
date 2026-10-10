@@ -15,7 +15,7 @@ from typing import Any
 from . import metrics
 from .backend import Backend
 from .errors import BackendUnavailable
-from .models import Policy, Result
+from .models import Result
 from .tool import Tool
 
 
@@ -67,12 +67,10 @@ class Patcher:
         backend: Backend,
         fmt: Any,
         tools: dict[str, type[Tool]],
-        policy: Policy | None = None,
     ):
         self.backend = backend
         self.fmt = fmt
         self.tools = tools
-        self.policy = policy or Policy()
 
     # --- public ------------------------------------------------------------
 
@@ -157,9 +155,6 @@ class Patcher:
 
         tool_cls = self.tools.get(action)
         if tool_cls is None:
-            # Native passthrough: if the backend knows this name (MCP bridge
-            # tools), let it run. Backend returns None for unknown names,
-            # in which case we fall through to the original "unknown action".
             native = getattr(self.backend, "invoke_native", None)
             if callable(native):
                 try:
@@ -180,23 +175,18 @@ class Patcher:
             )
 
         op = getattr(tool_cls, "op", "write")
-        spec = self.policy.for_op(op)
 
-        # For op="index" path_args usually point at a directory, not at the
-        # per-file scope. Skip path filtering here; the Tool receives the
-        # index spec via `_index_spec` and applies it to individual files.
-        if op != "index":
-            block = self._filter_paths(tool_cls, args, spec)
+        # For op in ("index_docs", "index_py", "index_lua") path_args typically
+        # point at a directory. Individual files are filtered later by the
+        # indexer via backend.filter_check(path, op).
+        if not op.startswith("index"):
+            block = self._filter_paths(tool_cls, args, op)
             if block is not None:
                 return Result(status="blocked", message=block, action=action,
                               error_code="filter")
 
-        kwargs = dict(args)
-        if op == "index":
-            kwargs["_index_spec"] = spec
-
         try:
-            return tool_cls().execute(backend=self.backend, fmt=self.fmt, **kwargs)
+            return tool_cls().execute(backend=self.backend, fmt=self.fmt, **dict(args))
         except PermissionError as e:
             return Result(status="blocked", message=str(e), action=action,
                           error_code="sandbox")
@@ -213,13 +203,11 @@ class Patcher:
                           message=f"\u0418\u0421\u041a\u041b\u042e\u0427\u0415\u041d\u0418\u0415: {type(e).__name__}: {e}",
                           action=action)
 
-    def _filter_paths(self, tool_cls: type[Tool], args: dict, spec) -> str | None:
-        if not spec.is_active():
-            return None
+    def _filter_paths(self, tool_cls: type[Tool], args: dict, op: str) -> str | None:
         for key in getattr(tool_cls, "path_args", []) or []:
             val = args.get(key)
             if isinstance(val, str) and val:
-                err = self.backend.filter_check(val, spec)
+                err = self.backend.filter_check(val, op)
                 if err:
                     return err
         for key in getattr(tool_cls, "path_list_args", []) or []:
@@ -227,7 +215,7 @@ class Patcher:
             if isinstance(val, list):
                 for item in val:
                     if isinstance(item, str) and item:
-                        err = self.backend.filter_check(item, spec)
+                        err = self.backend.filter_check(item, op)
                         if err:
                             return err
         return None

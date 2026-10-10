@@ -1031,7 +1031,7 @@ class MCPBackend:
         )
 
 
-    def filter_check(self, path: str, spec: FilterSpec) -> str | None:
+    def filter_check(self, path: str, op: str) -> str | None:
         """No path-level filtering for Roblox DataModel.
 
         Roblox paths are not filesystem paths and cannot be enforced the same

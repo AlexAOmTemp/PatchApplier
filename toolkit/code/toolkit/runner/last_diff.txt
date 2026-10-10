@@ -1,1 +1,19 @@
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v210] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 165, символов: 1152) [v376] [~1, ⇅7]
+  ~ toolkit/code/toolkit/config/workspace.py  (+23 стр., +0.8 KB)
+      + toolkit/code/toolkit/config/workspace.py :: PathPolicy  [class]  L51–L71
+      + toolkit/code/toolkit/config/workspace.py :: PathPolicy.to_dict  [method]  L61–L62
+      + toolkit/code/toolkit/config/workspace.py :: PathPolicy.from_dict  [method]  L64–L68
+      + ... и ещё 3
+      - toolkit/code/toolkit/config/workspace.py :: RootPolicy  [class]  L59–L66
+      - toolkit/code/toolkit/config/workspace.py :: _policy_to_dict  [function]  L209–L216
+      - toolkit/code/toolkit/config/workspace.py :: _policy_from_dict  [function]  L219–L226
+      ~ toolkit/code/toolkit/config/workspace.py :: Root  [class]  L47–L56 → L74–L108
+      ~ toolkit/code/toolkit/config/workspace.py :: Workspace  [class]  L69–L81 → L111–L129
+      ~ toolkit/code/toolkit/config/workspace.py :: _is_nested  [function]  L95–L108 → L143–L152
+      ~ ... и ещё 6
+
+.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v331] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 165, символов: 1152) [v377] [без изменений]
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v211] [без изменений]

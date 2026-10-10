@@ -22,7 +22,6 @@ import threading
 import time
 
 from ..core.errors import BackendUnavailable
-from ..core.models import FilterSpec
 from ..core.paths import is_mcp_path
 
 
@@ -434,11 +433,11 @@ class CompositeBackend:
 
     # --- filter ------------------------------------------------------------
 
-    def filter_check(self, path: str, spec: FilterSpec) -> str | None:
+    def filter_check(self, path: str, op: str) -> str | None:
         name, backend = self._owner(path)
         if backend is None:
             return None
-        return backend.filter_check(path, spec)
+        return backend.filter_check(path, op)
 
     def invoke_native(self, name: str, args: dict):
         """Delegate to the MCP sub-backend, if present and ready.

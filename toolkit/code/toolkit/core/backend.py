@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from .models import FileStat, FilterSpec
+from .models import FileStat
 
 
 class Backend(Protocol):
@@ -61,6 +61,10 @@ class Backend(Protocol):
 
     # --- filter -----------------------------------------------------------
 
-    def filter_check(self, path: str, spec: FilterSpec) -> str | None:
-        """None = ok. Otherwise — error message with block-reason prefix."""
+    def filter_check(self, path: str, op: str) -> str | None:
+        """None = ok. Otherwise — error message with block-reason prefix.
+
+        `op` selects which policy flag to consult: read, write, or one
+        of the index flags (index_docs / index_py / index_lua).
+        """
         ...

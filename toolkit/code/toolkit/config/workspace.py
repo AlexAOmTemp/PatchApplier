@@ -1,35 +1,36 @@
 """Workspace model — multi-root project for the toolkit.
 
-Spec: docs/WORKSPACE.md. Pure data + validation + JSON I/O. Not wired
-into Session / backends / GUI yet — that is steps 3+ of the plan.
+Spec: docs/WORKSPACE.md, docs/WORKSPACE_BACKEND.md.
 
 Concepts:
-  Workspace   — a named set of FS roots + policy + per-domain index config.
-  Root        — one FS directory; identified by the basename of its path.
-                Uniqueness enforced: two roots named `toolkit` cannot
-                coexist. No label / id / display_name — the basename is
-                the identity (see WORKSPACE.md §2).
-  RootPolicy  — five independent flags per root: read, write, index_docs,
-                index_py, index_lua. No nesting, so no inheritance.
+  Workspace    — a named set of FS roots + per-domain config. Identity
+                 file: `workspace.json` in the state directory.
+  Root         — one FS directory; identified by the basename of its path.
+                 Uniqueness enforced: two roots named `toolkit` cannot
+                 coexist. No label / id / display_name — the basename is
+                 the identity.
+  PathPolicy   — five independent flags (read, write, index_docs,
+                 index_py, index_lua) applied to a path and, by
+                 inheritance, to its subtree.
+  Root.overrides — per-path policy map: relative path -> PathPolicy.
+                 Special key "." holds the root default; empty means
+                 all-True everywhere. Nearest-match wins.
 
-State layout (external by default):
-    <toolkit_root>/runtime/workspaces/<id>/
-        workspace.json    this module reads/writes it
-        .patchignore      FS visibility rules
-        .mcpignore        MCP visibility rules
-        INDEX.md          docs index (produced elsewhere)
-        CODE_INDEX.md     Python index
-        CODE_INDEX_LUA.md Luau index
-        *.manifest.json   index sidecars
-        .index_meta.json  per-section metadata
-        runtime/          bridge state, logs, metrics
+Serialization form of a root:
+    {
+      "path": "...",
+      "overrides": {
+        ".": {"read": true, "write": true,
+              "index_docs": true, "index_py": true, "index_lua": true},
+        "docs/generated": {"write": false, "index_docs": false}
+      },
+      "include": [...],
+      "exclude": [...]
+    }
 
-Embedded state (user puts the directory inside their project) works the
-same — the toolkit just needs the path. `runtime/recent.json` records
-recently opened state directories, so embedded workspaces can be found.
-
-Not implemented here: policy enforcement, path resolution to roots,
-Session wiring, GUI, migration from the old single-root model.
+Legacy workspace.json (single top-level `policy: {root_name: flags}` block)
+still loads: the flags become the root's `overrides["."]` on the fly. It
+is not written back in that shape.
 """
 from __future__ import annotations
 
@@ -41,13 +42,45 @@ from pathlib import Path
 
 WORKSPACE_FILENAME = "workspace.json"
 
-DEFAULT_INDEX_FLAGS = ("index_docs", "index_py", "index_lua")
+ALL_FLAGS = ("read", "write", "index_docs", "index_py", "index_lua")
+
+
+# --- dataclasses -----------------------------------------------------------
+
+
+@dataclass
+class PathPolicy:
+    """Five independent permission flags for a path (and, by inheritance,
+    its subtree). All True by default."""
+    read: bool = True
+    write: bool = True
+    index_docs: bool = True
+    index_py: bool = True
+    index_lua: bool = True
+
+    def to_dict(self) -> dict:
+        return {k: bool(getattr(self, k)) for k in ALL_FLAGS}
+
+    @classmethod
+    def from_dict(cls, d) -> "PathPolicy":
+        if not isinstance(d, dict):
+            return cls()
+        return cls(**{k: bool(d.get(k, True)) for k in ALL_FLAGS})
+
+    def copy(self) -> "PathPolicy":
+        return PathPolicy(**{k: bool(getattr(self, k)) for k in ALL_FLAGS})
 
 
 @dataclass
 class Root:
-    """One FS root. Name is derived from path's basename (see module doc)."""
+    """One FS root. Name is derived from path's basename.
+
+    `overrides` maps relative paths (forward-slash separated) to a
+    PathPolicy. The special key "." holds the default for the root. An
+    empty map means "all flags True everywhere".
+    """
     path: str
+    overrides: dict[str, PathPolicy] = field(default_factory=dict)
     include: list[str] = field(default_factory=list)
     exclude: list[str] = field(default_factory=list)
 
@@ -55,30 +88,45 @@ class Root:
         """Basename of the root path — the root's identity in workspace."""
         return Path(self.path).name
 
+    def policy_for(self, rel: str) -> PathPolicy:
+        """Effective policy for a relative path inside this root.
 
-@dataclass
-class RootPolicy:
-    """Per-root policy. All flags independent; default all True."""
-    read: bool = True
-    write: bool = True
-    index_docs: bool = True
-    index_py: bool = True
-    index_lua: bool = True
+        Nearest-match wins: exact -> nearest ancestor -> "." -> default.
+        """
+        if not self.overrides:
+            return PathPolicy()
+        norm = (rel or "").replace("\\", "/").strip("/")
+        if norm in self.overrides:
+            return self.overrides[norm]
+        parts = norm.split("/") if norm else []
+        for i in range(len(parts) - 1, 0, -1):
+            prefix = "/".join(parts[:i])
+            if prefix in self.overrides:
+                return self.overrides[prefix]
+        if "." in self.overrides:
+            return self.overrides["."]
+        return PathPolicy()
 
 
 @dataclass
 class Workspace:
-    """A workspace: roots + policy + per-domain index config."""
+    """A workspace: roots + per-domain config."""
     id: str
     name: str
     roots: dict[str, Root] = field(default_factory=dict)
-    policy: dict[str, RootPolicy] = field(default_factory=dict)
     format: dict = field(default_factory=dict)
     exec: dict = field(default_factory=dict)
     mcp: dict = field(default_factory=dict)
 
     def root_names(self) -> list[str]:
         return sorted(self.roots.keys())
+
+    def policy_for(self, root_name: str, rel: str) -> PathPolicy:
+        """Effective policy for `<root_name>/<rel>`. Defaults to all-True."""
+        r = self.roots.get(root_name)
+        if r is None:
+            return PathPolicy()
+        return r.policy_for(rel)
 
 
 # --- identity -------------------------------------------------------------
@@ -93,11 +141,7 @@ def new_id() -> str:
 
 
 def _is_nested(a: Path, b: Path) -> bool:
-    """True if either path is a strict ancestor of the other.
-
-    Both sides resolved first. On Windows this is case-insensitive in
-    practice via the filesystem; on POSIX it is exact.
-    """
+    """True if either path is a strict ancestor of the other."""
     try:
         a = a.resolve()
         b = b.resolve()
@@ -119,11 +163,9 @@ def _roblox_services() -> set[str]:
 def validate(ws: Workspace) -> None:
     """Check the invariants from WORKSPACE.md §4 / §8.
 
-    Raises ValueError with a short reason when a check fails. Called on
-    save and on add_root. Does not touch the filesystem beyond the
-    paths' resolve() for nesting checks.
+    Raises ValueError with a short reason when a check fails.
     """
-    names: dict[str, str] = {}  # name -> path, to report collisions
+    names: dict[str, str] = {}
     reserved = _roblox_services()
     paths: list[tuple[str, Path]] = []
     for name, root in ws.roots.items():
@@ -147,15 +189,13 @@ def validate(ws: Workspace) -> None:
             )
         names[name] = root.path
         paths.append((name, Path(root.path)))
-    # Nesting: pairwise, but N is tiny.
     for i in range(len(paths)):
         for j in range(i + 1, len(paths)):
             n1, p1 = paths[i]
             n2, p2 = paths[j]
             if _is_nested(p1, p2):
                 raise ValueError(
-                    f"roots {n1!r} and {n2!r} are nested: "
-                    f"{p1} <-> {p2}"
+                    f"roots {n1!r} and {n2!r} are nested: {p1} <-> {p2}"
                 )
 
 
@@ -171,18 +211,14 @@ def add_root(ws: Workspace, path: str) -> str:
     if not name:
         raise ValueError(f"cannot derive a root name from {path!r}")
     if name in ws.roots:
-        raise ValueError(
-            f"a root named {name!r} already exists in this workspace"
-        )
+        raise ValueError(f"a root named {name!r} already exists")
     probe = Workspace(
         id=ws.id, name=ws.name,
         roots={**ws.roots, name: candidate},
-        policy={**ws.policy, name: RootPolicy()},
         format=ws.format, exec=ws.exec, mcp=ws.mcp,
     )
     validate(probe)
     ws.roots[name] = candidate
-    ws.policy.setdefault(name, RootPolicy())
     return name
 
 
@@ -191,6 +227,8 @@ def add_root(ws: Workspace, path: str) -> str:
 
 def _root_to_dict(r: Root) -> dict:
     d: dict = {"path": r.path}
+    if r.overrides:
+        d["overrides"] = {k: v.to_dict() for k, v in r.overrides.items()}
     if r.include:
         d["include"] = list(r.include)
     if r.exclude:
@@ -199,30 +237,13 @@ def _root_to_dict(r: Root) -> dict:
 
 
 def _root_from_dict(d: dict) -> Root:
+    raw = d.get("overrides") or {}
+    overrides = {str(k): PathPolicy.from_dict(v) for k, v in raw.items()}
     return Root(
         path=str(d.get("path", "")),
+        overrides=overrides,
         include=list(d.get("include") or []),
         exclude=list(d.get("exclude") or []),
-    )
-
-
-def _policy_to_dict(p: RootPolicy) -> dict:
-    return {
-        "read": bool(p.read),
-        "write": bool(p.write),
-        "index_docs": bool(p.index_docs),
-        "index_py": bool(p.index_py),
-        "index_lua": bool(p.index_lua),
-    }
-
-
-def _policy_from_dict(d: dict) -> RootPolicy:
-    return RootPolicy(
-        read=bool(d.get("read", True)),
-        write=bool(d.get("write", True)),
-        index_docs=bool(d.get("index_docs", True)),
-        index_py=bool(d.get("index_py", True)),
-        index_lua=bool(d.get("index_lua", True)),
     )
 
 
@@ -231,7 +252,6 @@ def to_dict(ws: Workspace) -> dict:
         "id": ws.id,
         "name": ws.name,
         "roots": {k: _root_to_dict(v) for k, v in ws.roots.items()},
-        "policy": {k: _policy_to_dict(v) for k, v in ws.policy.items()},
         "format": dict(ws.format),
         "exec": dict(ws.exec),
         "mcp": dict(ws.mcp),
@@ -239,16 +259,19 @@ def to_dict(ws: Workspace) -> dict:
 
 
 def from_dict(d: dict) -> Workspace:
-    roots = {k: _root_from_dict(v) for k, v in (d.get("roots") or {}).items()}
-    policy = {k: _policy_from_dict(v) for k, v in (d.get("policy") or {}).items()}
-    # Every root must have a policy entry; fill defaults for missing ones.
-    for name in roots:
-        policy.setdefault(name, RootPolicy())
+    roots_data = d.get("roots") or {}
+    old_policy = d.get("policy") or {}  # migration from pre-per-path format
+    roots: dict[str, Root] = {}
+    for name, rd in roots_data.items():
+        r = _root_from_dict(rd or {})
+        # Migrate old top-level policy block into the root's default override.
+        if not r.overrides and name in old_policy:
+            r.overrides["."] = PathPolicy.from_dict(old_policy[name])
+        roots[name] = r
     return Workspace(
         id=str(d.get("id") or new_id()),
         name=str(d.get("name") or "workspace"),
         roots=roots,
-        policy=policy,
         format=dict(d.get("format") or {}),
         exec=dict(d.get("exec") or {}),
         mcp=dict(d.get("mcp") or {}),

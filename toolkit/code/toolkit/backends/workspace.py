@@ -22,7 +22,7 @@ from pathlib import Path
 
 from ..config import patchignore
 from ..config.workspace import Workspace
-from ..core.models import FileStat, FilterSpec
+from ..core.models import FileStat
 from .filesystem import FilesystemBackend
 
 
@@ -303,15 +303,18 @@ class WorkspaceBackend:
 
     # --- filter ------------------------------------------------------------
 
-    def filter_check(self, path: str, spec: FilterSpec) -> str | None:
+    def filter_check(self, path: str, op: str) -> str | None:
         """None = ok. Otherwise a message with a block reason.
 
         Rules (see WORKSPACE_BACKEND.md §5):
-          0. State prefix (`.patch_applier/`) is always OK — RW for internal
-             tools, never indexed. Same exemption as FilesystemBackend.
+          0. State prefix (`.patch_applier/`) is always OK.
           1. Root must exist in workspace.
           2. `.patchignore` from state_dir applies to ``rel`` inside the root.
-          3. Policy applies to the *full* ``<basename>/<rel>``.
+          3. Per-path policy applies: nearest override under the root,
+             otherwise the root default, otherwise all-True.
+
+        `op` is one of read / write / index_docs / index_py / index_lua —
+        the flag consulted on the resolved PathPolicy.
         """
         name, rel = self._split(path)
         if name == patchignore.STATE_DIR:
@@ -321,7 +324,7 @@ class WorkspaceBackend:
         rel_norm = rel.replace("\\", "/")
         if rel_norm and patchignore.path_hidden(rel_norm, self._patterns):
             return f"Скрытая папка: {path}"
-        full = f"{name}/{rel_norm}" if rel_norm else name
-        if not spec.resolve(full):
+        pol = self.ws.policy_for(name, rel_norm)
+        if not bool(getattr(pol, op, True)):
             return f"Запрещено политикой: {path}"
         return None

@@ -15,28 +15,7 @@ import shutil
 from pathlib import Path
 
 from ..config import patchignore
-from ..core.models import FileStat, FilterSpec
-
-
-def _explicitly_allowed(spec: FilterSpec, rel_str: str) -> bool:
-    """True if `spec.overrides` has an explicit True for the path or one
-    of its named ancestors.
-
-    The root (`.`) is deliberately ignored: it is an ancestor of every
-    path, so treating `.'=True` as "everything allowed" would disable the
-    .patchignore rule for the entire tree. Only named intermediate paths
-    count — e.g. `.patch_applier=True` opens `.patch_applier/...` without
-    opening `.git/...`.
-    """
-    ov = (spec.overrides if spec is not None else None) or {}
-    parts = rel_str.split("/")
-    for i in range(len(parts), 0, -1):
-        prefix = "/".join(parts[:i])
-        if prefix == ".":
-            continue
-        if prefix in ov and ov[prefix] is True:
-            return True
-    return False
+from ..core.models import FileStat
 
 
 class FilesystemBackend:

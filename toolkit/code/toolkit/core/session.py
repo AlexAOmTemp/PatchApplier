@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any
 
 from .backend import Backend
-from .models import Policy, Result
+from .models import Result
 from .patcher import Patcher
 from .tool import Tool
 
@@ -26,13 +26,11 @@ class Session:
         backend: Backend,
         fmt: Any,
         tools: dict[str, type[Tool]],
-        policy: Policy | None = None,
     ):
         self.backend = backend
         self.fmt = fmt
         self.tools = tools
-        self.policy = policy or Policy()
-        self.patcher = Patcher(backend, fmt, tools, self.policy)
+        self.patcher = Patcher(backend, fmt, tools)
 
     def __enter__(self) -> "Session":
         self.backend.open()
