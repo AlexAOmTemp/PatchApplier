@@ -186,4 +186,18 @@ class FilesystemBackend:
         d.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(s, d)
 
+    def filter_check(self, path: str, op: str) -> str | None:
+        """No path-level policy at the FS level.
+
+        In the new model, FilesystemBackend is used as a sub-backend of
+        WorkspaceBackend. Path policy is a Workspace concern (per-root,
+        per-path PathPolicy), enforced in WorkspaceBackend.filter_check.
+        When FilesystemBackend is driven directly (tests, ad-hoc tools),
+        there is no policy to consult — return None.
+
+        Sandbox enforcement (path must be inside the root) still happens
+        in `_resolve`, called by every read/write method.
+        """
+        return None
+
 
