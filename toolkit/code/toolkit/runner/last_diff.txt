@@ -1,2 +1,3 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 170) [v354] [+1]
-  + ## toolkit/docs/GUI_TREE.md  (155 стр., 9.4 KB, mtime 2026-10-10 22:29)
+.patch_applier/INDEX.md (файлов: 23, без summary: 173) [v356] [+1, -1]
+  + ## toolkit/docs/GUI_PROJECT_SETTINGS.md  (172 стр., 10.4 KB, mtime 2026-10-10 22:54)
+  - ## toolkit/docs/GUI_TREE.md  (168 стр., 9.7 KB, mtime 2026-10-10 22:35)

@@ -1,13 +1,16 @@
-[doc] ✓ create_file: Файл создан: toolkit/docs/GUI_TREE.md (155 стр., 9596 Б)
+[rm-old] ✓ delete_file: Файл удалён: toolkit/docs/GUI_TREE.md (168 стр., 9933 Б)
 
-[commit] ✗ run_python: exit=2  duration=39ms
+[new-doc] ✓ create_file: Файл создан: toolkit/docs/GUI_PROJECT_SETTINGS.md (172 стр., 10620 Б)
+
+[commit] ✗ run_python: exit=2  duration=38ms
 --- stdout ---
-unknown subcommand: docs: GUI_TREE.md design for 7.3 file tree
-[timing] user (2 actions): 0.04s
+unknown subcommand: docs: GUI_PROJECT_SETTINGS.md — separate project management window
+[timing] user (3 actions): 0.04s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 170) [v354] [+1]
-  + ## toolkit/docs/GUI_TREE.md  (155 стр., 9.4 KB, mtime 2026-10-10 22:29)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 173) [v356] [+1, -1]
+  + ## toolkit/docs/GUI_PROJECT_SETTINGS.md  (172 стр., 10.4 KB, mtime 2026-10-10 22:54)
+  - ## toolkit/docs/GUI_TREE.md  (168 стр., 9.7 KB, mtime 2026-10-10 22:35)
 [timing] auto-rebuild (1 actions): 0.03s
 
-##RESULT:{"ok": 2, "errors": 1, "skipped": 0, "failed": [2], "blocked": []}
+##RESULT:{"ok": 3, "errors": 1, "skipped": 0, "failed": [3], "blocked": []}
 [timing] total: 0.07s
