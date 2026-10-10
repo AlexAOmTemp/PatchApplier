@@ -229,7 +229,7 @@ CompositeBackend
 
 4. **Интеграция в `CompositeBackend`.** ✅ **Готово.** CLI `_create_backend` + GUI `_build_backend_for_config` строят `WorkspaceBackend` из `workspace.json`. `config.loader.load_workspace(cfg)`. Никакого fallback на старую модель. GUI File menu (New/Open/Recent/Project settings) работает.
 
-5. **Индексаторы под multi-root.** ⚠️ **Формально работает.** `rebuild_*` ходят по `list("")`, который возвращает плоский список с префиксами `<basename>/<rel>`. На одном корне проверено. На двух — только `test_workspace_backend.py`, живого проекта не заводили.
+5. **Индексаторы под multi-root.** ✅ **Готово.** `rebuild_*` ходят по `list("")`, который возвращает плоский список с префиксами `<basename>/<rel>`. Проверено live на двух корнях: `test_multi_root_smoke.py` (16/16) — индекс собирает файлы обоих корней; per-root `PathPolicy(index_docs=False, index_py=False)` реально исключает root из индекса при rebuild.
 
 6. **Write (шаг 4 из WORKSPACE.md).** ✅ **Готово.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня. Кросс-root `move` запрещён (`RuntimeError`), кросс-root `copy` разрешён через `FilesystemBackend.copy_to`. State-префикс — всегда RW.
 

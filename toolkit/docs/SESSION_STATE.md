@@ -78,7 +78,7 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 
 2. **Редактор per-path overrides.** Сейчас Project settings работает только с per-root default (`overrides["."]`). Path-level (`docs/generated: read=false`) — только через `workspace.json` руками. Нужен UI внутри Project settings: выбор root'а → дерево его путей → флаги.
 
-3. **Multi-root smoke на живом проекте.** Формально покрыто `test_workspace_backend.py` (два roots `alpha`/`beta`). Но реальный проект с 2+ roots и rebuild'ом не запускали. Нужно: создать проект, добавить второй root (например `D:/some-other-folder`), запустить `rebuild_index`/`rebuild_code_index`, убедиться, что оба корня в индексе.
+3. ~~**Multi-root smoke на живом проекте.**~~ **Закрыто.** `test_multi_root_smoke.py` (16/16) — два корня `alpha`/`beta`, `rebuild_index` + `rebuild_code_index` собирают файлы обоих, per-root `PathPolicy` исключает корень из индекса при rebuild.
 
 **Мелкие:**
 
