@@ -1,32 +1,32 @@
-"""Tk widget: scrollable directory list with five policy flags per row.
+"""Tk widget: scrollable directory list with per-row policy cells.
 
-A row = one directory. Five cells on the right: R / W / Id / Ip / Il.
+A row = one directory. On the right: five possible cells, R / W / Id /
+Ip / Il. Which cells are shown is controlled by `active_flags`:
+
+    read        always visible
+    write       always visible
+    index_docs  visible only when Documentation is enabled
+    index_py    visible only when Python indexing is enabled
+    index_lua   visible only when Lua-on-disk (Rojo) is enabled
+
+The MCP-side Lua index is not configured from here (it is always on
+when MCP runs and is filtered only via .mcpignore), so index_lua here
+is about disk files in Rojo mode.
+
 Each cell cycles through three states:
 
     dot     no override at this path (inherit)
     +       override exists, this flag is True
     -       override exists, this flag is False
 
-Click semantics (see docs/GUI_PROJECT_SETTINGS.md section 2.2):
+Click semantics:
 
     dot  ->  + or -   create override from effective, invert the clicked flag
     +    ->  -        flip to False (only this flag)
     -    ->  +        flip to True (only this flag)
 
-Returning a cell to dot (removing the whole override) is a separate
-Ctrl+click gesture - not implemented in this pass.
-
-Hidden rows. A directory matched by `.patchignore` is a hard deny: all
-five flags show a fixed minus and do not respond to clicks. The same
-rule was in the old settings dialog (hidden = R-.W-.I-); we restore it.
-An override on a hidden path (if one exists from before the pattern was
-added) is ignored while the row is hidden - the file is closed anyway.
-
-The topmost row is the virtual root, keyed "." in overrides. It holds
-the default policy for the whole root; children inherit from it.
-
-Directory rows use tree connectors (TEE, ELBOW, PIPE) so nesting is
-visible without counting indents.
+Hidden rows are hard-denied: all cells show a fixed minus and clicks are
+ignored. The topmost row is the virtual root, keyed "." in overrides.
 """
 from __future__ import annotations
 
@@ -58,16 +58,23 @@ _PIPE = "\u2502   "
 _SPACE = "    "
 
 
+def _all_flags() -> set[str]:
+    return {k for k, _ in FLAG_COLUMNS}
+
+
 class PolicyTree(tk.Frame):
     """Scrollable canvas with a scrollbar and one row per directory."""
 
-    def __init__(self, parent, root: Root):
+    def __init__(self, parent, root: Root,
+                 active_flags: set[str] | None = None):
         super().__init__(parent)
         self._root = root
-        self._overrides = root.overrides  # mutate in place, same object
+        self._overrides = root.overrides
         self._row_widgets: dict[str, dict] = {}
         self._hidden_paths: set[str] = set()
         self._root_label = Path(root.path).name or "[root]"
+        self._active_flags = (set(active_flags) if active_flags is not None
+                              else _all_flags())
 
         self._container = tk.Frame(self, bd=1, relief="sunken")
         self._container.pack(fill="both", expand=True)
@@ -92,6 +99,10 @@ class PolicyTree(tk.Frame):
 
     # --- public API ---------------------------------------------------
 
+    def set_active_flags(self, flags: set[str]) -> None:
+        """Change which cells are shown. Caller must re-render."""
+        self._active_flags = set(flags)
+
     def render(self, paths: list[tuple[str, bool]],
                show_hidden: bool = False) -> None:
         """(Re)build the visual rows from a flat [(rel, hidden)] list."""
@@ -104,13 +115,14 @@ class PolicyTree(tk.Frame):
         if not show_hidden:
             tree = filter_hidden(tree)
 
-        self._make_header_row()
+        active = [(k, l) for k, l in FLAG_COLUMNS if k in self._active_flags]
+        self._make_header_row(active)
         self._make_row(".", display_text=f"[{self._root_label}]",
-                       hidden=False, root_row=True)
-        self._render_children(tree, prefix="", path_prefix="")
+                       hidden=False, root_row=True, active_columns=active)
+        self._render_children(tree, prefix="", path_prefix="",
+                              active_columns=active)
 
     def overrides(self) -> dict[str, PathPolicy]:
-        """Return the live overrides dict (mutated in place)."""
         return self._overrides
 
     # --- rendering ----------------------------------------------------
@@ -121,18 +133,18 @@ class PolicyTree(tk.Frame):
         except Exception:
             return "#f0f0f0"
 
-    def _make_header_row(self) -> None:
+    def _make_header_row(self, active_columns) -> None:
         row = tk.Frame(self._inner, bg=self._bg())
         row.pack(fill="x", anchor="w", pady=(0, 4))
-        for _, label in FLAG_COLUMNS:
+        for _, label in active_columns:
             lbl = tk.Label(row, text=label, font=_MONO, width=2,
                            bg=self._bg(), fg="#306030")
             lbl.pack(side="left", padx=(0, 2))
         tk.Label(row, text="path", font=_MONO, bg=self._bg(), fg="#306030",
                  anchor="w").pack(side="left", fill="x", expand=True)
 
-    def _render_children(self, nodes: list[dict],
-                         prefix: str, path_prefix: str) -> None:
+    def _render_children(self, nodes: list[dict], prefix: str,
+                         path_prefix: str, active_columns) -> None:
         last = len(nodes) - 1
         for i, node in enumerate(nodes):
             is_last = (i == last)
@@ -141,19 +153,25 @@ class PolicyTree(tk.Frame):
             path = (f"{path_prefix}/{node['name']}"
                     if path_prefix else node["name"])
             self._make_row(path, display_text=display,
-                           hidden=bool(node.get("hidden")))
+                           hidden=bool(node.get("hidden")),
+                           active_columns=active_columns)
             if node.get("children"):
                 cont = prefix + (_SPACE if is_last else _PIPE)
-                self._render_children(node["children"], cont, path)
+                self._render_children(node["children"], cont, path,
+                                      active_columns)
 
     def _make_row(self, rel_path: str, display_text: str,
-                  hidden: bool = False, root_row: bool = False) -> None:
+                  hidden: bool = False, root_row: bool = False,
+                  active_columns=None) -> None:
+        if active_columns is None:
+            active_columns = [(k, l) for k, l in FLAG_COLUMNS
+                              if k in self._active_flags]
         bg = self._bg()
         row = tk.Frame(self._inner, bg=bg)
         row.pack(fill="x", anchor="w")
 
         cells = {}
-        for key, _label in FLAG_COLUMNS:
+        for key, _label in active_columns:
             cell = tk.Label(row, text="\u00b7", font=_MONO, width=2,
                             bg=bg, fg="#888888",
                             cursor=("arrow" if hidden else "hand2"))
@@ -179,6 +197,8 @@ class PolicyTree(tk.Frame):
         if not widgets:
             return
         for key, _label in FLAG_COLUMNS:
+            if key not in widgets:
+                continue
             state = self._flag_state(rel_path, key)
             try:
                 widgets[key].config(text=_STATE_GLYPH[state],
@@ -189,10 +209,6 @@ class PolicyTree(tk.Frame):
     # --- state --------------------------------------------------------
 
     def _flag_state(self, rel_path: str, flag_key: str) -> bool | None:
-        # Hidden = hard deny: `.patchignore` closes all five flags. The
-        # same rule applied in the pre-workspace settings dialog. An
-        # override carried over from before the pattern was added does
-        # not open the row; the file is closed anyway.
         if rel_path in self._hidden_paths:
             return False
         pol = self._overrides.get(rel_path)

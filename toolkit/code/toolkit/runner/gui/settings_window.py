@@ -1,25 +1,38 @@
-"""Project settings window: name, roots, visibility, sources.
+"""Project settings window: name, sources, roots, policy.
 
 Opened from File -> Project settings. Edits an in-memory Workspace and
 an in-memory CONFIG dict; writes both on OK; Cancel discards.
 
-Sections:
-  - project name (Entry, right-click or Ctrl+C to copy)
-  - Roots (LabelFrame): notebook with per-root PolicyTree,
-    Add / Remove, Show hidden, short legend
-  - Visibility rules (LabelFrame): editors for the two ignore files,
-    labelled by what they hide rather than by filename
-  - Sources (LabelFrame): Documentation, Python (+ Allow scripts),
-    MCP, Lua on disk, Luau source radio
+Section order follows the workflow: choose what you work with (Sources),
+remove noise (visibility rules, inside Sources), then tune policy (Roots).
 
-Invariants:
-  - `exec.enabled` requires `index_python`. When Python indexing is off,
-    the exec checkbox is forced off and disabled. Enforced again on save.
-  - Luau source radio follows MCP / Lua-on-disk checkboxes:
-      neither         -> radio disabled, no selection
-      only MCP        -> forced to mcp, disabled
-      only Lua-on-disk-> forced to rojo, disabled
-      both            -> radio enabled, default rojo
+  - project name (Entry, right-click or Ctrl+C to copy)
+  - Sources (LabelFrame):
+      [x] Documentation (.md)                [Hide paths…] (N rules)
+      [x] Python (.py)                       (toggle + nested exec)
+          [x] Allow Python scripts
+      [x] MCP (Roblox scene + code)          [Hide modules…] (N rules)
+      [x] Lua files on disk (.luau)
+          Luau source: ( ) MCP  ( ) Rojo
+  - Roots (LabelFrame, hidden when no FS source is on):
+      notebook with per-root PolicyTree, Add/Remove, Show hidden, legend
+  - OK / Cancel
+
+Visibility rules live next to the source they affect:
+  - Hide paths (patchignore) applies to disk roots; disabled when neither
+    Documentation nor Python is on.
+  - Hide modules (mcpignore) applies to DataModel; disabled when MCP is
+    off or Luau source is Rojo.
+
+Column visibility in the policy tree is driven by Sources:
+  - Id shown only when Documentation is on
+  - Ip shown only when Python is on
+  - Il shown only when Lua-on-disk is on (MCP-side index is not tuned
+    here; it is always on when MCP runs and filtered via .mcpignore)
+
+Invariants enforced here and on save:
+  - exec.enabled requires index_python
+  - luau_mode follows the radio; forced when only one source is on
 """
 from __future__ import annotations
 
@@ -191,8 +204,8 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     dlg.title("Project settings")
     dlg.transient(parent)
     dlg.grab_set()
-    dlg.geometry("780x820")
-    dlg.minsize(660, 700)
+    dlg.geometry("820x820")
+    dlg.minsize(700, 700)
 
     main = tk.Frame(dlg, padx=12, pady=12)
     main.pack(fill="both", expand=True)
@@ -209,7 +222,92 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     tk.Label(main, text=f"Folder: {project_dir}", anchor="w",
              fg="#666").pack(fill="x")
 
-    # === Roots ========================================================
+    # --- state --------------------------------------------------------
+    docs_var = tk.BooleanVar(value=bool(config.get("index_docs", True)))
+    py_var = tk.BooleanVar(value=bool(config.get("index_python", True)))
+    backend_now = (config.get("backend") or "composite")
+    mcp_var = tk.BooleanVar(value=backend_now in ("mcp", "composite"))
+    rojo_var = tk.BooleanVar(value=bool(config.get("index_lua", False)))
+    luau_var = tk.StringVar(value=(config.get("luau_mode") or "mcp"))
+    exec_var = tk.BooleanVar(value=bool((config.get("exec") or {}).get("enabled")))
+
+    pi_path = state_dir / _pi.PATCHIGNORE_NAME
+    mi_path = state_dir / _mi.MCPIGNORE_NAME
+
+    def _count_label(path: Path) -> str:
+        if not path.is_file():
+            return "(no rules)"
+        try:
+            n = len(_pi.parse(path.read_text(encoding="utf-8")))
+            return f"{n} rule{'s' if n != 1 else ''}"
+        except Exception:
+            return "(unreadable)"
+
+    pi_label_var = tk.StringVar(value=_count_label(pi_path))
+    mi_label_var = tk.StringVar(value=_count_label(mi_path))
+
+    # --- Sources ------------------------------------------------------
+    src = tk.LabelFrame(main, text="Sources", padx=8, pady=8)
+    src.pack(fill="x", pady=(8, 0))
+
+    # Row 1: Documentation + Hide paths button (right-aligned)
+    r_docs = tk.Frame(src)
+    r_docs.pack(fill="x")
+    tk.Checkbutton(r_docs, text="Documentation (.md)", variable=docs_var,
+                   anchor="w").pack(side="left")
+    pi_btn = tk.Button(r_docs, text="Hide paths\u2026",
+                       command=lambda: _open_pi(), width=14)
+    pi_btn.pack(side="right")
+    tk.Label(r_docs, textvariable=pi_label_var, fg="#888",
+             font=("Consolas", 8)).pack(side="right", padx=(0, 6))
+
+    # Row 2: Python + Allow scripts (nested visual)
+    r_py = tk.Frame(src)
+    r_py.pack(fill="x")
+    tk.Checkbutton(r_py, text="Python (.py)", variable=py_var,
+                   anchor="w").pack(side="left")
+
+    r_py_sub = tk.Frame(src)
+    r_py_sub.pack(fill="x", padx=(22, 0))
+    exec_cb = tk.Checkbutton(r_py_sub, text="Allow Python scripts (run_python)",
+                             variable=exec_var, anchor="w")
+    exec_cb.pack(side="left")
+    exec_hint = tk.Label(r_py_sub, text="", fg="#c07000",
+                         font=("Consolas", 8))
+    exec_hint.pack(side="left", padx=(8, 0))
+
+    # Row 3: MCP + Hide modules button (right-aligned)
+    r_mcp = tk.Frame(src)
+    r_mcp.pack(fill="x", pady=(4, 0))
+    tk.Checkbutton(r_mcp, text="MCP (Roblox scene + code)", variable=mcp_var,
+                   anchor="w").pack(side="left")
+    mi_btn = tk.Button(r_mcp, text="Hide modules\u2026",
+                       command=lambda: _open_mi(), width=14)
+    mi_btn.pack(side="right")
+    tk.Label(r_mcp, textvariable=mi_label_var, fg="#888",
+             font=("Consolas", 8)).pack(side="right", padx=(0, 6))
+
+    # Row 4: Lua files on disk
+    r_rojo = tk.Frame(src)
+    r_rojo.pack(fill="x")
+    tk.Checkbutton(r_rojo, text="Lua files on disk (.luau)", variable=rojo_var,
+                   anchor="w").pack(side="left")
+
+    # Row 5: Luau source radio
+    radio_row = tk.Frame(src)
+    radio_row.pack(fill="x", padx=(22, 0), pady=(2, 0))
+    tk.Label(radio_row, text="Luau source:").pack(side="left")
+    luau_mcp_rb = tk.Radiobutton(radio_row, text="MCP", variable=luau_var,
+                                 value="mcp")
+    luau_rojo_rb = tk.Radiobutton(radio_row, text="Rojo", variable=luau_var,
+                                  value="rojo")
+    luau_mcp_rb.pack(side="left", padx=(8, 0))
+    luau_rojo_rb.pack(side="left", padx=(8, 0))
+    luau_hint = tk.Label(radio_row, text="", fg="#888",
+                         font=("Consolas", 8))
+    luau_hint.pack(side="left", padx=(8, 0))
+
+    # --- Roots --------------------------------------------------------
     roots_frame = tk.LabelFrame(main, text="Roots (project folders)",
                                 padx=8, pady=8)
     roots_frame.pack(fill="both", expand=True, pady=(8, 0))
@@ -223,11 +321,22 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     def _patterns():
         return _pi.read(state_dir)
 
+    def _active_flags() -> set[str]:
+        flags = {"read", "write"}
+        if docs_var.get():
+            flags.add("index_docs")
+        if py_var.get():
+            flags.add("index_py")
+        if rojo_var.get():
+            flags.add("index_lua")
+        return flags
+
     def _render_tab(name: str) -> None:
         pt = tree_widgets.get(name)
         root_obj = w.roots.get(name)
         if pt is None or root_obj is None:
             return
+        pt.set_active_flags(_active_flags())
         try:
             dirs = scan_subdirs(
                 Path(root_obj.path),
@@ -246,7 +355,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         for name in w.root_names():
             root_obj = w.roots[name]
             tab = tk.Frame(nb)
-            pt = PolicyTree(tab, root_obj)
+            pt = PolicyTree(tab, root_obj, active_flags=_active_flags())
             pt.pack(fill="both", expand=True)
             tree_widgets[name] = pt
             nb.add(tab, text=name)
@@ -295,33 +404,17 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         w.roots.pop(name, None)
         _rebuild_tabs()
 
-    tk.Button(roots_ctrl, text="Add root\u2026", command=_add_root).pack(side="left")
-    tk.Button(roots_ctrl, text="Remove root", command=_remove_root).pack(
-        side="left", padx=(6, 0))
+    add_btn = tk.Button(roots_ctrl, text="Add root\u2026", command=_add_root)
+    add_btn.pack(side="left")
+    rm_btn = tk.Button(roots_ctrl, text="Remove root", command=_remove_root)
+    rm_btn.pack(side="left", padx=(6, 0))
     tk.Checkbutton(roots_ctrl, text="Show hidden", variable=show_hidden_var).pack(
         side="right")
 
     tk.Label(roots_frame, text=_LEGEND, anchor="w", justify="left",
              fg="#666", font=("Consolas", 8)).pack(fill="x", pady=(6, 0))
 
-    # === Visibility rules ============================================
-    vis = tk.LabelFrame(main, text="Visibility rules", padx=8, pady=8)
-    vis.pack(fill="x", pady=(8, 0))
-
-    pi_path = state_dir / _pi.PATCHIGNORE_NAME
-    mi_path = state_dir / _mi.MCPIGNORE_NAME
-
-    def _count_label(path: Path) -> str:
-        if not path.is_file():
-            return "(no rules)"
-        try:
-            n = len(_pi.parse(path.read_text(encoding="utf-8")))
-            return f"{n} rule{'s' if n != 1 else ''}"
-        except Exception:
-            return "(unreadable)"
-
-    pi_label_var = tk.StringVar(value=_count_label(pi_path))
-    mi_label_var = tk.StringVar(value=_count_label(mi_path))
+    # --- ignore editor openers (defined after paths)
 
     def _open_pi():
         _open_ignore_editor(dlg, pi_path, "Hide filesystem paths",
@@ -334,73 +427,6 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         _open_ignore_editor(dlg, mi_path, "Hide Roblox modules",
                             _mi.DEFAULT_MCPIGNORE,
                             on_saved=lambda: mi_label_var.set(_count_label(mi_path)))
-
-    pi_row = tk.Frame(vis)
-    pi_row.pack(fill="x", pady=(0, 4))
-    tk.Button(pi_row, text="Hide filesystem paths\u2026",
-              command=_open_pi, width=24, anchor="w").pack(side="left")
-    tk.Label(pi_row, textvariable=pi_label_var, fg="#666").pack(
-        side="left", padx=(8, 0))
-    tk.Label(pi_row, text="(.patchignore: paths hidden from the LLM on disk)",
-             fg="#999", font=("Consolas", 8)).pack(side="left", padx=(8, 0))
-
-    mi_row = tk.Frame(vis)
-    mi_row.pack(fill="x")
-    mi_btn = tk.Button(mi_row, text="Hide Roblox modules\u2026",
-                       command=_open_mi, width=24, anchor="w")
-    mi_btn.pack(side="left")
-    tk.Label(mi_row, textvariable=mi_label_var, fg="#666").pack(
-        side="left", padx=(8, 0))
-    tk.Label(mi_row, text="(.mcpignore: modules hidden from the LLM in DataModel)",
-             fg="#999", font=("Consolas", 8)).pack(side="left", padx=(8, 0))
-
-    # === Sources =====================================================
-    src = tk.LabelFrame(main, text="Sources", padx=8, pady=8)
-    src.pack(fill="x", pady=(8, 0))
-
-    docs_var = tk.BooleanVar(value=bool(config.get("index_docs", True)))
-    py_var = tk.BooleanVar(value=bool(config.get("index_python", True)))
-    backend_now = (config.get("backend") or "composite")
-    mcp_var = tk.BooleanVar(value=backend_now in ("mcp", "composite"))
-    rojo_var = tk.BooleanVar(value=bool(config.get("index_lua", False)))
-    luau_var = tk.StringVar(value=(config.get("luau_mode") or "mcp"))
-    exec_var = tk.BooleanVar(value=bool((config.get("exec") or {}).get("enabled")))
-
-    # Documentation
-    tk.Checkbutton(src, text="Documentation (.md)", variable=docs_var,
-                   anchor="w").pack(fill="x")
-
-    # Python (with nested Allow scripts)
-    tk.Checkbutton(src, text="Python (.py)", variable=py_var,
-                   anchor="w").pack(fill="x")
-    py_sub = tk.Frame(src)
-    py_sub.pack(fill="x", padx=(22, 0))
-    exec_cb = tk.Checkbutton(py_sub, text="Allow Python scripts (run_python)",
-                             variable=exec_var, anchor="w")
-    exec_cb.pack(side="left")
-    exec_hint = tk.Label(py_sub, text="", fg="#888", font=("Consolas", 8))
-    exec_hint.pack(side="left", padx=(8, 0))
-
-    # MCP
-    tk.Checkbutton(src, text="MCP (Roblox scene + code)", variable=mcp_var,
-                   anchor="w").pack(fill="x")
-
-    # Lua files on disk
-    tk.Checkbutton(src, text="Lua files on disk (.luau)", variable=rojo_var,
-                   anchor="w").pack(fill="x")
-
-    # Luau source radio
-    radio_row = tk.Frame(src)
-    radio_row.pack(fill="x", pady=(4, 0), padx=(22, 0))
-    tk.Label(radio_row, text="Luau source:").pack(side="left")
-    luau_mcp_rb = tk.Radiobutton(radio_row, text="MCP", variable=luau_var,
-                                 value="mcp")
-    luau_rojo_rb = tk.Radiobutton(radio_row, text="Rojo", variable=luau_var,
-                                  value="rojo")
-    luau_mcp_rb.pack(side="left", padx=(8, 0))
-    luau_rojo_rb.pack(side="left", padx=(8, 0))
-    luau_hint = tk.Label(radio_row, text="", fg="#888", font=("Consolas", 8))
-    luau_hint.pack(side="left", padx=(8, 0))
 
     # --- reactive rules ----------------------------------------------
 
@@ -433,27 +459,56 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             luau_rojo_rb.config(state="disabled")
             luau_hint.config(text="(only Rojo)")
             return
-        # both: user chooses, default Rojo
+        # both
         luau_mcp_rb.config(state="normal")
         luau_rojo_rb.config(state="normal")
         if luau_var.get() not in ("mcp", "rojo"):
             luau_var.set("rojo")
         luau_hint.config(text="")
 
-    def _sync_mcp_btn():
-        # .mcpignore is relevant only when MCP is on and Luau source is mcp.
+    def _sync_visibility_buttons():
+        fs_any = bool(docs_var.get() or py_var.get())
+        pi_btn.config(state=("normal" if fs_any else "disabled"))
+        # .mcpignore applies to DataModel code: needs MCP as source AND Luau
+        # source being MCP (not Rojo).
         use_mcp_code = bool(mcp_var.get()) and luau_var.get() == "mcp"
         mi_btn.config(state=("normal" if use_mcp_code else "disabled"))
 
-    py_var.trace_add("write", lambda *_: _sync_exec_state())
-    mcp_var.trace_add("write", lambda *_: (_sync_luau_state(), _sync_mcp_btn()))
-    rojo_var.trace_add("write", lambda *_: _sync_luau_state())
-    luau_var.trace_add("write", lambda *_: _sync_mcp_btn())
-    _sync_exec_state()
-    _sync_luau_state()
-    _sync_mcp_btn()
+    def _sync_roots_visibility():
+        fs_any = bool(docs_var.get() or py_var.get())
+        if fs_any:
+            if not roots_frame.winfo_ismapped():
+                roots_frame.pack(fill="both", expand=True, pady=(8, 0))
+                # after the Sources frame; main already contains src
+                roots_frame.pack_configure(after=src)
+        else:
+            if roots_frame.winfo_ismapped():
+                roots_frame.pack_forget()
+        # Add/Remove also gated by fs_any
+        st = "normal" if fs_any else "disabled"
+        add_btn.config(state=st)
+        rm_btn.config(state=st)
 
-    # === buttons ======================================================
+    def _sync_tree_columns():
+        # Column set changed: re-render all tabs.
+        for name in w.root_names():
+            _render_tab(name)
+
+    def _sync_all():
+        _sync_exec_state()
+        _sync_luau_state()
+        _sync_visibility_buttons()
+        _sync_roots_visibility()
+        _sync_tree_columns()
+
+    docs_var.trace_add("write", lambda *_: _sync_all())
+    py_var.trace_add("write", lambda *_: _sync_all())
+    mcp_var.trace_add("write", lambda *_: _sync_all())
+    rojo_var.trace_add("write", lambda *_: _sync_all())
+    luau_var.trace_add("write", lambda *_: _sync_all())
+    _sync_all()
+
+    # --- buttons ------------------------------------------------------
     btn_row = tk.Frame(main)
     btn_row.pack(fill="x", pady=(12, 0))
 
@@ -474,10 +529,8 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
 
         config["index_docs"] = docs
         config["index_python"] = py
-        # index_lua is on when any Luau source is enabled.
         config["index_lua"] = bool(mcp or rojo)
 
-        # Luau mode from radio, but only meaningful when a source exists.
         if mcp and rojo:
             config["luau_mode"] = luau_var.get() or "rojo"
         elif mcp:
@@ -487,7 +540,6 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         else:
             config["luau_mode"] = (config.get("luau_mode") or "mcp")
 
-        # Backend derived.
         fs_on = docs or py
         if fs_on and mcp:
             config["backend"] = "composite"

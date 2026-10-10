@@ -100,6 +100,38 @@ def main():
     except Exception as e:
         t.expect('render with show_hidden ok', False, repr(e))
 
+    # --- active_flags: hide Id/Ip/Il ---
+    w2 = PolicyTree(frame, r, active_flags={'read', 'write'})
+    try:
+        w2.render(paths, show_hidden=False)
+        t.expect('render with 2 flags ok', True)
+    except Exception as e:
+        t.expect('render with 2 flags ok', False, repr(e))
+    # id column should be absent from row_widgets
+    code_widgets = w2._row_widgets.get('code', {})
+    t.expect('Id cell absent when index_docs off', 'index_docs' not in code_widgets,
+             str(list(code_widgets.keys())))
+    t.expect('R cell present', 'read' in code_widgets)
+    t.expect('W cell present', 'write' in code_widgets)
+
+    # switch flags on the fly
+    w2.set_active_flags({'read', 'write', 'index_docs'})
+    w2.render(paths, show_hidden=False)
+    code_widgets = w2._row_widgets.get('code', {})
+    t.expect('Id cell present after enable', 'index_docs' in code_widgets)
+    t.expect('Ip still absent', 'index_py' not in code_widgets)
+
+    # overrides survive re-render
+    w2._cycle('code', 'index_docs')
+    t.expect('override set on index_docs',
+             'code' in w2.overrides() and w2.overrides()['code'].index_docs is False)
+    w2.set_active_flags({'read', 'write'})
+    w2.render(paths, show_hidden=False)
+    w2.set_active_flags({'read', 'write', 'index_docs'})
+    w2.render(paths, show_hidden=False)
+    t.expect('override survived hide+show cycle',
+             w2.overrides()['code'].index_docs is False)
+
     root.destroy()
 
     print()

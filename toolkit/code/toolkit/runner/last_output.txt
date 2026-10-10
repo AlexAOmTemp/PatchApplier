@@ -1,58 +1,45 @@
-[sw] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/settings_window.py (+235 стр., +9018 Б)
+[tv] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/tree_view.py (+16 стр., +478 Б)
 
-[app-call] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — +9 стр., +172 Б
+[tv-test] ✓ replace_in_file: toolkit/code/toolkit/tests/test_tree_view.py: заменено 1 вхожд. (последнее) — +32 стр., +1440 Б
 
-[smoke-gui] ✓ run_python: exit=0  duration=177ms
+[run-tv] ✓ run_python: exit=0  duration=251ms
 --- stdout ---
-[OK]   toolkit.runner.gui.app imported
-[OK]   all expected attributes present
-=== gui smoke OK ===
+[OK]   render ok (hidden filtered)
+[OK]   overrides starts empty
+[OK]   override created for code
+[OK]   read inverted from effective (True -> False)
+[OK]   other flags stayed at effective (write=True)
+[OK]   read flipped back to True
+[OK]   write now False
+[OK]   read unaffected
+[OK]   nested override created
+[OK]   nested index_py inverted (True -> False)
+[OK]   render with show_hidden ok
+[OK]   render with 2 flags ok
+[OK]   Id cell absent when index_docs off
+[OK]   R cell present
+[OK]   W cell present
+[OK]   Id cell present after enable
+[OK]   Ip still absent
+[OK]   override set on index_docs
+[OK]   override survived hide+show cycle
 
-[smoke] ✓ run_python: exit=0  duration=80ms
---- stdout ---
-[OK]   toolkit.core
-[OK]   toolkit.core.models
-[OK]   toolkit.core.patcher
-[OK]   toolkit.core.session
-[OK]   toolkit.config
-[OK]   toolkit.config.workspace
-[OK]   toolkit.backends
-[OK]   toolkit.backends.filesystem
-[OK]   toolkit.backends.workspace
-[OK]   toolkit.backends.composite
-[OK]   toolkit.backends.mcp
-[OK]   toolkit.indexers
-[OK]   toolkit.indexers.doc
-[OK]   toolkit.indexers.code
-[OK]   toolkit.tools
-[OK]   toolkit.tools.index
-[OK]   toolkit.tools.status
-[OK]   toolkit.runner.projects
+=== 19 ok, 0 failed ===
+[timing] user (3 actions): 0.26s
 
-=== all imports OK ===
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v383] [без изменений]
 
-[commit] ✓ run_python: exit=0  duration=160ms
---- stdout ---
-[add rc=0]
-[commit rc=0]
-[master 4de5ed8] settings: ignore editors and sources toggles
- 6 files changed, 487 insertions(+), 85 deletions(-)
-[timing] user (5 actions): 0.43s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1141) [v429] [~1, ⇅5]
+  ~ toolkit/code/toolkit/runner/gui/tree_view.py  (+16 стр., +0.5 KB)
+      + toolkit/code/toolkit/runner/gui/tree_view.py :: _all_flags  [function]  L61–L62
+      + toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.set_active_flags  [method]  L102–L104
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree  [class]  L61–L222 → L65–L238
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.__init__  [method]  L64–L91 → L68–L98
+      ~ toolkit/code/toolkit/runner/gui/tree_view.py :: PolicyTree.render  [method]  L95–L110 → L106–L123
+      ~ ... и ещё 6
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v379] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v258] [без изменений]
+[timing] auto-rebuild (3 actions): 0.84s
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1138) [v425] [~1, ⇅8]
-  ~ toolkit/code/toolkit/runner/gui/settings_window.py  (+235 стр., +8.8 KB)
-      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor  [function]  L97–L187
-      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor._add  [function]  L133–L137
-      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor._remove  [function]  L139–L141
-      + ... и ещё 8
-      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: _make_copyable_entry  [function]  L44–L85 → L51–L91
-      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L88–L240 → L193–L475
-      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._ok  [function]  L222–L236 → L436–L471
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v254] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
-
-##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.23s
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.10s
