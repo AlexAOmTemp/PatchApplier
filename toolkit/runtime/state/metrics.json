@@ -1,15 +1,15 @@
 {
   "since": 1791626376.4806795,
-  "updated": 1791655073.0803032,
+  "updated": 1791655921.9505765,
   "counts": {
     "rebuild_index": {
-      "ok": 46
+      "ok": 48
     },
     "rebuild_code_index": {
-      "ok": 39
+      "ok": 40
     },
     "rebuild_lua_code_index": {
-      "ok": 26,
+      "ok": 28,
       "error": 7
     },
     "list_units": {
@@ -20,7 +20,7 @@
       "error": 2
     },
     "read_file": {
-      "ok": 50,
+      "ok": 54,
       "blocked": 5,
       "error": 1
     },
@@ -32,7 +32,7 @@
     },
     "run_python": {
       "error": 3,
-      "ok": 12
+      "ok": 13
     },
     "file_stat": {
       "ok": 1
@@ -47,7 +47,7 @@
       "ok": 10
     },
     "insert_at_anchor": {
-      "ok": 23
+      "ok": 25
     },
     "get_status": {
       "ok": 1
@@ -57,7 +57,7 @@
     },
     "replace_unit": {
       "error": 5,
-      "ok": 15
+      "ok": 19
     },
     "file_exists": {
       "ok": 5,

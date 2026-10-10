@@ -1,110 +1,126 @@
-[ws-backend] ✓ create_file: Файл создан: toolkit/code/toolkit/backends/workspace.py (176 стр., 6536 Б)
+[r-ws] ✓ read_file: toolkit/docs/WORKSPACE.md [## 7. State: external vs embedded]
+135: '## 7. State: external vs embedded\n'
+136: '\n'
+137: '<!-- summary: State — каталог с workspace.json, индексами, .patchignore/.mcpignore, runtime. По умолчанию external (<toolkit_root>/runtime/workspaces/<id>). Embedded — пользователь кладёт куда хочет. Никакого реестра, только recent.json. -->\n'
+138: '\n'
+139: '**По умолчанию state — external.** Каталог `<toolkit_root>/runtime/workspaces/<id>/`. Пользовательские каталоги содержат только свои файлы, никакого шума.\n'
+140: '\n'
+141: '**Содержимое state-каталога:**\n'
+142: '\n'
+143: '```\n'
+144: '<state>/\n'
+145: '  workspace.json          конфиг (roots, policy, format, exec, mcp)\n'
+146: '  .patchignore            правила видимости FS\n'
+147: '  .mcpignore              правила видимости MCP\n'
+148: '  INDEX.md                производное (docs)\n'
+149: '  CODE_INDEX.md           производное (Python)\n'
+150: '  CODE_INDEX_LUA.md       производное (Luau)\n'
+151: '  *.manifest.json\n'
+152: '  *.version\n'
+153: '  .index_meta.json\n'
+154: '  runtime/                логи, metrics, bridge state\n'
+155: '```\n'
+156: '\n'
+157: '**Embedded state.** Тот же набор файлов, но каталог лежит на любом пути, который пользователь выбрал — типично внутри своего проекта (`D:/my-game/.patchapplier/`). Пользователь хочет — коммитит эту папку в git вместе с проектом. Хочет — добавляет в `.gitignore`. Утилита не навязывает: state — самодостаточный каталог, его расположение — выбор пользователя.\n'
+158: '\n'
+159: '**Доступ к state.** `.patch_applier/` (или новый `state_dir`) всегда RW для внутренних тулов и никогда не индексируется — правило сохраняется, не меняется от multi-root. LLM читает индексы через `get_index`, политики — через `get_status`. Прямой `read_file` возможен (state RW), но не требуется — это файлы конфигурации и автогенерируемые артефакты. Если state физически лежит внутри корня (embedded) — он всё равно доступен через корневой путь, и никакого конфликта это не создаёт: LLM по этим путям не работает.\n'
+160: '\n'
+161: '**Никакого реестра.** `workspace.json` в state-каталоге — единственный источник истины. Что такое workspace, знает только его state-каталог. Никакого глобального списка с ID и путями.\n'
+162: '\n'
+163: '**`runtime/recent.json` — convenience, не реестр.** Список путей к state-каталогам, последние N. Нужен, чтобы GUI показывал «недавние». Если путь недоступен (каталог переехал, удалён) — запись выкидывается из списка, без попыток «найти». Юзер сам указывает новый путь, если хочет.\n'
+164: '\n'
+165: '**ID workspace.** UUID4 или короткий hash. Генерируется при создании, не меняется. Используется как имя каталога в `runtime/workspaces/<id>/`, но на адресацию и отображение не влияет.\n'
+166: '\n'
 
-[ws-export] ✓ read_file: toolkit/code/toolkit/backends/__init__.py
-1: '"""Backend implementations: filesystem, mcp, composite."""\r\n'
-2: '\r\n'
-3: 'from .filesystem import FilesystemBackend\r\n'
-4: 'from .mcp import MCPBackend\r\n'
-5: 'from .composite import CompositeBackend\r\n'
-6: '\r\n'
-7: '__all__ = ["FilesystemBackend", "MCPBackend", "CompositeBackend"]\r\n'
+[r-ws8] ✓ read_file: toolkit/docs/WORKSPACE.md [## 8. Жизненный цикл]
+167: '## 8. Жизненный цикл\n'
+168: '\n'
+169: '<!-- summary: New workspace — юзер добавляет roots через выбор каталога. Валидация: не вложены друг в друга, basename уникален. Каждый root = вкладка с деревом. Open — юзер указывает путь к state-каталогу. -->\n'
+170: '\n'
+171: '**Создание.** GUI: «New workspace» → пользователь задаёт имя workspace → добавляет roots.\n'
+172: '\n'
+173: "**Добавление root'а.** Пользователь нажимает «Add root» → диалог выбора каталога. Валидация:\n"
+174: '\n'
+175: '1. **Вложенность.** Каталог не вложен ни в один существующий root и не содержит существующий.\n'
+176: "2. **Basename уникален.** Имя корневого каталога не совпадает с basename'ом ни одного уже добавленного root'а.\n"
+177: '3. **Не имя Roblox-сервиса.** basename не входит в список `core.paths.ROBLOX_SERVICES`.\n'
+178: '\n'
+179: 'Если basename конфликтует, диалог показывает ошибку:\n'
+180: '\n'
+181: '```\n'
+182: 'Дерево с корнем `toolkit` уже есть в проекте.\n'
+183: 'Второе дерево с корнем `toolkit` добавить нельзя.\n'
+184: 'Выберите каталог выше по дереву, чтобы имя отличалось\n'
+185: '(например `project2` вместо `project2/toolkit`).\n'
+186: '```\n'
+187: '\n'
+188: 'Утилита не придумывает альтернативу за пользователя и не предлагает автосуффиксы. Пользователь сам решает, какой каталог добавить.\n'
+189: '\n'
+190: "**Интерфейс — вкладки по root'ам.** Каждый добавленный root = отдельная вкладка с деревом файлов. Внутри вкладки видны только файлы этого root'а. Заголовок вкладки = basename каталога. Вся работа (просмотр, выбор, чтение) — по вкладкам.\n"
+191: '\n'
+192: '**Открытие.** Два пути:\n'
+193: '- Из списка «недавние» — клик по записи, state-каталог читается.\n'
+194: '- «Open workspace» → пользователь указывает путь к state-каталогу (где лежит `workspace.json`). Если файла нет — «проект недоступен».\n'
+195: '\n'
+196: "**Удаление root'а.** Удаляется из `workspace.json`, индексы пересобираются. Если basename удалённого root'а был занят — он освобождается, пользователь может добавить другой каталог с тем же basename.\n"
+197: '\n'
+198: '**Удаление workspace.** Удаляется state-каталог, запись в `recent.json`. Roots пользователя не трогаются никогда.\n'
+199: '\n'
+200: '**Перемещение state (external ↔ embedded).** Копирование каталога, обновление пути в `recent.json`. Содержимое не меняется.\n'
+201: '\n'
+202: "**Переименование каталога на диске.** Если пользователь переименует корневой каталог root'а (например `toolkit` → `toolkit-dev`), basename root'а поменяется. Paths в новых патчах будут использовать новое имя. Старые патчи сломаются — это ожидаемо и осознанно. GUI показывает предупреждение при загрузке, если basename не совпадает с тем, что было в индексе.\n"
+203: '\n'
 
-[test-wb] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_workspace_backend.py (151 стр., 5493 Б)
+[r-wb7] ✓ read_file: toolkit/docs/WORKSPACE_BACKEND.md [## 7. State dir — где что лежит]
+152: '## 7. State dir — где что лежит\n'
+153: '`state_dir` — каталог, где живут производные файлы. Один на workspace, не на корень:\n'
+154: '\n'
+155: '- **External** (по умолчанию) — `<toolkit_root>/runtime/workspaces/<id>/`.\n'
+156: '- **Embedded** — пользователь выбрал (например, внутри своего проекта).\n'
+157: '\n'
+158: 'Содержимое:\n'
+159: '\n'
+160: '```\n'
+161: '<state>/\n'
+162: '  workspace.json\n'
+163: '  .patchignore\n'
+164: '  .mcpignore\n'
+165: '  INDEX.md\n'
+166: '  CODE_INDEX.md\n'
+167: '  CODE_INDEX_LUA.md\n'
+168: '  *.manifest.json\n'
+169: '  *.version\n'
+170: '  .index_meta.json\n'
+171: '  runtime/\n'
+172: '```\n'
+173: '\n'
+174: '**Доступ.** Захардкоженная политика: RW для внутренних тулов, никогда не индексируется (см. §5). LLM к этим файлам обращается через спецметоды: `get_index` (индекс), `get_status` (политики, session), `get_status(sections=["indexes"])` (версии). Прямой `read_file` возможен, но не требуется.\n'
+175: '\n'
+176: "**Индексатор пропускает `state_dir` всегда** — независимо от расположения, без `exclude` глобов. Это знание backend'а, не пользователя.\n"
+177: '\n'
+178: '**Индексы** собираются со всех корней по флагам политики. Один набор `INDEX.md` / `CODE_INDEX.md` / `CODE_INDEX_LUA.md`. Путь в индексе — `<basename>/<rel>`.\n'
+179: '\n'
+180: "**Куда пишутся индексы.** Внутренние тулы (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`) знают `state_dir` из workspace-конфига. `INDEX.md`, `CODE_INDEX.md`, `CODE_INDEX_LUA.md` пишутся туда. Никаких `local_dir` из backend'а — путь берётся из workspace.\n"
 
-[run] ✓ run_python: exit=0  duration=77ms
---- stdout ---
-[OK]   read alpha/hello.txt
-[OK]   read beta/hello.txt
-[OK]   read unknown root -> FileNotFoundError (FileNotFoundError)
-[OK]   exists alpha/hello.txt
-[OK]   exists alpha/nope.txt
-[OK]   exists unknown root -> False
-[OK]   list("") returns sorted basenames
-[OK]   list("alpha") prefixes with basename
-[OK]   list("alpha") includes nested
-[OK]   list("alpha") excludes beta
-[OK]   list unknown root -> empty
-[OK]   stat size
-[OK]   stat is_file
-[OK]   write raises NotImplementedError (NotImplementedError)
-[OK]   delete raises NotImplementedError (NotImplementedError)
-[OK]   move raises NotImplementedError (NotImplementedError)
-[OK]   copy raises NotImplementedError (NotImplementedError)
-[OK]   filter blocks alpha path
-[OK]   filter allows beta path
-[OK]   filter blocks unknown root
-[OK]   filter blocks hidden via state .patchignore
-[OK]   filter allows non-hidden path
+[r-wb11] ✓ read_file: toolkit/docs/WORKSPACE_BACKEND.md [## 11. Порядок работы]
+226: '## 11. Порядок работы\n'
+227: '1. **Дизайн (этот документ).** — Готово.\n'
+228: '2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → `_root` (приватный атрибут; публичный конструктор сохраняет имя `working_dir` для совместимости вызовов). `CompositeBackend.working_dir` — property починена через chain `_root → working_dir → None`; удаление property отложено до шага 3 (пока тулы `RebuildLuaCodeIndexTool` читают её). `RebuildLuaCodeIndexTool` — `local_dir` резолвится через chain. Тест: `tests/test_working_dir_removed.py`. Явные пути в тулах и раннерах — на шаге 3.\n'
+229: '3. **`WorkspaceBackend` read-only.** `open/close/is_alive/read/exists/stat/list/filter_check`. Резолв путей `<basename>/rel`. `filter_check` сохраняет ту же логику (sandbox + state exemption + patchignore + policy) — но с multi-root sandbox: «путь внутри любого из корней».\n'
+230: '4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json` в state-каталоге. Старая модель (single-root) остаётся как fallback для проектов без workspace.\n'
+231: '5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.\n'
+232: '6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`.\n'
+233: '7. **GUI (шаг 5 из WORKSPACE.md).** Вкладки по корням.\n'
+234: '\n'
+235: 'Каждый шаг самодостаточен, откатывается. Шаг 2 можно сделать отдельным независимым коммитом до того, как взяться за WorkspaceBackend.\n'
 
-=== 22 ok, 0 failed ===
+[dec] ✓ insert_at_anchor: перед L77 в toolkit/docs/DECISIONS.md — +2 стр., +541 Б
+[timing] user (5 actions): 0.01s
 
-[regress] ✓ run_python: exit=0  duration=70ms
---- stdout ---
-[OK]   fs._root is Path
-[OK]   fs._root resolves to root
-[OK]   fs.working_dir gone (AttributeError)
-[OK]   composite.working_dir == fs._root
-[OK]   composite falls back to legacy working_dir
-[OK]   composite returns None when FS has no root
-[OK]   composite returns None when no FS sub-backend
-[OK]   read still works
-[OK]   filter_check still works
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v306] [~2, ⇅5]
+  ~ toolkit/docs/DECISIONS.md §1. Зафиксировано (L7–L146, 38.3 KB, ⚠ stale) — 44 решения — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру. — [decisions, fixed]
+  ~ toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L146, 23.2 KB, ⚠ stale, ⚠ large) — Шаги 1–3 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py read-only + тесты. Шаг 2 (working_dir → _root) тоже закрыт. Открыто: шаг 4 (интеграция в Composite), шаг 5 (индексаторы), шаг 6 (write), шаг 7 (GUI). — [workspace, refactor, history]
+[timing] auto-rebuild (1 actions): 0.03s
 
-=== 9 ok, 0 failed ===
-
-[regress2] ✓ run_python: exit=0  duration=65ms
---- stdout ---
-== lifecycle ==
-[OK]   open enables all
-[OK]   is_alive true when all alive
-[OK]   degraded: composite still alive (fs up)
-[OK]   degraded: mcp sub-backend dead
-
-== routing ==
-[OK]   read fs path routed to fs
-[OK]   no mcp call
-[OK]   read DataModel path routed to mcp
-[OK]   read root file routed to fs
-[OK]   read SSS routed to mcp
-[OK]   read script at root routed to fs
-
-== write / delete / move routing ==
-[OK]   write fs path -> fs
-[OK]   write fs path -> no mcp
-[OK]   write mcp path -> mcp
-[OK]   write mcp path -> no fs
-
-== list routing ==
-[OK]   list('') -> fs
-[OK]   list('toolkit') -> fs
-[OK]   list('ReplicatedStorage') -> mcp
-
-== cross-backend move rejected ==
-[OK]   cross-backend move raises
-
-== filter delegates ==
-[OK]   filter fs path -> fs
-[OK]   filter mcp path -> mcp
-
-== ROBLOX_SERVICES coverage ==
-[OK]   ReplicatedStorage in ROBLOX_SERVICES
-[OK]   ServerScriptService in ROBLOX_SERVICES
-[OK]   ServerStorage in ROBLOX_SERVICES
-[OK]   StarterPlayer in ROBLOX_SERVICES
-[OK]   Workspace in ROBLOX_SERVICES
-[OK]   Players in ROBLOX_SERVICES
-
-=== ИТОГ: 26 ok ===
-[timing] user (6 actions): 0.22s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v304] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 161, символов: 1112) [v348] [+2]
-  + toolkit/code/toolkit/backends/workspace.py  (176 стр., 6.4 KB)
-  + toolkit/code/toolkit/tests/test_workspace_backend.py  (151 стр., 5.4 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v185] [без изменений]
-[timing] auto-rebuild (3 actions): 0.91s
-
-##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.13s
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.04s

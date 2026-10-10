@@ -150,12 +150,7 @@ CompositeBackend
 `CompositeBackend.working_dir` убирается вместе с протоколом. Если где-то нужен явный корень — передаётся через аргумент, а не через backend.
 
 ## 7. State dir — где что лежит
-`state_dir` — каталог, где живут производные файлы. Один на workspace, не на корень:
-
-- **External** (по умолчанию) — `<toolkit_root>/runtime/workspaces/<id>/`.
-- **Embedded** — пользователь выбрал (например, внутри своего проекта).
-
-Содержимое:
+`state_dir` — папка проекта. Одна, выбрана пользователем при создании. Содержимое:
 
 ```
 <state>/
@@ -173,11 +168,11 @@ CompositeBackend
 
 **Доступ.** Захардкоженная политика: RW для внутренних тулов, никогда не индексируется (см. §5). LLM к этим файлам обращается через спецметоды: `get_index` (индекс), `get_status` (политики, session), `get_status(sections=["indexes"])` (версии). Прямой `read_file` возможен, но не требуется.
 
-**Индексатор пропускает `state_dir` всегда** — независимо от расположения, без `exclude` глобов. Это знание backend'а, не пользователя.
+**Индексатор пропускает `state_dir` всегда** — независимо от расположения. Это знание backend'а, не пользователя.
 
 **Индексы** собираются со всех корней по флагам политики. Один набор `INDEX.md` / `CODE_INDEX.md` / `CODE_INDEX_LUA.md`. Путь в индексе — `<basename>/<rel>`.
 
-**Куда пишутся индексы.** Внутренние тулы (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`) знают `state_dir` из workspace-конфига. `INDEX.md`, `CODE_INDEX.md`, `CODE_INDEX_LUA.md` пишутся туда. Никаких `local_dir` из backend'а — путь берётся из workspace.
+**Куда пишутся индексы.** В `state_dir`. Внутренние тулы (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`) знают его из `workspace.json`. Никаких `local_dir` из backend'а.
 ## 8. Что НЕ в этом шаге
 
 - **Write.** Ни `write`, ни `delete`, ни `move`, ни `copy`. Все мутирующие методы возвращают `not_supported: write is not implemented in this step`. Включается на следующем шаге, целиком (все корни с `write=true`).
@@ -224,12 +219,18 @@ CompositeBackend
 
 Работа не «в одном патче» — по одному модулю, с прогоном тестов между шагами.
 ## 11. Порядок работы
-1. **Дизайн (этот документ).** — Готово.
-2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → `_root` (приватный атрибут; публичный конструктор сохраняет имя `working_dir` для совместимости вызовов). `CompositeBackend.working_dir` — property починена через chain `_root → working_dir → None`; удаление property отложено до шага 3 (пока тулы `RebuildLuaCodeIndexTool` читают её). `RebuildLuaCodeIndexTool` — `local_dir` резолвится через chain. Тест: `tests/test_working_dir_removed.py`. Явные пути в тулах и раннерах — на шаге 3.
-3. **`WorkspaceBackend` read-only.** `open/close/is_alive/read/exists/stat/list/filter_check`. Резолв путей `<basename>/rel`. `filter_check` сохраняет ту же логику (sandbox + state exemption + patchignore + policy) — но с multi-root sandbox: «путь внутри любого из корней».
-4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json` в state-каталоге. Старая модель (single-root) остаётся как fallback для проектов без workspace.
-5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.
-6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`.
-7. **GUI (шаг 5 из WORKSPACE.md).** Вкладки по корням.
+1. **Дизайн.** — Готово (`WORKSPACE.md`, `WORKSPACE_BACKEND.md`).
 
-Каждый шаг самодостаточен, откатывается. Шаг 2 можно сделать отдельным независимым коммитом до того, как взяться за WorkspaceBackend.
+2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → приватный `_root`. `CompositeBackend.working_dir` — chain `_root → working_dir → None`. `RebuildLuaCodeIndexTool` — через chain. Тест `test_working_dir_removed.py` (9/9).
+
+3. **`WorkspaceBackend` read-only.** ✅ **Готово.** `open/close/is_alive/read/exists/stat/list/filter_check`, routing `<basename>/<rel>`, `list("")` → basenames. Тест `test_workspace_backend.py` (22/22). В рантайм не подключён.
+
+4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` как единственного FS-бэкенда. **Однокорневая модель удаляется целиком:** поля `project_dir` и `recent_projects` из tool-wide config, `resolve_state_dir` / `STATE_DIR` из `config/loader.py`, fallback на `FilesystemBackend(project_dir)` при отсутствии `workspace.json`. Загрузка проекта — по пути из `recent.json`.
+
+5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.
+
+6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`. Все write-методы `WorkspaceBackend` включаются.
+
+7. **GUI (шаг 5 из WORKSPACE.md).** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`.
+
+Каждый шаг самодостаточен, откатывается.

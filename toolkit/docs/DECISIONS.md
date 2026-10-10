@@ -74,6 +74,10 @@
 
 **Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git (`commit`, `log`, `status`, `reset-hard`, `show-file`) для чекпоинтов между большими патчами.
 
+**Обратной совместимости нет.** Однокорневая модель (`project_dir` = `working_dir` = место state) не сохраняется. Переход полный: старая модель удаляется вместе с полями `project_dir` / `recent_projects` из tool-wide config. `resolve_state_dir` / `STATE_DIR = ".patch_applier"` тоже уходят. Никаких «fallback на старую модель», никаких «двух режимов» — модель одна.
+
+**Никаких external / embedded.** Один алгоритм: пользователь выбирает каталог, туда утилита кладёт `workspace.json`, `.patchignore`, `.mcpignore`, индексы, `runtime/`. `recent.json` хранит путь к папке проекта. При старте читается верхний путь → `workspace.json` из него.
+
 **Открыто (шаги 4–7):**
 
 - **Шаг 4 — интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json`. Требует решений: как выбирается активный workspace (recent.json / аргумент CLI / поле в tool-wide config), по какому критерию происходит переключение модели (флаг / наличие workspace.json).
