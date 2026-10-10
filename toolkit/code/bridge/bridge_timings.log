@@ -4043,3 +4043,8 @@
 2026-10-10T21:38:20.565889  [bridge.timing] calls=1 preflight=0.001s call_min=0.000s call_max=0.000s call_sum=0.000s total=0.002s
 2026-10-10T21:38:21.762993  [bridge.timing] calls=1 preflight=0.031s call_min=0.066s call_max=0.066s call_sum=0.066s total=0.097s
 2026-10-10T21:38:21.847561  [bridge.timing] calls=1 preflight=0.000s call_min=0.061s call_max=0.061s call_sum=0.061s total=0.062s
+2026-10-10T21:41:41.028219  [bridge.timing] calls=1 preflight=0.000s call_min=0.061s call_max=0.061s call_sum=0.061s total=0.062s
+2026-10-10T21:41:58.543893  [bridge.timing] calls=1 preflight=0.001s call_min=0.001s call_max=0.001s call_sum=0.001s total=0.003s
+2026-10-10T21:41:59.644464  [bridge.timing] calls=1 preflight=0.001s call_min=0.001s call_max=0.001s call_sum=0.001s total=0.002s
+2026-10-10T21:42:00.844651  [bridge.timing] calls=1 preflight=0.033s call_min=0.067s call_max=0.067s call_sum=0.067s total=0.101s
+2026-10-10T21:42:01.028923  [bridge.timing] calls=1 preflight=0.000s call_min=0.055s call_max=0.055s call_sum=0.055s total=0.055s
