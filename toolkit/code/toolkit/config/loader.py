@@ -345,6 +345,21 @@ def scan_subdirs(
 
 
 
+def load_workspace(cfg: dict):
+    """Read workspace.json from <project_dir>/<state_dir>/.
+
+    Returns a Workspace or None when there is no file. A None result
+    means "this project folder has no workspace" — the runner refuses
+    to open it rather than silently falling back to a single-root model.
+    """
+    project = (cfg.get("project_dir") or "").strip()
+    if not project:
+        return None
+    from .workspace import load as _ws_load
+    state_dir = Path(project) / resolve_state_dir(cfg)
+    return _ws_load(state_dir)
+
+
 def resolve_index_paths(cfg: dict) -> dict:
     sub = resolve_state_dir(cfg)
     prefix = (sub + "/") if sub else ""

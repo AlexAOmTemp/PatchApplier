@@ -180,20 +180,37 @@ def _rebuild_code_patch(args, cfg: dict) -> dict:
 # --- main -------------------------------------------------------------------
 
 
-def _create_backend(args, cfg, working_dir):
-    """Build the appropriate Backend (filesystem / mcp / composite)."""
-    backend_name = args.backend or cfg.get("backend", "filesystem")
+def _create_backend(args, cfg, project_dir):
+    """Build the appropriate Backend.
+
+    FS side is a WorkspaceBackend loaded from <project_dir>/<state_dir>/
+    workspace.json. Missing workspace.json is a hard error — there is no
+    single-root fallback in the new model.
+    """
+    backend_name = args.backend or cfg.get("backend", "composite")
     if backend_name == "auto":
         mcp_cfg = cfg.get("mcp") or {}
         backend_name = "composite" if mcp_cfg.get("bridge_script") else "filesystem"
+
+    def _build_fs():
+        ws = cfg_loader.load_workspace(cfg)
+        if ws is None:
+            raise RuntimeError(
+                f"no workspace.json under {project_dir}/{cfg_loader.resolve_state_dir(cfg)}/ "
+                "— create a project via the GUI first"
+            )
+        state_dir = Path(project_dir) / cfg_loader.resolve_state_dir(cfg)
+        from toolkit.backends.workspace import WorkspaceBackend
+        return WorkspaceBackend(ws, state_dir)
+
     if backend_name == "filesystem":
-        return FilesystemBackend(working_dir)
+        return _build_fs()
     if backend_name == "mcp":
-        return _create_mcp_backend(args, cfg, working_dir)
+        return _create_mcp_backend(args, cfg, project_dir)
     if backend_name == "composite":
         return CompositeBackend([
-            ("fs", FilesystemBackend(working_dir)),
-            ("mcp", _create_mcp_backend(args, cfg, working_dir)),
+            ("fs", _build_fs()),
+            ("mcp", _create_mcp_backend(args, cfg, project_dir)),
         ])
     raise RuntimeError(f"unknown backend: {backend_name!r}")
 

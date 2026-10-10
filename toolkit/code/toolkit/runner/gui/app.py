@@ -758,6 +758,14 @@ def periodic_button_state():
 
 # ==== Session management (persistent backend) ====
 
+def _load_ws_or_error(project_dir):
+    """Load workspace.json from a project folder; None if missing."""
+    from ...config import loader as _l
+    state_dir = Path(project_dir) / _l.resolve_state_dir(CONFIG)
+    from ...config.workspace import load as _ws_load
+    return _ws_load(state_dir)
+
+
 def _build_backend_for_config():
     """Build backend from current CONFIG.
 
@@ -771,7 +779,13 @@ def _build_backend_for_config():
         return None, "project_dir not set or not a directory"
 
     if backend_name == "filesystem":
-        return FilesystemBackend(work_dir), "filesystem"
+        ws = _load_ws_or_error(work_dir)
+        if ws is None:
+            return None, "workspace.json not found in project folder"
+        from ...backends.workspace import WorkspaceBackend
+        from ...config import loader as _l
+        state_dir = Path(work_dir) / _l.resolve_state_dir(CONFIG)
+        return WorkspaceBackend(ws, state_dir), "filesystem"
 
     from ...config.loader import default_bridge_script
     mcp_cfg = dict(CONFIG.get("mcp") or {})
@@ -813,8 +827,14 @@ def _build_backend_for_config():
     if backend_name == "mcp":
         return mcp_backend, "mcp"
     if backend_name == "composite":
+        ws = _load_ws_or_error(work_dir)
+        if ws is None:
+            return None, "workspace.json not found in project folder"
+        from ...backends.workspace import WorkspaceBackend
+        from ...config import loader as _l
+        state_dir = Path(work_dir) / _l.resolve_state_dir(CONFIG)
         return CompositeBackend([
-            ("fs", FilesystemBackend(work_dir)),
+            ("fs", WorkspaceBackend(ws, state_dir)),
             ("mcp", mcp_backend),
         ]), "composite"
     return None, f"unknown backend: {backend_name}"

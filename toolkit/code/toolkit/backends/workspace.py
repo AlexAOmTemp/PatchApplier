@@ -71,6 +71,18 @@ class WorkspaceBackend:
         """Re-read workspace-level `.patchignore` from state_dir."""
         self._patterns = patchignore.read(self.state_dir)
 
+    @property
+    def working_dir(self):
+        """The state directory — where the workspace's own files live.
+
+        Kept for compatibility with tools that need "one path" for
+        indexing (RebuildLuaCodeIndexTool) and with CompositeBackend's
+        working_dir property. It is NOT a filesystem root; roots are in
+        self.roots.
+        """
+        return self.state_dir
+
+
     # --- path routing ------------------------------------------------------
 
     def _split(self, path: str) -> tuple[str, str]:

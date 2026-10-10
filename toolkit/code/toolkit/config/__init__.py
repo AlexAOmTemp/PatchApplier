@@ -6,6 +6,7 @@ from .loader import (
     add_recent,
     config_path,
     load,
+    load_workspace,
     parse_csv,
     save,
     workspaces_root,
@@ -26,7 +27,7 @@ from .workspace import (
 
 __all__ = [
     "CONFIG_FILENAME", "DEFAULTS",
-    "config_path", "load", "save",
+    "config_path", "load", "save", "load_workspace",
     "add_recent", "parse_csv", "workspaces_root",
     "Root", "RootPolicy", "Workspace",
     "new_id", "add_root", "validate_workspace",
