@@ -1,10 +1,16 @@
-[{"id": "tv-test", "action": "create_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_tree_view.py",
-    "file_content": "'''Smoke test for runner/gui/tree_view.PolicyTree (Tk widget).\n\nCreates a hidden Tk root, builds the widget over a fake Root, renders\na few rows, simulates click cycles on cells, checks that overrides\nchange as documented. Not a substitute for a visual check, but catches\nthe common breakages: missing imports, broken state transitions,\nrender crashes.\n\nRequires a display. Skipped silently if Tk cannot start.\n\nRun: python toolkit/code/toolkit/tests/test_tree_view.py\n'''\nfrom __future__ import annotations\n\nimport sys\nfrom pathlib import Path\n\n\nHERE = Path(__file__).resolve().parent\nsys.path.insert(0, str(HERE.parent.parent))\n\nPASS = '[OK]  '\nFAIL = '[FAIL]'\nSKIP = '[SKIP]'\n\n\nclass T:\n    def __init__(self):\n        self.passed = 0\n        self.failed = 0\n\n    def expect(self, label, cond, detail=''):\n        if cond:\n            print(PASS + ' ' + label)\n            self.passed += 1\n        else:\n            print(FAIL + ' ' + label + (' -- ' + detail if detail else ''))\n            self.failed += 1\n\n\ndef main():\n    try:\n        import tkinter as tk\n        root = tk.Tk()\n        root.withdraw()\n    except Exception as e:\n        print(SKIP + ' Tk not available: ' + type(e).__name__ + ': ' + str(e))\n        return 0\n\n    t = T()\n\n    from toolkit.config.workspace import Root\n    from toolkit.runner.gui.tree_view import PolicyTree\n\n    r = Root(path='/fake/root')\n    frame = tk.Frame(root)\n    w = PolicyTree(frame, r)\n\n    paths = [\n        ('code', False),\n        ('code/bridge', False),\n        ('docs', False),\n        ('docs/generated', True),\n    ]\n    try:\n        w.render(paths, show_hidden=False)\n        t.expect('render ok (hidden filtered)', True)\n    except Exception as e:\n        t.expect('render ok (hidden filtered)', False, repr(e))\n\n    t.expect('overrides starts empty', w.overrides() == {})\n\n    w._cycle('code', 'read')\n    p = w.overrides().get('code')\n    t.expect('override created for code', p is not None)\n    t.expect('read inverted from effective (True -> False)',\n             p is not None and p.read is False)\n    t.expect('other flags stayed at effective (write=True)',\n             p is not None and p.write is True)\n\n    w._cycle('code', 'read')\n    p = w.overrides().get('code')\n    t.expect('read flipped back to True',\n             p is not None and p.read is True)\n\n    w._cycle('code', 'write')\n    p = w.overrides().get('code')\n    t.expect('write now False', p is not None and p.write is False)\n    t.expect('read unaffected', p is not None and p.read is True)\n\n    w._cycle('code/bridge', 'index_py')\n    pb = w.overrides().get('code/bridge')\n    t.expect('nested override created', pb is not None)\n    t.expect('nested index_py inverted (True -> False)',\n             pb is not None and pb.index_py is False)\n\n    try:\n        w.render(paths, show_hidden=True)\n        t.expect('render with show_hidden ok', True)\n    except Exception as e:\n        t.expect('render with show_hidden ok', False, repr(e))\n\n    root.destroy()\n\n    print()\n    print('=== ' + str(t.passed) + ' ok, ' + str(t.failed) + ' failed ===')\n    return 0 if t.failed == 0 else 1\n\n\nif __name__ == '__main__':\n    sys.exit(main())\n"}}]
+[{"id": "r1", "action": "grep",
+  "arguments": {"pattern": "Клик по флагу|циклит",
+                "paths": ["toolkit/docs/GUI_PROJECT_SETTINGS.md"]}}]
 
-[{"id": "run", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_tree_view.py"}}]
+[{"id": "r2", "action": "read_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/shell.py",
+                "address": {"qualname": "RunPythonTool.execute"},
+                "part": "body"}}]
+
+[{"id": "r3", "action": "grep",
+  "arguments": {"pattern": "args",
+                "paths": ["toolkit/code/toolkit/tools/shell.py"]}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "tree_view widget with smoke test"]}}]
+                "args": ["commit", "tree_view widget (PolicyTree, 11 tests pass)"]}}]
