@@ -1,199 +1,58 @@
-[r1] ✓ read_file: toolkit/code/toolkit/runner/gui/settings_window.py L100–L240
-100: '    dlg = tk.Toplevel(parent)\n'
-101: '    dlg.title("Project settings")\n'
-102: '    dlg.transient(parent)\n'
-103: '    dlg.grab_set()\n'
-104: '    dlg.geometry("700x560")\n'
-105: '    dlg.minsize(600, 460)\n'
-106: '\n'
-107: '    main = tk.Frame(dlg, padx=12, pady=12)\n'
-108: '    main.pack(fill="both", expand=True)\n'
-109: '\n'
-110: '    # --- name ---------------------------------------------------------\n'
-111: '    name_row = tk.Frame(main)\n'
-112: '    name_row.pack(fill="x", pady=(0, 6))\n'
-113: '    tk.Label(name_row, text="Project name:").pack(side="left")\n'
-114: '    name_var = tk.StringVar(value=w.name)\n'
-115: '    name_entry = tk.Entry(name_row, textvariable=name_var)\n'
-116: '    name_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))\n'
-117: '    _make_copyable_entry(name_entry)\n'
-118: '\n'
-119: '    tk.Label(main, text=f"Folder: {project_dir}", anchor="w",\n'
-120: '             fg="#666").pack(fill="x")\n'
-121: '\n'
-122: '    # --- tabs ---------------------------------------------------------\n'
-123: '    tk.Label(main, text="Roots:", anchor="w").pack(fill="x", pady=(10, 2))\n'
-124: '\n'
-125: '    nb = ttk.Notebook(main)\n'
-126: '    nb.pack(fill="both", expand=True)\n'
-127: '\n'
-128: '    show_hidden_var = tk.BooleanVar(value=False)\n'
-129: '    tree_widgets: dict[str, PolicyTree] = {}\n'
-130: '\n'
-131: '    def _patterns():\n'
-132: '        return _pi.read(state_dir)\n'
-133: '\n'
-134: '    def _render_tab(name: str) -> None:\n'
-135: '        pt = tree_widgets.get(name)\n'
-136: '        root_obj = w.roots.get(name)\n'
-137: '        if pt is None or root_obj is None:\n'
-138: '            return\n'
-139: '        try:\n'
-140: '            dirs = scan_subdirs(\n'
-141: '                Path(root_obj.path),\n'
-142: '                max_depth=_MAX_DEPTH,\n'
-143: '                patterns=_patterns(),\n'
-144: '                show_hidden=bool(show_hidden_var.get()),\n'
-145: '            )\n'
-146: '        except Exception:\n'
-147: '            dirs = []\n'
-148: '        pt.render(dirs, show_hidden=bool(show_hidden_var.get()))\n'
-149: '\n'
-150: '    def _rebuild_tabs() -> None:\n'
-151: '        for tab_id in nb.tabs():\n'
-152: '            nb.forget(tab_id)\n'
-153: '        tree_widgets.clear()\n'
-154: '        for name in w.root_names():\n'
-155: '            root_obj = w.roots[name]\n'
-156: '            tab = tk.Frame(nb)\n'
-157: '            pt = PolicyTree(tab, root_obj)\n'
-158: '            pt.pack(fill="both", expand=True)\n'
-159: '            tree_widgets[name] = pt\n'
-160: '            nb.add(tab, text=name)\n'
-161: '        for name in w.root_names():\n'
-162: '            _render_tab(name)\n'
-163: '\n'
-164: '    def _on_show_hidden():\n'
-165: '        for name in w.root_names():\n'
-166: '            _render_tab(name)\n'
-167: '    show_hidden_var.trace_add("write", lambda *_: _on_show_hidden())\n'
-168: '\n'
-169: '    _rebuild_tabs()\n'
-170: '\n'
-171: '    # --- controls row -------------------------------------------------\n'
-172: '    ctrl = tk.Frame(main)\n'
-173: '    ctrl.pack(fill="x", pady=(8, 0))\n'
-174: '\n'
-175: '    def _add_root() -> None:\n'
-176: '        folder = filedialog.askdirectory(title="Root folder", parent=dlg)\n'
-177: '        if not folder:\n'
-178: '            return\n'
-179: '        try:\n'
-180: '            ws_mod.add_root(w, folder)\n'
-181: '        except ValueError as e:\n'
-182: '            messagebox.showerror("Cannot add root", str(e), parent=dlg)\n'
-183: '            return\n'
-184: '        _rebuild_tabs()\n'
-185: '        try:\n'
-186: '            nb.select(len(nb.tabs()) - 1)\n'
-187: '        except Exception:\n'
-188: '            pass\n'
-189: '\n'
-190: '    def _remove_root() -> None:\n'
-191: '        try:\n'
-192: '            idx = nb.index(nb.select())\n'
-193: '        except Exception:\n'
-194: '            return\n'
-195: '        if idx < 0:\n'
-196: '            return\n'
-197: '        name = nb.tab(idx, "text")\n'
-198: '        if not messagebox.askyesno(\n'
-199: '                "Remove root",\n'
-200: '                f"Remove root {name!r} from this project?\\n"\n'
-201: '                "Files on disk are not touched.",\n'
-202: '                parent=dlg):\n'
-203: '            return\n'
-204: '        w.roots.pop(name, None)\n'
-205: '        _rebuild_tabs()\n'
-206: '\n'
-207: '    tk.Button(ctrl, text="Add root\\u2026", command=_add_root).pack(side="left")\n'
-208: '    tk.Button(ctrl, text="Remove root", command=_remove_root).pack(\n'
-209: '        side="left", padx=(6, 0))\n'
-210: '    tk.Checkbutton(ctrl, text="Show hidden", variable=show_hidden_var).pack(\n'
-211: '        side="right")\n'
-212: '\n'
-213: '    # --- legend -------------------------------------------------------\n'
-214: '    legend = tk.Label(main, text=_LEGEND, anchor="w", justify="left",\n'
-215: '                      fg="#666", font=("Consolas", 9))\n'
-216: '    legend.pack(fill="x", pady=(8, 0))\n'
-217: '\n'
-218: '    # --- buttons ------------------------------------------------------\n'
-219: '    btn_row = tk.Frame(main)\n'
-220: '    btn_row.pack(fill="x", pady=(10, 0))\n'
-221: '\n'
-222: '    def _ok() -> None:\n'
-223: '        new_name = name_var.get().strip()\n'
-224: '        if new_name and new_name != w.name:\n'
-225: '            w.name = new_name\n'
-226: '        try:\n'
-227: '            save_workspace(project_dir, w, state_subdir)\n'
-228: '        except Exception as e:\n'
-229: '            messagebox.showerror("Error", str(e), parent=dlg)\n'
-230: '            return\n'
-231: '        dlg.destroy()\n'
-232: '        if on_save is not None:\n'
-233: '            try:\n'
-234: '                on_save(new_name or None)\n'
-235: '            except Exception:\n'
-236: '                pass\n'
-237: '\n'
-238: '    tk.Button(btn_row, text="OK", command=_ok, width=10).pack(side="right")\n'
-239: '    tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(\n'
-240: '        side="right", padx=(0, 6))\n'
+[sw] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/runner/gui/settings_window.py (+235 стр., +9018 Б)
 
-[r2] ✓ grep: Найдено 17 совпадений:
-toolkit/code/toolkit/config/loader.py:7: `ui_language`, `format`/`format_preset`, `mcp` (bridge config), `exec`
-toolkit/code/toolkit/config/loader.py:12: `code_*`, `lua_*`, `luau_mode`, `index_*`.
-toolkit/code/toolkit/config/loader.py:41:     "exec",
-toolkit/code/toolkit/config/loader.py:57:     "luau_mode": "mcp",
-toolkit/code/toolkit/config/loader.py:65:     "index_docs_dir": "",
-toolkit/code/toolkit/config/loader.py:71:     "index_docs": True,
-toolkit/code/toolkit/config/loader.py:72:     "index_python": True,
-toolkit/code/toolkit/config/loader.py:73:     "index_lua": True,
-toolkit/code/toolkit/config/loader.py:91:     # tool must be explicitly enabled, because executing arbitrary Python
-toolkit/code/toolkit/config/loader.py:93:     "exec": {
-toolkit/code/toolkit/config/loader.py:119:         # tools by their original names (multi_edit, execute_luau, ...).
-toolkit/code/toolkit/config/loader.py:216:     # Deep-merge `exec` so a partial override does not silently drop the
-toolkit/code/toolkit/config/loader.py:218:     exec_defaults = DEFAULTS.get("exec") or {}
-toolkit/code/toolkit/config/loader.py:219:     if isinstance(cfg.get("exec"), dict):
-toolkit/code/toolkit/config/loader.py:220:         merged = dict(exec_defaults)
-toolkit/code/toolkit/config/loader.py:221:         merged.update(cfg["exec"])
-toolkit/code/toolkit/config/loader.py:222:         cfg["exec"] = merged
+[app-call] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — +9 стр., +172 Б
 
-[r3] ✓ read_file: toolkit/code/toolkit/runner/gui/app.py L933–L960
-933: '            on_save=lambda new_name=None: _switch_project(proj, new_name),\r\n'
-934: '        )\r\n'
-935: '    except _projects.NotAProject:\r\n'
-936: '        messagebox.showerror(\r\n'
-937: '            "\\u041d\\u0435 \\u043f\\u0440\\u043e\\u0435\\u043a\\u0442",\r\n'
-938: '            f"\\u0412 {proj} \\u043d\\u0435\\u0442 workspace.json",\r\n'
-939: '            parent=root,\r\n'
-940: '        )\r\n'
-941: '\r\n'
-942: '\r\n'
-943: 'def _switch_project(project_dir: str, project_name: str | None = None) -> None:\r\n'
-944: '    """Activate a project folder and restart the session.\r\n'
-945: '\r\n'
-946: '    Called from the File menu. Updates CONFIG, saves tool-wide config,\r\n'
-947: '    records the folder in recent.json, then restarts Session in the\r\n'
-948: '    background. If workspace.json is missing, the session will fail to\r\n'
-949: '    build — that is the correct behaviour (no fallback in the new model).\r\n'
-950: '    """\r\n'
-951: '    p = Path(project_dir).resolve()\r\n'
-952: '    CONFIG["project_dir"] = str(p)\r\n'
-953: '    try:\r\n'
-954: '        _cfg.save(CONFIG)\r\n'
-955: '    except Exception:\r\n'
-956: '        pass\r\n'
-957: '    try:\r\n'
-958: '        _cfg.add_recent_file(str(p), project_name)\r\n'
-959: '    except Exception:\r\n'
-960: '        pass\r\n'
+[smoke-gui] ✓ run_python: exit=0  duration=177ms
+--- stdout ---
+[OK]   toolkit.runner.gui.app imported
+[OK]   all expected attributes present
+=== gui smoke OK ===
 
-[r4] ✓ grep: Найдено 2 совпадений:
-toolkit/code/toolkit/runner/gui/app.py:954:         _cfg.save(CONFIG)
-toolkit/code/toolkit/runner/gui/app.py:1180:             _cfg.save(CONFIG)
-[timing] user (4 actions): 0.00s
+[smoke] ✓ run_python: exit=0  duration=80ms
+--- stdout ---
+[OK]   toolkit.core
+[OK]   toolkit.core.models
+[OK]   toolkit.core.patcher
+[OK]   toolkit.core.session
+[OK]   toolkit.config
+[OK]   toolkit.config.workspace
+[OK]   toolkit.backends
+[OK]   toolkit.backends.filesystem
+[OK]   toolkit.backends.workspace
+[OK]   toolkit.backends.composite
+[OK]   toolkit.backends.mcp
+[OK]   toolkit.indexers
+[OK]   toolkit.indexers.doc
+[OK]   toolkit.indexers.code
+[OK]   toolkit.tools
+[OK]   toolkit.tools.index
+[OK]   toolkit.tools.status
+[OK]   toolkit.runner.projects
 
-##RESULT:{"ok": 4, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+=== all imports OK ===
+
+[commit] ✓ run_python: exit=0  duration=160ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master 4de5ed8] settings: ignore editors and sources toggles
+ 6 files changed, 487 insertions(+), 85 deletions(-)
+[timing] user (5 actions): 0.43s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v379] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 167, символов: 1138) [v425] [~1, ⇅8]
+  ~ toolkit/code/toolkit/runner/gui/settings_window.py  (+235 стр., +8.8 KB)
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor  [function]  L97–L187
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor._add  [function]  L133–L137
+      + toolkit/code/toolkit/runner/gui/settings_window.py :: _open_ignore_editor._remove  [function]  L139–L141
+      + ... и ещё 8
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: _make_copyable_entry  [function]  L44–L85 → L51–L91
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L88–L240 → L193–L475
+      ~ toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._ok  [function]  L222–L236 → L436–L471
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v254] [без изменений]
+[timing] auto-rebuild (3 actions): 0.80s
+
+##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.23s
