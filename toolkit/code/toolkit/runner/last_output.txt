@@ -1,244 +1,156 @@
-[r1] ✓ grep: Найдено 1 совпадений:
-toolkit/docs/GUI_PROJECT_SETTINGS.md:29: - **Дерево каталогов** root'а. Только каталоги, без файлов (см. §3). У каждого каталога — пять флагов `R / W / Id / Ip / Il` (как в старом дереве политики, но 5 вместо 3). Клик по флагу циклит значение: `·` (inherit) → `+` (allow) → `−` (deny) → `·`. Shift+клик — на всё поддерево.
+[r1] ✓ read_unit: def _menu_project_settings() -> None:
+    """Open the project settings dialog (roots + policies + name)."""
 
-[r2] ✓ read_unit:         if not self._opt("enabled", False):
-            return Result(
-                status="blocked",
-                message=(
-                    "run_python disabled (exec.enabled=false). "
-                    "Set exec.enabled=true in .patch_applier.json to use it."
-                ),
-                error_code="exec_disabled",
-                action="run_python",
-            )
-
-        # -- 2. shape -------------------------------------------------------
-        if bool(script) == bool(module):
-            return Result(
-                status="error",
-                message="Specify exactly one of `script` or `module`.",
-                error_code="ambiguous_input",
-                action="run_python",
-            )
-        if module and not self._opt("allow_module_mode", True):
-            return Result(
-                status="blocked",
-                message="module mode disabled (exec.allow_module_mode=false).",
-                error_code="module_mode_disabled",
-                action="run_python",
-            )
-
-        # -- 3. interpreter -------------------------------------------------
-        interp = self._opt("interpreter", None) or sys.executable
-        if not interp:
-            return Result(
-                status="error",
-                message=(
-                    "no interpreter (exec.interpreter unset and "
-                    "sys.executable empty)."
-                ),
-                error_code="no_interpreter",
-                action="run_python",
-            )
-
-        # -- 4. argv --------------------------------------------------------
-        argv: list[str] = [str(interp)]
-        if script:
-            try:
-                sp = self._resolve_inside_project(script)
-            except ValueError as e:
-                return Result(
-                    status="blocked",
-                    message=str(e),
-                    error_code="script_outside_project",
-                    action="run_python",
-                )
-            if not sp.is_file():
-                return Result(
-                    status="error",
-                    message=f"script not found: {script}",
-                    error_code="script_not_found",
-                    action="run_python",
-                )
-            if sp.suffix.lower() != ".py":
-                return Result(
-                    status="error",
-                    message=f"script must be a .py file: {script}",
-                    error_code="script_not_python",
-                    action="run_python",
-                )
-            argv.append(str(sp))
-        else:
-            argv.extend(["-m", str(module)])
-
-        if args is not None:
-            if not isinstance(args, list) or not all(
-                isinstance(a, str) for a in args
-            ):
-                return Result(
-                    status="error",
-                    message="`args` must be a list of strings.",
-                    error_code="bad_args",
-                    action="run_python",
-                )
-            argv.extend(args)
-
-        # -- 5. cwd ---------------------------------------------------------
-        try:
-            cwd_path = self._resolve_inside_project(cwd or ".")
-        except ValueError as e:
-            return Result(
-                status="blocked",
-                message=str(e),
-                error_code="cwd_outside_project",
-                action="run_python",
-            )
-        if not cwd_path.is_dir():
-            return Result(
-                status="error",
-                message=f"cwd is not a directory: {cwd}",
-                error_code="cwd_not_found",
-                action="run_python",
-            )
-
-        # -- 6. timeout -----------------------------------------------------
-        t_default = int(self._opt("default_timeout", 60))
-        t_max = int(self._opt("max_timeout", 600))
-        t = int(timeout) if timeout is not None else t_default
-        if t <= 0:
-            t = t_default
-        if t > t_max:
-            return Result(
-                status="error",
-                message=f"timeout {t}s exceeds max_timeout {t_max}s.",
-                error_code="timeout_too_large",
-                action="run_python",
-            )
-
-        # -- 7. output cap --------------------------------------------------
-        cfg_cap = int(self._opt("max_output_bytes", 200_000))
-        cap = int(max_bytes) if max_bytes else cfg_cap
-        if cap <= 0:
-            cap = cfg_cap
-        cap = min(cap, cfg_cap)
-
-        # -- 8. env ---------------------------------------------------------
-        child_env = self._build_env(env)
-
-        # -- 9. spawn -------------------------------------------------------
-        popen_kwargs: dict = {
-            "args": argv,
-            "cwd": str(cwd_path),
-            "env": child_env,
-            "shell": False,
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-        }
-        if os.name == "nt":
-            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-
-        t0 = time.monotonic()
-        try:
-            proc = subprocess.Popen(**popen_kwargs)
-        except FileNotFoundError as e:
-            return Result(
-                status="error",
-                message=f"cannot start interpreter: {e}",
-                error_code="interpreter_not_found",
-                action="run_python",
-            )
-        except OSError as e:
-            return Result(
-                status="error",
-                message=f"OSError starting process: {e}",
-                error_code="os_error",
-                action="run_python",
-            )
-
-        timed_out = False
-        try:
-            out_b, err_b = proc.communicate(timeout=t)
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            _kill_tree(proc)
-            try:
-                out_b, err_b = proc.communicate(timeout=5)
-            except Exception:
-                out_b, err_b = b"", b""
-        duration_ms = int((time.monotonic() - t0) * 1000)
-        exit_code = proc.returncode if proc.returncode is not None else -1
-
-        # -- 10. truncate ---------------------------------------------------
-        out_b, out_tr = _clip(out_b or b"", cap)
-        err_b, err_tr = _clip(err_b or b"", cap)
-        enc = self._opt("child_encoding", "utf-8") or "utf-8"
-        stdout = out_b.decode(enc, errors="replace")
-        stderr = err_b.decode(enc, errors="replace")
-
-        # -- 11. result -----------------------------------------------------
-        if timed_out:
-            status, code = "error", "timeout"
-        elif exit_code == 0:
-            status, code = "ok", None
-        else:
-            status, code = "error", "nonzero_exit"
-
-        flags = []
-        if timed_out:
-            flags.append("TIMED_OUT")
-        if out_tr:
-            flags.append("stdout_truncated")
-        if err_tr:
-            flags.append("stderr_truncated")
-        flag_s = ("  " + " ".join(flags)) if flags else ""
-
-        parts = [
-            f"exit={exit_code}  duration={duration_ms}ms{flag_s}",
-        ]
-        if stdout:
-            parts.append("--- stdout ---\n" + stdout.rstrip("\n"))
-        if stderr:
-            parts.append("--- stderr ---\n" + stderr.rstrip("\n"))
-        message = "\n".join(parts)
-
-        return Result(
-            status=status,
-            message=message,
-            error_code=code,
-            action="run_python",
+[r2] ✓ read_unit:     proj = CONFIG.get("project_dir", "").strip()
+    if not proj:
+        messagebox.showwarning(
+            "\u041d\u0435\u0442 \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
+            "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u0438\u043b\u0438 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0440\u043e\u0435\u043a\u0442 (File).",
+            parent=root,
         )
+        return
+    state_subdir = _cfg.resolve_state_dir(CONFIG)
+    try:
+        w = _projects.load_workspace(proj, state_subdir)
+    except _projects.NotAProject:
+        messagebox.showerror(
+            "\u041d\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
+            f"\u0412 {proj} \u043d\u0435\u0442 workspace.json",
+            parent=root,
+        )
+        return
 
-[r3] ✓ grep: Найдено 14 совпадений:
-toolkit/code/toolkit/tools/shell.py:3: Runs `sys.executable <script> [args...]` or `sys.executable -m <module> [args...]`
-toolkit/code/toolkit/tools/shell.py:97:     path_args: list[str] = []          # `script` is checked inside execute
-toolkit/code/toolkit/tools/shell.py:98:     path_list_args: list[str] = []
-toolkit/code/toolkit/tools/shell.py:178:         args: list[str] | None = None,
-toolkit/code/toolkit/tools/shell.py:256:         if args is not None:
-toolkit/code/toolkit/tools/shell.py:257:             if not isinstance(args, list) or not all(
-toolkit/code/toolkit/tools/shell.py:258:                 isinstance(a, str) for a in args
-toolkit/code/toolkit/tools/shell.py:262:                     message="`args` must be a list of strings.",
-toolkit/code/toolkit/tools/shell.py:263:                     error_code="bad_args",
-toolkit/code/toolkit/tools/shell.py:266:             argv.extend(args)
-toolkit/code/toolkit/tools/shell.py:311:         popen_kwargs: dict = {
-toolkit/code/toolkit/tools/shell.py:312:             "args": argv,
-toolkit/code/toolkit/tools/shell.py:320:             popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-toolkit/code/toolkit/tools/shell.py:324:             proc = subprocess.Popen(**popen_kwargs)
+    dlg = tk.Toplevel(root)
+    dlg.title("Project settings")
+    dlg.transient(root)
+    dlg.grab_set()
+    dlg.geometry("760x460")
+    dlg.minsize(700, 420)
 
-[commit] ✓ run_python: exit=0  duration=160ms
---- stdout ---
-[add rc=0]
-[commit rc=0]
-[master 28ca5f5] tree_view widget (PolicyTree, 11 tests pass)
- 5 files changed, 233 insertions(+), 65 deletions(-)
- create mode 100644 toolkit/code/toolkit/runner/gui/tree_view.py
-[timing] user (4 actions): 0.17s
+    main = tk.Frame(dlg, padx=12, pady=12)
+    main.pack(fill="both", expand=True)
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v367] [без изменений]
+    name_row = tk.Frame(main)
+    name_row.pack(fill="x", pady=(0, 8))
+    tk.Label(name_row, text="Project name:").pack(side="left")
+    name_var = tk.StringVar(value=w.name)
+    tk.Entry(name_row, textvariable=name_var).pack(side="left", fill="x", expand=True, padx=(8, 0))
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 166, символов: 1120) [v413] [без изменений]
+    tk.Label(main, text=f"Folder: {proj}", anchor="w", fg="#666").pack(fill="x")
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v242] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
+    tk.Label(main, text="Roots:", anchor="w").pack(fill="x", pady=(10, 2))
+    cols = ("name", "path", "R", "W", "Id", "Ip", "Il")
+    tree = ttk.Treeview(main, columns=cols, show="headings", height=8)
+    for c, w_ in zip(cols, (120, 380, 32, 32, 36, 36, 36)):
+        tree.heading(c, text=c)
+        tree.column(c, width=w_, anchor="w" if c in ("name", "path") else "center")
+    tree.pack(fill="both", expand=True)
 
-##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.97s
+    def _reload_roots() -> None:
+        for row in tree.get_children():
+            tree.delete(row)
+        try:
+            roots = _projects.list_roots(proj, state_subdir)
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=dlg)
+            return
+        for r in roots:
+            p = r["policy"]
+            tree.insert("", "end", iid=r["name"], values=(
+                r["name"], r["path"],
+                "\u2713" if p["read"] else "\u2715",
+                "\u2713" if p["write"] else "\u2715",
+                "\u2713" if p["index_docs"] else "\u2715",
+                "\u2713" if p["index_py"] else "\u2715",
+                "\u2713" if p["index_lua"] else "\u2715",
+            ))
+
+    _reload_roots()
+
+    def _add_root() -> None:
+        folder = filedialog.askdirectory(title="Root folder", parent=dlg)
+        if not folder:
+            return
+        try:
+            _projects.add_root(proj, folder, state_subdir)
+        except ValueError as e:
+            messagebox.showerror("Cannot add root", str(e), parent=dlg)
+            return
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=dlg)
+            return
+        _reload_roots()
+
+    def _remove_root() -> None:
+        sel = tree.selection()
+        if not sel:
+            return
+        name = sel[0]
+        if not messagebox.askyesno(
+                "Remove root",
+                f"Remove root {name!r} from this project?\n"
+                "Files on disk are not touched.",
+                parent=dlg):
+            return
+        try:
+            _projects.remove_root(proj, name, state_subdir)
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=dlg)
+            return
+        _reload_roots()
+
+    def _toggle_flag(flag_key: str) -> None:
+        sel = tree.selection()
+        if not sel:
+            return
+        name = sel[0]
+        try:
+            roots = {r["name"]: r for r in _projects.list_roots(proj, state_subdir)}
+        except Exception:
+            return
+        cur = roots.get(name)
+        if cur is None:
+            return
+        new_val = not bool(cur["policy"][flag_key])
+        try:
+            _projects.update_root_policy(proj, name, {flag_key: new_val}, state_subdir)
+        except Exception as e:
+            messagebox.showerror("Error", str(e), parent=dlg)
+            return
+        _reload_roots()
+        try:
+            tree.selection_set(name)
+        except Exception:
+            pass
+
+    ctrl_row = tk.Frame(main)
+    ctrl_row.pack(fill="x", pady=(6, 0))
+    tk.Button(ctrl_row, text="Add root\u2026", command=_add_root).pack(side="left")
+    tk.Button(ctrl_row, text="Remove", command=_remove_root).pack(side="left", padx=(6, 0))
+    tk.Label(ctrl_row, text="   Toggle:").pack(side="left", padx=(12, 0))
+    for label, key in (("R", "read"), ("W", "write"),
+                       ("Id", "index_docs"), ("Ip", "index_py"),
+                       ("Il", "index_lua")):
+        tk.Button(ctrl_row, text=label, width=3,
+                  command=(lambda k=key: _toggle_flag(k))).pack(side="left", padx=(2, 0))
+
+    btn_row = tk.Frame(main)
+    btn_row.pack(fill="x", pady=(12, 0))
+
+    def _ok() -> None:
+        new_name = name_var.get().strip()
+        if new_name and new_name != w.name:
+            try:
+                _projects.rename_project(proj, new_name, state_subdir)
+            except Exception as e:
+                messagebox.showerror("Error", str(e), parent=dlg)
+                return
+        dlg.destroy()
+        _switch_project(proj, new_name or None)
+
+    tk.Button(btn_row, text="OK", command=_ok, width=10).pack(side="right")
+    tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(side="right", padx=(0, 6))
+[timing] user (2 actions): 0.03s
+
+##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.03s
