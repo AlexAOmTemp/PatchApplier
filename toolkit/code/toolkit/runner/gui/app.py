@@ -12,6 +12,7 @@ import os
 import traceback
 
 from ...config import loader as _cfg
+from .. import projects as _projects
 from ...core.patchparse import parse_patches
 from ...core.router import plan_rebuilds
 from ...tools import TOOL_MAP
@@ -1653,58 +1654,52 @@ def _menu_new_project() -> None:
     folder = filedialog.askdirectory(title="\u041f\u0430\u043f\u043a\u0430 \u0434\u043b\u044f \u043d\u043e\u0432\u043e\u0433\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0430")
     if not folder:
         return
-    folder_path = Path(folder).resolve()
-    state_dir = folder_path / _cfg.resolve_state_dir(CONFIG)
-    if (state_dir / "workspace.json").is_file():
+    state_subdir = _cfg.resolve_state_dir(CONFIG)
+    if _projects.is_project(folder, state_subdir):
         if messagebox.askyesno(
                 "\u041f\u0440\u043e\u0435\u043a\u0442 \u0443\u0436\u0435 \u0435\u0441\u0442\u044c",
-                f"\u0412 {folder_path.name} \u0443\u0436\u0435 \u0435\u0441\u0442\u044c workspace.json.\n"
+                f"\u0412 {Path(folder).name} \u0443\u0436\u0435 \u0435\u0441\u0442\u044c workspace.json.\n"
                 "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0435\u0433\u043e?",
                 parent=root):
-            _switch_project(str(folder_path))
+            _switch_project(folder)
         return
     name = simpledialog.askstring(
         "\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
         "\u0418\u043c\u044f \u043f\u0440\u043e\u0435\u043a\u0442\u0430:",
-        initialvalue=folder_path.name,
+        initialvalue=Path(folder).name,
         parent=root,
     )
     if not name:
         return
     try:
-        from ...config import workspace as _ws
-        from ...config import patchignore as _pi
-        from ...config import mcpignore as _mi
-        state_dir.mkdir(parents=True, exist_ok=True)
-        w = _ws.Workspace(id=_ws.new_id(), name=name)
-        if not _ws.save(w, state_dir):
-            messagebox.showerror("\u041e\u0448\u0438\u0431\u043a\u0430",
-                                 "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c workspace.json",
-                                 parent=root)
-            return
-        _pi.ensure_default(state_dir)
-        _mi.ensure_default(state_dir)
+        _projects.create_project(folder, name, state_subdir)
+    except _projects.ProjectExists:
+        messagebox.showerror(
+            "\u041e\u0448\u0438\u0431\u043a\u0430",
+            "\u041f\u0440\u043e\u0435\u043a\u0442 \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442",
+            parent=root,
+        )
+        return
     except Exception as e:
         messagebox.showerror("\u041e\u0448\u0438\u0431\u043a\u0430", str(e), parent=root)
         return
-    _switch_project(str(folder_path), name)
+    _switch_project(folder, name)
 
 
 def _menu_open_project() -> None:
     folder = filedialog.askdirectory(title="\u041f\u0430\u043f\u043a\u0430 \u043f\u0440\u043e\u0435\u043a\u0442\u0430")
     if not folder:
         return
-    folder_path = Path(folder).resolve()
-    state_dir = folder_path / _cfg.resolve_state_dir(CONFIG)
-    if not (state_dir / "workspace.json").is_file():
+    state_subdir = _cfg.resolve_state_dir(CONFIG)
+    if not _projects.is_project(folder, state_subdir):
         messagebox.showerror(
             "\u041d\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
-            f"\u0412 {folder_path.name} \u043d\u0435\u0442 workspace.json.\n"
+            f"\u0412 {Path(folder).name} \u043d\u0435\u0442 workspace.json.\n"
             "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: File \u2192 New project.",
             parent=root,
         )
         return
-    _switch_project(str(folder_path))
+    _switch_project(folder)
 
 
 def _menu_open_recent(path: str) -> None:

@@ -1,9 +1,1 @@
-.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v324] [~1, ⇅5, +1, -1]
-  ~ toolkit/docs/DECISIONS.md §1. Зафиксировано (L7–L89, 19.8 KB) — 44 решения + Workspace refactor — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру; Workspace refactor — multi-root, WorkspaceBackend, state-префикс. — [decisions, fixed]
-  + toolkit/docs/DECISIONS.md §Workspace refactor (L61–L89, 4.6 KB) — Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта).
-  - toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L87, 4.2 KB) — Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта).
-
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1121) [v369] [+1]
-  + toolkit/code/manual/_final_cleanup.py  (82 стр., 2.5 KB)
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v204] [создан, 153 строк]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v206] [без изменений]
