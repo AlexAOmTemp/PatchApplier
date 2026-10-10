@@ -1,16 +1,27 @@
-[rm-old] ✓ delete_file: Файл удалён: toolkit/docs/GUI_TREE.md (168 стр., 9933 Б)
+[del-btn] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — -3 стр., -118 Б
 
-[new-doc] ✓ create_file: Файл создан: toolkit/docs/GUI_PROJECT_SETTINGS.md (172 стр., 10620 Б)
+[del-fn] ✓ replace_in_file: toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — -18 стр., -663 Б
+
+[grep-check] ✓ grep: Совпадений не найдено: 'open_settings_dialog|Настройки'
+
+[smoke-gui] ✗ run_python: exit=1  duration=187ms
+--- stdout ---
+[OK]   toolkit.runner.gui.app imported
+[FAIL] missing attribute: open_settings_dialog
+
+[doc-upd] ✓ replace_in_file: toolkit/docs/GUI_PROJECT_SETTINGS.md: заменено 1 вхожд. (последнее) — -2 стр., +38 Б
 
 [commit] ✗ run_python: exit=2  duration=38ms
 --- stdout ---
-unknown subcommand: docs: GUI_PROJECT_SETTINGS.md — separate project management window
-[timing] user (3 actions): 0.04s
+unknown subcommand: gui: remove obsolete settings button and placeholder
+[timing] user (6 actions): 0.23s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 173) [v356] [+1, -1]
-  + ## toolkit/docs/GUI_PROJECT_SETTINGS.md  (172 стр., 10.4 KB, mtime 2026-10-10 22:54)
-  - ## toolkit/docs/GUI_TREE.md  (168 стр., 9.7 KB, mtime 2026-10-10 22:35)
-[timing] auto-rebuild (1 actions): 0.03s
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v358] [~2, ⇅3]
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §7. Открытые вопросы (L130–L172, 2.9 KB, ⚠ no summary)
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §4. Что делать с кнопкой ⚙ в правом панели (L153–L158, 0.8 KB, ⚠ no summary)
 
-##RESULT:{"ok": 3, "errors": 1, "skipped": 0, "failed": [3], "blocked": []}
-[timing] total: 0.07s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1095) [v404] [без изменений]
+[timing] auto-rebuild (2 actions): 0.71s
+
+##RESULT:{"ok": 6, "errors": 2, "skipped": 0, "failed": [4, 6], "blocked": []}
+[timing] total: 0.94s

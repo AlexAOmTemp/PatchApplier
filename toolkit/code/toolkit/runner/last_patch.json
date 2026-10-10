@@ -1,15 +1,12 @@
-[{"id": "q5-note", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/GUI_PROJECT_SETTINGS.md",
-    "search": "### 1. Где живёт state активного таба\n\n**Не храним.** По алфавиту корней — первая вкладка. Согласовано.",
-    "replace": "### 1. Где живёт state активного таба\n\n**Не храним.** По алфавиту корней — первая вкладка. Согласовано.\n\nЕсли в будущем понадобится — хранить **в `workspace.json`** (`ui.active_root`), а не в `CONFIG` и не в `recent.json`. Обоснование: это свойство проекта, при переключении между проектами должно восстанавливаться само. `recent.json` — только путь к папке проекта, туда UI-мелочи не пишем.",
+[{"id": "smoke-fix", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/manual/_smoke_gui.py",
+    "search": "    for name in (\"run\", \"_switch_project\", \"_menu_new_project\",\n                 \"_menu_open_project\", \"_menu_project_settings\",\n                 \"open_settings_dialog\"):",
+    "replace": "    for name in (\"run\", \"_switch_project\", \"_menu_new_project\",\n                 \"_menu_open_project\", \"_menu_project_settings\"):",
     "search_repr": false}}]
 
-[{"id": "q1-note", "action": "replace_in_file",
-    "arguments": {"file_path": "toolkit/docs/GUI_PROJECT_SETTINGS.md",
-    "search": "### 4. Что делать с кнопкой ⚙ в правом панели\n\n**(a)** Удалить — вместо неё File → Project settings.\n**(b)** Оставить, открывает то же окно.\n\n**Предлагаю (a)** — один вход вместо двух.",
-    "replace": "### 4. Что делать с кнопкой ⚙ в правом панели\n\n**Удалить.** Один вход: `File → Project settings…`.\n\nWorkflow проекта: пользователь создаёт проект, задаёт настройки, дальше в них не заходит в 90% случаев. Настройки — отдельное окно, которое открывается осознанно. На экране — минимум того, что нужно постоянно (Выполнить, Повторить, лог, статус); периодическое — за раскрывающейся панелью; разовое — за окном.\n\nСогласовано.\n\n### 4a. Уточнение: что где живёт\n\n| Данные | Где | Кто пишет |\n|---|---|---|\n| Путь к папке проекта | `recent.json` | GUI (при открытии) |\n| Имя проекта, roots, policy, format | `<project>/.patch_applier/workspace.json` | GUI (это окно) |\n| `.patchignore`, `.mcpignore` | `<project>/.patch_applier/` | GUI (редакторы) |\n| Backend / index toggles / exec / mcp | `<project>/.patch_applier/config.json` + tool-wide | GUI (это окно) |\n| UI-мелочи (если появятся) | `workspace.json`, поле `ui.*` | GUI |",
-    "search_repr": false}}]
+[{"id": "smoke-gui", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "docs: GUI_PROJECT_SETTINGS.md (separate window, no dup buttons)"]}}]
+                "args": ["commit", "remove obsolete settings button and placeholder"]}}]

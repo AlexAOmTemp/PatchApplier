@@ -913,24 +913,6 @@ def _start_session_in_background():
     threading.Thread(target=_run, daemon=True).start()
 
 
-# ==== Диалог настроек ====
-
-def open_settings_dialog():
-    """Placeholder — replaced by File → Project settings.
-
-    The old dialog carried the pre-workspace policy tree (three roles,
-    per-path overrides inside one root). The new model keeps policy per
-    root inside workspace.json; editing lives under File → Project
-    settings. Backend / MCP / exec settings live in .patch_applier.json.
-    """
-    messagebox.showinfo(
-        "Settings",
-        "Project roots and per-path policy — File → Project settings\u2026\n"
-        "Backend / MCP / exec — edit .patch_applier.json.",
-        parent=root,
-    )
-
-
 def _menu_project_settings() -> None:
     """Open the project settings dialog (roots + policies + name)."""
     proj = CONFIG.get("project_dir", "").strip()
@@ -1350,9 +1332,6 @@ def run():
         root.attributes("-topmost", topmost_var.get())
     tk.Checkbutton(right_panel, text="Поверх всех окон",
                    variable=topmost_var, command=toggle_topmost).pack(anchor="w", pady=(0, 8))
-
-    tk.Button(right_panel, text="⚙ Настройки",
-              command=open_settings_dialog).pack(fill="x", pady=(0, 4))
 
     tk.Button(right_panel, text="📊 Получить последний дифф",
               command=on_get_last_diff).pack(fill="x", pady=(0, 8))

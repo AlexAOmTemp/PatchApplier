@@ -18,8 +18,7 @@ try:
     print("[OK]   toolkit.runner.gui.app imported")
     # Sanity: attributes we expect to survive the refactor.
     for name in ("run", "_switch_project", "_menu_new_project",
-                 "_menu_open_project", "_menu_project_settings",
-                 "open_settings_dialog"):
+                 "_menu_open_project", "_menu_project_settings"):
         if not hasattr(_app, name):
             print(f"[FAIL] missing attribute: {name}")
             sys.exit(1)
