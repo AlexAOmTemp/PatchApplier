@@ -925,12 +925,21 @@ def _menu_project_settings() -> None:
         return
     state_subdir = _cfg.resolve_state_dir(CONFIG)
     from .settings_window import open_project_settings
+
+    def _on_settings_saved(new_name=None):
+        try:
+            _cfg.save(CONFIG)
+        except Exception:
+            pass
+        _switch_project(proj, new_name)
+
     try:
         open_project_settings(
             parent=root,
             project_dir=Path(proj),
             state_subdir=state_subdir,
-            on_save=lambda new_name=None: _switch_project(proj, new_name),
+            config=CONFIG,
+            on_save=_on_settings_saved,
         )
     except _projects.NotAProject:
         messagebox.showerror(
