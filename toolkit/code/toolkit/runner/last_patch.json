@@ -1,20 +1,31 @@
-[{"id": "probe", "action": "create_file",
-  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt",
-                "file_content": "probe\n"}}]
+[{"id": "cleanup-script", "action": "overwrite_file",
+  "arguments": {"file_path": "toolkit/code/manual/_final_cleanup.py",
+    "file_content": "\"\"\"Final session cleanup: gitignore + remove stray dir + git rm --cached.\"\"\"\nfrom __future__ import annotations\n\nimport shutil\nimport subprocess\nfrom pathlib import Path\n\n\nROOT = Path(__file__).resolve().parents[3]\n\n# 1. .patch_applier/.gitignore\n_gitignore_state = (\n    \"# Toolkit state — generated files, not for version control.\\n\"\n    \"INDEX.md\\n\"\n    \"INDEX.md.version\\n\"\n    \"CODE_INDEX.md\\n\"\n    \"CODE_INDEX.md.version\\n\"\n    \"CODE_INDEX.manifest.json\\n\"\n    \"CODE_INDEX_LUA.md\\n\"\n    \"CODE_INDEX_LUA.md.version\\n\"\n    \"CODE_INDEX_LUA.manifest.json\\n\"\n    \".index_meta.json\\n\"\n    \"bridge_log.jsonl\\n\"\n    \"outputs.json\\n\"\n    \"patch.json\\n\"\n    \"\\n\"\n    \"# Kept (config / policy): workspace.json, .patchignore, .mcpignore, config.json\\n\"\n)\n(ROOT / \".patch_applier\" / \".gitignore\").write_text(_gitignore_state,\n                                                     encoding=\"utf-8\")\nprint(\"wrote .patch_applier/.gitignore\")\n\n# 2. toolkit/.gitignore\n_gitignore_toolkit = (\n    \"# Toolkit runtime — logs and toolkit-wide state.\\n\"\n    \"runtime/\\n\"\n    \"\\n\"\n    \"# Python cache.\\n\"\n    \"__pycache__/\\n\"\n    \"*.pyc\\n\"\n)\n(ROOT / \"toolkit\" / \".gitignore\").write_text(_gitignore_toolkit,\n                                               encoding=\"utf-8\")\nprint(\"wrote toolkit/.gitignore\")\n\n# 3. Remove stray .patch_applier/.patch_applier/\nstray = ROOT / \".patch_applier\" / \".patch_applier\"\nif stray.exists():\n    shutil.rmtree(stray)\n    print(f\"removed stray: {stray}\")\nelse:\n    print(\"no stray dir\")\n\n# 4. git rm --cached for already-tracked generated files\nexe = shutil.which(\"git\")\npaths = [\n    \"toolkit/runtime\",\n    \".patch_applier/INDEX.md\",\n    \".patch_applier/INDEX.md.version\",\n    \".patch_applier/CODE_INDEX.md\",\n    \".patch_applier/CODE_INDEX.md.version\",\n    \".patch_applier/CODE_INDEX.manifest.json\",\n    \".patch_applier/CODE_INDEX_LUA.md\",\n    \".patch_applier/CODE_INDEX_LUA.md.version\",\n    \".patch_applier/CODE_INDEX_LUA.manifest.json\",\n    \".patch_applier/.index_meta.json\",\n    \".patch_applier/bridge_log.jsonl\",\n    \".patch_applier/outputs.json\",\n    \".patch_applier/patch.json\",\n]\np = subprocess.run(\n    [exe, \"rm\", \"-r\", \"--cached\", \"--ignore-unmatch\"] + paths,\n    cwd=str(ROOT), capture_output=True, text=True,\n)\nprint(f\"git rm rc={p.returncode}\")\nif p.stdout.strip(): print(p.stdout.rstrip())\nif p.stderr.strip(): print(\"STDERR:\", p.stderr.rstrip())\n\n# 5. Rebuild state listing\nprint(\"\\n=== .patch_applier/ after ===\")\nfor c in sorted((ROOT / \".patch_applier\").iterdir()):\n    print(f\"  {c.name}\")\n"}}]
 
-[{"id": "probe-read", "action": "read_file",
-  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt",
-                "escape": "none", "numbered": false}}]
-
-[{"id": "probe-del", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_write_probe.txt"}}]
+[{"id": "run-cleanup", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_final_cleanup.py"}}]
 
 [{"id": "dec-fix", "action": "insert_at_anchor",
   "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
-    "anchor": "**Обратной совместимости нет.**",
-    "position": "before",
-    "new_content": "**Workspace refactor — модель.** Multi-root workspace вместо однокорневого проекта. `project_dir` = папка проекта, `state_dir` = `<project>/.patch_applier/` сбоку, `roots` в `workspace.json` — набор FS-каталогов с уникальными basename'ами. Адресация путей `<basename>/<rel>`, state-префикс `.patch_applier/<rel>`. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`. История: `§2.5`.\n\n**Workspace refactor — реализация (шаги 1–4, 6).** `config/workspace.py` (модель + JSON + валидация, 23/23), `backends/workspace.py` (`WorkspaceBackend` — routing, read/write в корни, state-префикс, `list_roots()`, `list(\"\")` = плоский список файлов с префиксами, 35/35), интеграция в CLI `_create_backend` + GUI `_build_backend_for_config`, `workspace.json` создаётся вручную. `working_dir` удалён из `FilesystemBackend` (приватный `_root`). «Один write-корень» отменён — пишут все корни с `write=true`.\n\n**Workspace refactor — что открыто.** Шаг 5 (multi-root индексаторы — формально покрыт тестом `test_workspace_backend` с двумя корнями; реальный multi-root проект не заводили). Шаг 7 (GUI-диалог создания/открытия проекта — сейчас GUI требует существующий `workspace.json`). См. `§2.5`.\n\n"}}]
+    "anchor": "**Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.",
+    "position": "after",
+    "new_content": "\n\n**Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы."}}]
+
+[{"id": "sec-title", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "search": "### 2.5 Workspace refactor",
+    "replace": "### Workspace refactor",
+    "search_repr": false}}]
+
+[{"id": "dec-sum1", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "search": "<!-- summary: 44 решения — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру. -->",
+    "replace": "<!-- summary: 44 решения + Workspace refactor — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру; Workspace refactor — multi-root, WorkspaceBackend, state-префикс. -->",
+    "search_repr": false}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "session end: workspace refactor steps 1-4+6 done, DECISIONS recorded"]}}]
+                "args": ["commit", "final: gitignore state, rename DECISIONS section, doc git hygiene"]}}]
+
+[{"id": "log", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_git.py", "args": ["log", "10"]}}]

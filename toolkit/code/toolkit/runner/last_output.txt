@@ -1,61 +1,20 @@
-[cleanup-script] ✓ create_file: Файл создан: toolkit/code/manual/_cleanup.py (31 стр., 913 Б)
-
-[do-cleanup] ✓ run_python: exit=0  duration=38ms
+[gl] ✓ run_python: exit=0  duration=60ms
 --- stdout ---
-root:  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier
-stale: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier  exists=True
-keep:  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\.patch_applier  exists=True
-  removing .index_meta.json
-  removing INDEX.md
-  removing INDEX.md.version
-removed D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\.patch_applier
-stale exists after: False
+e1cbe1e session end: workspace refactor steps 1-4+6 done, DECISIONS recorded
+e43d565 cleanup: remove stale toolkit/.patch_applier, doc state-write exception
+6d1c61f step 6 partial: write into workspace roots, cross-root copy
+17337f5 step 4 complete: WorkspaceBackend wired + list("") fixed
+014ba10 step 4: WorkspaceBackend wired into CLI+GUI, workspace.json created
+bb7f2bf docs: single project folder model, no external/embedded
+6f09f07 step 3 complete: WorkspaceBackend read-only + working_dir refactor
+[timing] user (1 actions): 0.06s
 
-[dec-sum] ✓ set_annotation: toolkit/docs/DECISIONS.md: annotation обновлён
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v323] [без изменений]
 
-[wb5-doc] ✓ insert_at_anchor: после L126 в toolkit/docs/WORKSPACE_BACKEND.md — +2 стр., +673 Б
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1121) [v368] [без изменений]
 
-[commit] ✓ run_python: exit=0  duration=192ms
---- stdout ---
-[add rc=0]
-[commit rc=0]
-[master e43d565] cleanup: remove stale toolkit/.patch_applier, doc state-write exception
- 9 files changed, 315 insertions(+), 47 deletions(-)
- create mode 100644 toolkit/code/manual/_cleanup.py
- create mode 100644 toolkit/code/manual/_recon.py
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v203] [без изменений]
+[timing] auto-rebuild (3 actions): 0.86s
 
-[verify] ✓ get_status: ## Session
-project:  PatchApplier
-backend:  composite
-luau:     mcp
-format:   default
-exec:     enabled  (sys.executable)
-native:   enabled  ((no allowlist -> all))
-
-## Indexes
-docs  .patch_applier/INDEX.md  [v320]  25.3 KB  20 files
-code  .patch_applier/CODE_INDEX.md  [v365]  121.3 KB  162 modules
-lua  .patch_applier/CODE_INDEX_LUA.md  [v200]  7.4 KB  22 modules
-
-## Policy Filesystem
-(root)   [RWI]
-
-+ auto-closed: dotdirs, __pycache__, node_modules, .venv  (not shown)
-  to open a hidden path: set + on the dir itself or its named ancestor
-## MCP
-scope:    Roblox scene + Luau code
-access:   unrestricted (DataModel is not path-filtered)
-[timing] user (6 actions): 0.24s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v321] [~2, ⇅6]
-  ~ toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L87, 4.2 KB) — Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта).
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L96–L131, 3.3 KB, ⚠ no summary)
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1121) [v366] [+1]
-  + toolkit/code/manual/_cleanup.py  (31 стр., 0.9 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v201] [без изменений]
-[timing] auto-rebuild (3 actions): 0.89s
-
-##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.14s
+##RESULT:{"ok": 4, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.92s

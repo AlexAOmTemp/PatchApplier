@@ -6,7 +6,7 @@
 
 ## 1. Зафиксировано
 
-<!-- summary: 44 решения — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру. -->
+<!-- summary: 44 решения + Workspace refactor — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру; Workspace refactor — multi-root, WorkspaceBackend, state-префикс. -->
 <!-- tags: decisions, fixed -->
 
 1. **Единый toolkit** — один фреймворк, три concrete backend'а (Filesystem, MCP, Composite), одна схема действий.
@@ -58,7 +58,7 @@
 
 29. **`state_dir` вместо `service_subdir`.** Единый служебный каталог (`.patch_applier` по умолчанию) внутри проекта: индексы (`INDEX.md`, `CODE_INDEX*.md`), их `.version` и `.manifest.json`, sidecar `.index_meta.json`, рантайм MCP (`patch.json`, `outputs.json`, `bridge_log.jsonl`).
 
-### 2.5 Workspace refactor
+### Workspace refactor
 
 <!-- summary: Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта). -->
 **Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.
@@ -79,6 +79,8 @@
 - **Никаких external/embedded.** Один алгоритм: пользователь выбирает папку проекта, туда кладётся `workspace.json`, `.patchignore`, `.mcpignore`, индексы, `runtime/`. `recent.json` — единственное место про «последнее».
 
 **Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.
+
+**Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.
 
 **Открыто:**
 
