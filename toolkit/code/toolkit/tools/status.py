@@ -47,6 +47,7 @@ class GetStatusTool:
 
     _context: dict = {}
 
+    @classmethod
     def set_context(
         cls,
         *,

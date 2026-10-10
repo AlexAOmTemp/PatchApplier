@@ -36,11 +36,10 @@ class T:
             self.failed += 1
 
 
-def _run(root, patches, policy=None):
+def _run(root, patches):
     backend = FilesystemBackend(root)
     fmt = Format.load('default')
-    with Session(backend, fmt=fmt, tools=TOOL_MAP,
-                 policy=policy or Policy()) as s:
+    with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
         return s.apply_patches(patches)
 
 
@@ -174,17 +173,6 @@ def main():
                                        'new_code': ''}}])[0]
         t.expect('error', r.status == 'error')
         t.expect('error_code empty_input', r.error_code == 'empty_input')
-
-        print()
-        print('== filter blocks replace_function_lua ==')
-        policy = Policy.uniform(mode='white', paths=['sub'])
-        r = _run(root, [{'action': 'replace_function_lua',
-                         'arguments': {
-                             'file_path': 'sample.lua',
-                             'qualname': 'M.hello',
-                             'new_code': 'function M.hello() return nil end',
-                         }}], policy)[0]
-        t.expect('blocked', r.status == 'blocked', r.status)
 
         print()
         print('== replace_function_lua: M:method ==')

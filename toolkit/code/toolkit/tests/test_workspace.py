@@ -122,7 +122,12 @@ def main():
         t.expect('root default index_py=False', pol_root.index_py is False)
         t.expect('override subpath read=False', pol_gen.read is False)
         t.expect('override inherits to child', pol_nested.read is False)
-        t.expect('override child write from default', pol_gen.write is False)
+        # A PathPolicy override is a *complete* replacement, not a partial
+        # merge with the root default. `docs/generated` sets read=False and
+        # leaves the other four flags at PathPolicy() defaults (all True),
+        # independent of the root default (write=False).
+        t.expect('override is complete (write stays True, not inherited)',
+                 pol_gen.write is True, str(pol_gen.write))
 
         # --- round-trip ---
         w.format = {'preset': 'default'}
