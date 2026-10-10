@@ -1,6 +1,6 @@
 import keyboard
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 import sys
 import threading
 import queue
@@ -1624,6 +1624,122 @@ def open_settings_dialog():
     tk.Button(btn_row, text="Отмена", command=dlg.destroy, width=10).pack(side="right")
 
 
+def _switch_project(project_dir: str, project_name: str | None = None) -> None:
+    """Activate a project folder and restart the session.
+
+    Called from the File menu. Updates CONFIG, saves tool-wide config,
+    records the folder in recent.json, then restarts Session in the
+    background. If workspace.json is missing, the session will fail to
+    build — that is the correct behaviour (no fallback in the new model).
+    """
+    p = Path(project_dir).resolve()
+    CONFIG["project_dir"] = str(p)
+    try:
+        _cfg.save(CONFIG)
+    except Exception:
+        pass
+    try:
+        _cfg.add_recent_file(str(p), project_name)
+    except Exception:
+        pass
+    update_project_status()
+    update_button_state()
+    _refresh_recent_menu()
+    msg_queue.put(("status", f"\u23f3 \u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043f\u0440\u043e\u0435\u043a\u0442: {p.name}..."))
+    _start_session_in_background()
+
+
+def _menu_new_project() -> None:
+    folder = filedialog.askdirectory(title="\u041f\u0430\u043f\u043a\u0430 \u0434\u043b\u044f \u043d\u043e\u0432\u043e\u0433\u043e \u043f\u0440\u043e\u0435\u043a\u0442\u0430")
+    if not folder:
+        return
+    folder_path = Path(folder).resolve()
+    state_dir = folder_path / _cfg.resolve_state_dir(CONFIG)
+    if (state_dir / "workspace.json").is_file():
+        if messagebox.askyesno(
+                "\u041f\u0440\u043e\u0435\u043a\u0442 \u0443\u0436\u0435 \u0435\u0441\u0442\u044c",
+                f"\u0412 {folder_path.name} \u0443\u0436\u0435 \u0435\u0441\u0442\u044c workspace.json.\n"
+                "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u0435\u0433\u043e?",
+                parent=root):
+            _switch_project(str(folder_path))
+        return
+    name = simpledialog.askstring(
+        "\u041d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
+        "\u0418\u043c\u044f \u043f\u0440\u043e\u0435\u043a\u0442\u0430:",
+        initialvalue=folder_path.name,
+        parent=root,
+    )
+    if not name:
+        return
+    try:
+        from ...config import workspace as _ws
+        from ...config import patchignore as _pi
+        from ...config import mcpignore as _mi
+        state_dir.mkdir(parents=True, exist_ok=True)
+        w = _ws.Workspace(id=_ws.new_id(), name=name)
+        if not _ws.save(w, state_dir):
+            messagebox.showerror("\u041e\u0448\u0438\u0431\u043a\u0430",
+                                 "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0437\u0434\u0430\u0442\u044c workspace.json",
+                                 parent=root)
+            return
+        _pi.ensure_default(state_dir)
+        _mi.ensure_default(state_dir)
+    except Exception as e:
+        messagebox.showerror("\u041e\u0448\u0438\u0431\u043a\u0430", str(e), parent=root)
+        return
+    _switch_project(str(folder_path), name)
+
+
+def _menu_open_project() -> None:
+    folder = filedialog.askdirectory(title="\u041f\u0430\u043f\u043a\u0430 \u043f\u0440\u043e\u0435\u043a\u0442\u0430")
+    if not folder:
+        return
+    folder_path = Path(folder).resolve()
+    state_dir = folder_path / _cfg.resolve_state_dir(CONFIG)
+    if not (state_dir / "workspace.json").is_file():
+        messagebox.showerror(
+            "\u041d\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
+            f"\u0412 {folder_path.name} \u043d\u0435\u0442 workspace.json.\n"
+            "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: File \u2192 New project.",
+            parent=root,
+        )
+        return
+    _switch_project(str(folder_path))
+
+
+def _menu_open_recent(path: str) -> None:
+    _switch_project(path)
+
+
+_recent_menu = None
+
+
+def _refresh_recent_menu() -> None:
+    global _recent_menu
+    if _recent_menu is None:
+        return
+    _recent_menu.delete(0, "end")
+    try:
+        items = _cfg.read_recent()
+    except Exception:
+        items = []
+    if not items:
+        _recent_menu.add_command(label="(\u043f\u0443\u0441\u0442\u043e)", state="disabled")
+        return
+    for it in items:
+        p = it["path"]
+        nm = it["name"]
+        exists = Path(p).is_dir()
+        label = f"{nm}  \u2014  {p}" if exists else f"\u2717 {nm}  \u2014  {p}"
+        if exists:
+            _recent_menu.add_command(
+                label=label,
+                command=(lambda path=p: _menu_open_recent(path)),
+            )
+        else:
+            _recent_menu.add_command(label=label, state="disabled")
+
+
 # ==== GUI ====
 
 def run():
@@ -1642,6 +1758,20 @@ def run():
     root.resizable(False, False)
 
     keyboard.add_hotkey(HOTKEY, lambda: root.after(0, on_button_click))
+    # --- Menu bar ---
+    global _recent_menu
+    menubar = tk.Menu(root)
+    file_menu = tk.Menu(menubar, tearoff=0)
+    file_menu.add_command(label="New project\u2026", command=_menu_new_project)
+    file_menu.add_command(label="Open project\u2026", command=_menu_open_project)
+    _recent_menu = tk.Menu(file_menu, tearoff=0)
+    file_menu.add_cascade(label="Recent", menu=_recent_menu)
+    _refresh_recent_menu()
+    file_menu.add_separator()
+    file_menu.add_command(label="Exit", command=root.destroy)
+    menubar.add_cascade(label="File", menu=file_menu)
+    root.config(menu=menubar)
+
 
     main_frame = tk.Frame(root)
     main_frame.pack(fill="both", expand=True)

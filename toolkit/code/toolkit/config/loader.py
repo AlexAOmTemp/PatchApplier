@@ -267,6 +267,57 @@ def add_recent(cfg: dict, path: str, max_n: int = 10) -> dict:
     return cfg
 
 
+def recent_path() -> Path:
+    """<toolkit_root>/runtime/state/recent.json — recent project folders."""
+    return toolkit_runtime_state_dir() / "recent.json"
+
+
+def read_recent() -> list[dict]:
+    """Return [{"path": str, "name": str}, ...] (most recent first)."""
+    p = recent_path()
+    if not p.is_file():
+        return []
+    try:
+        data = json.loads(p.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for it in data:
+        if isinstance(it, dict) and it.get("path"):
+            out.append({
+                "path": str(it["path"]),
+                "name": str(it.get("name") or Path(it["path"]).name),
+            })
+        elif isinstance(it, str) and it:
+            out.append({"path": it, "name": Path(it).name})
+    return out
+
+
+def add_recent_file(path: str, name: str | None = None,
+                    max_n: int = 10) -> None:
+    """Prepend a project folder to recent.json (dedup, cap at max_n)."""
+    if not path:
+        return
+    p_str = str(Path(path).resolve())
+    items = [it for it in read_recent() if it["path"] != p_str]
+    items.insert(0, {
+        "path": p_str,
+        "name": str(name) if name else Path(p_str).name,
+    })
+    items = items[:max_n]
+    p = recent_path()
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(
+            json.dumps(items, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
+
+
 def parse_csv(value) -> list:
     if value is None:
         return []
