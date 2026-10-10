@@ -123,7 +123,9 @@ def _filter_paths(self, tool, action_dict):
 
 **Multi-root policy** — следующий шаг (не этот). `Policy` в `Session` пока работает с одним ключом на путь; с `WorkspaceBackend` путь `<basename>/<rel>` будет резолвиться через `RootPolicy` в `Workspace`. Это правки в `core/models.py` и в `Patcher`. Отдельная задача.
 
-**State-каталог — захардкоженная политика.** `.patch_applier/` (или новый `state_dir`) всегда RW для внутренних тулов и **никогда** не индексируется. Это не из `workspace.json`, не зависит от корня, не переопределяется. Так уже работает — правило сохраняется. Именно чтобы индексатор не пытался индексировать свои же артефакты (INDEX.md, CODE_INDEX.md, sidecar'ы) и не рекурсировал.
+**State-каталог — захардкоженная политика.**
+
+**Write в state-префикс — всегда разрешён.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня только если путь под `<basename>/`. Путь под `.patch_applier/` (state-префикс) идёт в отдельный FS-бэкенд state и разрешён всегда — это нужно индексным тулам (`rebuild_index`, `rebuild_code_index`), которые пишут свои артефакты в state. Cross-root `move` запрещён (`RuntimeError`), cross-root `copy` разрешён (обе стороны локальные). См. `DECISIONS.md §2.5`. `.patch_applier/` (или новый `state_dir`) всегда RW для внутренних тулов и **никогда** не индексируется. Это не из `workspace.json`, не зависит от корня, не переопределяется. Так уже работает — правило сохраняется. Именно чтобы индексатор не пытался индексировать свои же артефакты (INDEX.md, CODE_INDEX.md, sidecar'ы) и не рекурсировал.
 
 **`.patchignore` / `.mcpignore`** — фильтр видимости, лежат в `state_dir`, применяются в backend'е (не в `Patcher`). Один на workspace, применяется к каждому корню.
 

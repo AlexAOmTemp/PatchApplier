@@ -60,7 +60,7 @@
 
 ### 2.5 Workspace refactor
 
-<!-- summary: Шаги 1–3 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py read-only + тесты. Шаг 2 (working_dir → _root) тоже закрыт. Открыто: шаг 4 (интеграция в Composite), шаг 5 (индексаторы), шаг 6 (write), шаг 7 (GUI). -->
+<!-- summary: Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта). -->
 **Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.
 
 **Сделано (шаги 1–4 + 6):**
