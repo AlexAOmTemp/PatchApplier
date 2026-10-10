@@ -89,12 +89,17 @@ def main():
     if not args:
         print("usage: _git.py <subcommand> [args]")
         print("subcommands:", ", ".join(sorted(_DISPATCH)))
+        print("(anything else is treated as a commit message)")
         return 2
     fn = _DISPATCH.get(args[0])
-    if fn is None:
-        print(f"unknown subcommand: {args[0]}")
-        return 2
-    return fn(args[1:])
+    if fn is not None:
+        return fn(args[1:])
+    # Fallback: the first token is not a known subcommand, so treat the
+    # whole command line as a commit message. This makes `commit <msg>`
+    # and bare `<msg>` equivalent, and — importantly — avoids the
+    # "unknown subcommand" trap when the message itself looks like a
+    # subcommand (e.g. starts with `gui:` or contains a colon).
+    return cmd_commit(args)
 
 
 if __name__ == "__main__":

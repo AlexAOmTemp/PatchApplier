@@ -1,16 +1,21 @@
-[{"id": "r1", "action": "grep",
-  "arguments": {"pattern": "Клик по флагу|циклит",
-                "paths": ["toolkit/docs/GUI_PROJECT_SETTINGS.md"]}}]
+[{"id": "doc-fix", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/GUI_PROJECT_SETTINGS.md",
+    "search": "Клик по флагу циклит значение: `·` (inherit) → `+` (allow) → `−` (deny) → `·`. Shift+клик — на всё поддерево.",
+    "replace": "Клик по флагу. Три состояния: `·` (нет override), `+` (override с True), `−` (override с False). Семантика клика:\n\n  - **Из `·`** — создать override: остальные флаги берутся из effective (ближайший override вверх или дефолт root'а), **кликнутый флаг инвертируется** (чтобы клик дал видимый эффект).\n  - **Из `+`** — клик → `−` (только этот флаг).\n  - **Из `−`** — клик → `+` (только этот флаг).\n  - **Возврат в `·`** (удаление override целиком) — отдельный жест (Ctrl+клик или контекстное меню). В этой итерации не реализовано.\n\n  Почему **не полный цикл `·→+→−→·`**: `PathPolicy` — полная замена, не per-flag merge. Если override содержит `read=False, write=False`, возврат в `·` удалил бы настройки по обоим флагам. Сброс override — осознанное действие.\n\n  **Shift+клик** — на всё поддерево. В этой итерации не реализовано.",
+    "search_repr": false}}]
 
-[{"id": "r2", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/tools/shell.py",
-                "address": {"qualname": "RunPythonTool.execute"},
-                "part": "body"}}]
+[{"id": "git-fallback", "action": "read_file",
+  "arguments": {"file_path": "toolkit/code/manual/_git.py",
+                "start_line": 70, "end_line": 101}}]
 
-[{"id": "r3", "action": "grep",
-  "arguments": {"pattern": "args",
-                "paths": ["toolkit/code/toolkit/tools/shell.py"]}}]
+[{"id": "git-main-patch", "action": "replace_unit",
+  "arguments": {"file_path": "toolkit/code/manual/_git.py",
+    "address": {"qualname": "main"},
+    "new_text": "def main():\n    args = sys.argv[1:]\n    if not args:\n        print(\"usage: _git.py <subcommand> [args]\")\n        print(\"subcommands:\", \", \".join(sorted(_DISPATCH)))\n        print(\"(anything else is treated as a commit message)\")\n        return 2\n    fn = _DISPATCH.get(args[0])\n    if fn is not None:\n        return fn(args[1:])\n    # Fallback: the first token is not a known subcommand, so treat the\n    # whole command line as a commit message. This makes `commit <msg>`\n    # and bare `<msg>` equivalent, and — importantly — avoids the\n    # \"unknown subcommand\" trap when the message itself looks like a\n    # subcommand (e.g. starts with `gui:` or contains a colon).\n    return cmd_commit(args)"}}]
+
+[{"id": "smoke", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "tree_view widget (PolicyTree, 11 tests pass)"]}}]
+                "args": ["commit", "docs: cycle semantics in GUI_PROJECT_SETTINGS; _git.py fallback for arbitrary messages"]}}]

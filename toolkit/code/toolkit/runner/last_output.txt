@@ -1,35 +1,244 @@
-[view-mod] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/gui/tree_view.py (191 стр., 7347 Б)
+[r1] ✓ grep: Найдено 1 совпадений:
+toolkit/docs/GUI_PROJECT_SETTINGS.md:29: - **Дерево каталогов** root'а. Только каталоги, без файлов (см. §3). У каждого каталога — пять флагов `R / W / Id / Ip / Il` (как в старом дереве политики, но 5 вместо 3). Клик по флагу циклит значение: `·` (inherit) → `+` (allow) → `−` (deny) → `·`. Shift+клик — на всё поддерево.
 
-[run] ✓ run_python: exit=0  duration=179ms
+[r2] ✓ read_unit:         if not self._opt("enabled", False):
+            return Result(
+                status="blocked",
+                message=(
+                    "run_python disabled (exec.enabled=false). "
+                    "Set exec.enabled=true in .patch_applier.json to use it."
+                ),
+                error_code="exec_disabled",
+                action="run_python",
+            )
+
+        # -- 2. shape -------------------------------------------------------
+        if bool(script) == bool(module):
+            return Result(
+                status="error",
+                message="Specify exactly one of `script` or `module`.",
+                error_code="ambiguous_input",
+                action="run_python",
+            )
+        if module and not self._opt("allow_module_mode", True):
+            return Result(
+                status="blocked",
+                message="module mode disabled (exec.allow_module_mode=false).",
+                error_code="module_mode_disabled",
+                action="run_python",
+            )
+
+        # -- 3. interpreter -------------------------------------------------
+        interp = self._opt("interpreter", None) or sys.executable
+        if not interp:
+            return Result(
+                status="error",
+                message=(
+                    "no interpreter (exec.interpreter unset and "
+                    "sys.executable empty)."
+                ),
+                error_code="no_interpreter",
+                action="run_python",
+            )
+
+        # -- 4. argv --------------------------------------------------------
+        argv: list[str] = [str(interp)]
+        if script:
+            try:
+                sp = self._resolve_inside_project(script)
+            except ValueError as e:
+                return Result(
+                    status="blocked",
+                    message=str(e),
+                    error_code="script_outside_project",
+                    action="run_python",
+                )
+            if not sp.is_file():
+                return Result(
+                    status="error",
+                    message=f"script not found: {script}",
+                    error_code="script_not_found",
+                    action="run_python",
+                )
+            if sp.suffix.lower() != ".py":
+                return Result(
+                    status="error",
+                    message=f"script must be a .py file: {script}",
+                    error_code="script_not_python",
+                    action="run_python",
+                )
+            argv.append(str(sp))
+        else:
+            argv.extend(["-m", str(module)])
+
+        if args is not None:
+            if not isinstance(args, list) or not all(
+                isinstance(a, str) for a in args
+            ):
+                return Result(
+                    status="error",
+                    message="`args` must be a list of strings.",
+                    error_code="bad_args",
+                    action="run_python",
+                )
+            argv.extend(args)
+
+        # -- 5. cwd ---------------------------------------------------------
+        try:
+            cwd_path = self._resolve_inside_project(cwd or ".")
+        except ValueError as e:
+            return Result(
+                status="blocked",
+                message=str(e),
+                error_code="cwd_outside_project",
+                action="run_python",
+            )
+        if not cwd_path.is_dir():
+            return Result(
+                status="error",
+                message=f"cwd is not a directory: {cwd}",
+                error_code="cwd_not_found",
+                action="run_python",
+            )
+
+        # -- 6. timeout -----------------------------------------------------
+        t_default = int(self._opt("default_timeout", 60))
+        t_max = int(self._opt("max_timeout", 600))
+        t = int(timeout) if timeout is not None else t_default
+        if t <= 0:
+            t = t_default
+        if t > t_max:
+            return Result(
+                status="error",
+                message=f"timeout {t}s exceeds max_timeout {t_max}s.",
+                error_code="timeout_too_large",
+                action="run_python",
+            )
+
+        # -- 7. output cap --------------------------------------------------
+        cfg_cap = int(self._opt("max_output_bytes", 200_000))
+        cap = int(max_bytes) if max_bytes else cfg_cap
+        if cap <= 0:
+            cap = cfg_cap
+        cap = min(cap, cfg_cap)
+
+        # -- 8. env ---------------------------------------------------------
+        child_env = self._build_env(env)
+
+        # -- 9. spawn -------------------------------------------------------
+        popen_kwargs: dict = {
+            "args": argv,
+            "cwd": str(cwd_path),
+            "env": child_env,
+            "shell": False,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+        }
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+        t0 = time.monotonic()
+        try:
+            proc = subprocess.Popen(**popen_kwargs)
+        except FileNotFoundError as e:
+            return Result(
+                status="error",
+                message=f"cannot start interpreter: {e}",
+                error_code="interpreter_not_found",
+                action="run_python",
+            )
+        except OSError as e:
+            return Result(
+                status="error",
+                message=f"OSError starting process: {e}",
+                error_code="os_error",
+                action="run_python",
+            )
+
+        timed_out = False
+        try:
+            out_b, err_b = proc.communicate(timeout=t)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _kill_tree(proc)
+            try:
+                out_b, err_b = proc.communicate(timeout=5)
+            except Exception:
+                out_b, err_b = b"", b""
+        duration_ms = int((time.monotonic() - t0) * 1000)
+        exit_code = proc.returncode if proc.returncode is not None else -1
+
+        # -- 10. truncate ---------------------------------------------------
+        out_b, out_tr = _clip(out_b or b"", cap)
+        err_b, err_tr = _clip(err_b or b"", cap)
+        enc = self._opt("child_encoding", "utf-8") or "utf-8"
+        stdout = out_b.decode(enc, errors="replace")
+        stderr = err_b.decode(enc, errors="replace")
+
+        # -- 11. result -----------------------------------------------------
+        if timed_out:
+            status, code = "error", "timeout"
+        elif exit_code == 0:
+            status, code = "ok", None
+        else:
+            status, code = "error", "nonzero_exit"
+
+        flags = []
+        if timed_out:
+            flags.append("TIMED_OUT")
+        if out_tr:
+            flags.append("stdout_truncated")
+        if err_tr:
+            flags.append("stderr_truncated")
+        flag_s = ("  " + " ".join(flags)) if flags else ""
+
+        parts = [
+            f"exit={exit_code}  duration={duration_ms}ms{flag_s}",
+        ]
+        if stdout:
+            parts.append("--- stdout ---\n" + stdout.rstrip("\n"))
+        if stderr:
+            parts.append("--- stderr ---\n" + stderr.rstrip("\n"))
+        message = "\n".join(parts)
+
+        return Result(
+            status=status,
+            message=message,
+            error_code=code,
+            action="run_python",
+        )
+
+[r3] ✓ grep: Найдено 14 совпадений:
+toolkit/code/toolkit/tools/shell.py:3: Runs `sys.executable <script> [args...]` or `sys.executable -m <module> [args...]`
+toolkit/code/toolkit/tools/shell.py:97:     path_args: list[str] = []          # `script` is checked inside execute
+toolkit/code/toolkit/tools/shell.py:98:     path_list_args: list[str] = []
+toolkit/code/toolkit/tools/shell.py:178:         args: list[str] | None = None,
+toolkit/code/toolkit/tools/shell.py:256:         if args is not None:
+toolkit/code/toolkit/tools/shell.py:257:             if not isinstance(args, list) or not all(
+toolkit/code/toolkit/tools/shell.py:258:                 isinstance(a, str) for a in args
+toolkit/code/toolkit/tools/shell.py:262:                     message="`args` must be a list of strings.",
+toolkit/code/toolkit/tools/shell.py:263:                     error_code="bad_args",
+toolkit/code/toolkit/tools/shell.py:266:             argv.extend(args)
+toolkit/code/toolkit/tools/shell.py:311:         popen_kwargs: dict = {
+toolkit/code/toolkit/tools/shell.py:312:             "args": argv,
+toolkit/code/toolkit/tools/shell.py:320:             popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+toolkit/code/toolkit/tools/shell.py:324:             proc = subprocess.Popen(**popen_kwargs)
+
+[commit] ✓ run_python: exit=0  duration=160ms
 --- stdout ---
-[OK]   render ok (hidden filtered)
-[OK]   overrides starts empty
-[OK]   override created for code
-[OK]   read inverted from effective (True -> False)
-[OK]   other flags stayed at effective (write=True)
-[OK]   read flipped back to True
-[OK]   write now False
-[OK]   read unaffected
-[OK]   nested override created
-[OK]   nested index_py inverted (True -> False)
-[OK]   render with show_hidden ok
+[add rc=0]
+[commit rc=0]
+[master 28ca5f5] tree_view widget (PolicyTree, 11 tests pass)
+ 5 files changed, 233 insertions(+), 65 deletions(-)
+ create mode 100644 toolkit/code/toolkit/runner/gui/tree_view.py
+[timing] user (4 actions): 0.17s
 
-=== 11 ok, 0 failed ===
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v367] [без изменений]
 
-[smoke-gui] ✓ run_python: exit=0  duration=180ms
---- stdout ---
-[OK]   toolkit.runner.gui.app imported
-[OK]   all expected attributes present
-=== gui smoke OK ===
-[timing] user (3 actions): 0.36s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 166, символов: 1120) [v413] [без изменений]
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v366] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v242] [без изменений]
+[timing] auto-rebuild (3 actions): 0.80s
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 166, символов: 1120) [v412] [+1]
-  + toolkit/code/toolkit/runner/gui/tree_view.py  (191 стр., 7.2 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v241] [без изменений]
-[timing] auto-rebuild (3 actions): 0.82s
-
-##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.18s
+##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.97s
