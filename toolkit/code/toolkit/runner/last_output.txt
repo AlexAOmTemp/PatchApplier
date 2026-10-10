@@ -1,51 +1,67 @@
-[tree-mod] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/gui/tree.py (102 стр., 3555 Б)
+[r1] ✓ read_file: toolkit/docs/GUI_PROJECT_SETTINGS.md L44–L60
+44: '### 2.4. Источники и runtime\n'
+45: '\n'
+46: '- **Index docs / python / lua** — три чекбокса. `lua` disabled если MCP выключен.\n'
+47: '- **MCP** — чекбокс «включить MCP-бэкенд». При включении активны native_tools и luau-mode.\n'
+48: '- **Luau mode** — radio: `mcp` / `rojo`.\n'
+49: '- **Exec** — чекбокс «разрешить run_python».\n'
+50: '\n'
+51: 'Эти параметры живут в `.patch_applier.json` (tool-wide) и `<project>/.patch_applier/config.json` (per-project), но редактируются в этом окне без прямого доступа к JSON.\n'
+52: '\n'
+53: '### 2.5. Кнопки\n'
+54: '\n'
+55: '`OK` — применить (rename + add/remove roots + policy + исключения + toggles), перезапустить сессию.\n'
+56: '`Cancel` — закрыть без изменений.\n'
+57: '\n'
+58: '## 3. Только каталоги, без файлов\n'
+59: '\n'
+60: '**Решение:** дерево показывает **только каталоги**. Файлы не показываются никогда.\n'
 
-[test] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_tree.py (142 стр., 4831 Б)
+[r2] ✓ read_file: toolkit/code/manual/_git.py L1–L30
+1: '"""Tiny git helper for refactor checkpoints.\n'
+2: '\n'
+3: 'Subcommands:\n'
+4: '  commit <message>       git add -A && git commit -m <message>\n'
+5: '  log [n]                show last n commits (default 5)\n'
+6: '  status                 short status\n'
+7: '  reset-hard [ref]       reset --hard <ref> (default HEAD)\n'
+8: '  show-file <ref> <p>    print a file as of <ref>\n'
+9: '\n'
+10: 'Run from anywhere inside the repo; resolves root from __file__.\n'
+11: '"""\n'
+12: 'from __future__ import annotations\n'
+13: '\n'
+14: 'import shutil\n'
+15: 'import subprocess\n'
+16: 'import sys\n'
+17: 'from pathlib import Path\n'
+18: '\n'
+19: '\n'
+20: 'def _git(args, cwd):\n'
+21: '    exe = shutil.which("git")\n'
+22: '    if not exe:\n'
+23: '        return -1, "", "git not found on PATH"\n'
+24: '    p = subprocess.run([exe] + args, cwd=str(cwd),\n'
+25: '                       capture_output=True, text=True, timeout=60)\n'
+26: '    return p.returncode, p.stdout, p.stderr\n'
+27: '\n'
+28: '\n'
+29: 'def _root() -> Path:\n'
+30: '    # here = <repo>/toolkit/code/manual/_git.py\n'
 
-[run] ✓ run_python: exit=0  duration=37ms
+[r3] ✓ run_python: exit=0  duration=174ms
 --- stdout ---
-[OK]   empty input -> empty output
-[OK]   two top-level nodes
-[OK]   first is code
-[OK]   second is docs
-[OK]   both have empty children
-[OK]   code node has 2 children
-[OK]   code/bridge child
-[OK]   code/toolkit child
-[OK]   code/toolkit has backends
-[OK]   docs has no children
-[OK]   auto-create a
-[OK]   auto-create a/b
-[OK]   auto-create a/b/c
-[OK]   duplicate prefix merged, not added twice
-[OK]   merged node is code
-[OK]   order preserved (not alphabetical)
-[OK]   backslash path splits correctly
-[OK]   leading/trailing slashes ignored
-[OK]   double slash ignored
-[OK]   filter removes .git
-[OK]   filter keeps code
-[OK]   filter keeps docs
-[OK]   docs/generated removed
-[OK]   drop removed from a
-[OK]   keep still under a
-[OK]   flatten matches input
+[OK]   toolkit.runner.gui.app imported
+[OK]   all expected attributes present
+=== gui smoke OK ===
+[timing] user (3 actions): 0.18s
 
-=== 26 ok, 0 failed ===
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v364] [без изменений]
 
-[commit] ✗ run_python: exit=2  duration=38ms
---- stdout ---
-unknown subcommand: gui: pure tree logic (runner/gui/tree.py) + tests
-[timing] user (4 actions): 0.08s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1102) [v410] [без изменений]
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v361] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v239] [без изменений]
+[timing] auto-rebuild (3 actions): 0.79s
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1102) [v407] [+2]
-  + toolkit/code/toolkit/runner/gui/tree.py  (102 стр., 3.5 KB)
-  + toolkit/code/toolkit/tests/test_tree.py  (142 стр., 4.7 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v236] [без изменений]
-[timing] auto-rebuild (3 actions): 0.82s
-
-##RESULT:{"ok": 6, "errors": 1, "skipped": 0, "failed": [4], "blocked": []}
-[timing] total: 0.90s
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.97s
