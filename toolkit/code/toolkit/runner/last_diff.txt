@@ -1,6 +1,6 @@
-.patch_applier/INDEX.md (файлов: 22, без summary: 155) [v350] [без изменений]
+.patch_applier/INDEX.md (файлов: 22, без summary: 155) [v352] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1095) [v398] [+1]
-  + toolkit/code/toolkit/tests/test_tool_edge_cases.py  (159 стр., 5.2 KB)
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1096) [v400] [+1]
+  + toolkit/code/toolkit/tests/test_multi_root_smoke.py  (157 стр., 6.0 KB)
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v228] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v230] [без изменений]

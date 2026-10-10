@@ -1,31 +1,19 @@
-[{"id": "del-recon", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_recon.py"}}]
-
-[{"id": "del-cleanup", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_cleanup.py"}}]
-
-[{"id": "del-final", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_final_cleanup.py"}}]
-
-[{"id": "del-gitst", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_git_status.py"}}]
-
-[{"id": "dec-line", "action": "insert_at_anchor",
-  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
-    "anchor": "**Git hygiene.**",
-    "position": "before",
-    "new_content": "**P1-фиксы тулов (следующая сессия после Workspace).** `insert_at_anchor` — auto-`\\n` между anchor и `new_content`, чтобы не склеивать строки (`from a import b` + `from c import d` → сломанный синтаксис). `replace_between` — EOL-нормализация anchor'ов, чтобы LF-anchor находился в CRLF-файле. Оба фикса — из `TOOL_PRACTICE.md §8`, регрессии в `test_tool_edge_cases.py`. См. также §2.5.\n\n"}}]
-
-[{"id": "check-script", "action": "create_file",
-  "arguments": {"file_path": "toolkit/code/manual/_check_starter.py",
-    "file_content": "\"\"\"Check: does the current project's status show roots in the policy section?\n\nRuns GetStatusTool with the current session's backend (if any) — but\nsince this is a standalone script, it constructs a fresh workspace from\n`.patch_applier/workspace.json` and a WorkspaceBackend, then calls\nGetStatusTool with the right context. The output is compared against\nexpected shape: `## Policy Filesystem` + root basename + `[R W Id Ip Il]`.\n\"\"\"\nfrom __future__ import annotations\n\nimport sys\nfrom pathlib import Path\n\n\nHERE = Path(__file__).resolve().parent\nsys.path.insert(0, str(HERE.parent))\n\nROOT = HERE.parents[2]  # PatchApplier/\nSTATE = ROOT / \".patch_applier\"\n\nfrom toolkit.config import workspace as ws_mod\nfrom toolkit.config.loader import load_workspace\nfrom toolkit.backends.workspace import WorkspaceBackend\nfrom toolkit.formats import Format\nfrom toolkit.tools.status import GetStatusTool\n\n\nws = load_workspace({\"project_dir\": str(ROOT), \"state_dir\": \".patch_applier\"})\nif ws is None:\n    print(\"[FAIL] no workspace loaded\")\n    sys.exit(1)\nprint(f\"[OK]   workspace loaded: {ws.name}  roots={ws.root_names()}\")\n\nwb = WorkspaceBackend(ws, STATE)\nwb.open()\n\ntry:\n    GetStatusTool.set_context(\n        project_name=ws.name,\n        backend=\"composite\",\n        backends_enabled={\"filesystem\", \"mcp\"},\n    )\n    r = GetStatusTool().execute(backend=wb, fmt=Format.load(\"default\"))\n    print()\n    print(r.message)\n    print()\n    if \"## Policy Filesystem\" in r.message:\n        print(\"[OK]   has Policy Filesystem section\")\n    else:\n        print(\"[FAIL] no Policy Filesystem section\")\n    for name in ws.root_names():\n        if name in r.message:\n            print(f\"[OK]   root '{name}' mentioned\")\n        else:\n            print(f\"[FAIL] root '{name}' missing from policy\")\n    if \"[R W Id Ip Il]\" in r.message or \"Id\" in r.message:\n        print(\"[OK]   five-flag display present\")\n    else:\n        print(\"[FAIL] five-flag display missing\")\nfinally:\n    wb.close()\n"}}]
-
-[{"id": "check", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_check_starter.py"}}]
-
-[{"id": "smoke", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
-
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "hygiene: remove one-off scripts, record P1 fixes in DECISIONS"]}}]
+                "args": ["commit", "test: multi-root smoke (2 roots, per-root policy, rebuild)"]}}]
+
+[{"id": "wb11", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
+    "search": "5. **Индексаторы под multi-root.** ⚠️ **Формально работает.** `rebuild_*` ходят по `list(\"\")`, который возвращает плоский список с префиксами `<basename>/<rel>`. На одном корне проверено. На двух — только `test_workspace_backend.py`, живого проекта не заводили.",
+    "replace": "5. **Индексаторы под multi-root.** ✅ **Готово.** `rebuild_*` ходят по `list(\"\")`, который возвращает плоский список с префиксами `<basename>/<rel>`. Проверено live на двух корнях: `test_multi_root_smoke.py` (16/16) — индекс собирает файлы обоих корней; per-root `PathPolicy(index_docs=False, index_py=False)` реально исключает root из индекса при rebuild.",
+    "search_repr": false}}]
+
+[{"id": "session-upd", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/SESSION_STATE.md",
+    "search": "3. **Multi-root smoke на живом проекте.** Формально покрыто `test_workspace_backend.py` (два roots `alpha`/`beta`). Но реальный проект с 2+ roots и rebuild'ом не запускали. Нужно: создать проект, добавить второй root (например `D:/some-other-folder`), запустить `rebuild_index`/`rebuild_code_index`, убедиться, что оба корня в индексе.",
+    "replace": "3. ~~**Multi-root smoke на живом проекте.**~~ **Закрыто.** `test_multi_root_smoke.py` (16/16) — два корня `alpha`/`beta`, `rebuild_index` + `rebuild_code_index` собирают файлы обоих, per-root `PathPolicy` исключает корень из индекса при rebuild.",
+    "search_repr": false}}]
+
+[{"id": "commit2", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_git.py",
+                "args": ["commit", "docs: mark multi-root smoke closed in WORKSPACE_BACKEND and SESSION_STATE"]}}]

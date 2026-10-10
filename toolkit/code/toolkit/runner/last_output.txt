@@ -1,75 +1,49 @@
-[ins-fix] ✓ replace_unit: toolkit/code/toolkit/tools/write.py: replace_unit применён
+[test] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_multi_root_smoke.py (157 стр., 6111 Б)
 
-[rep-fix] ✓ replace_unit: toolkit/code/toolkit/tools/write.py: replace_unit применён
-
-[test] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_tool_edge_cases.py (159 стр., 5302 Б)
-
-[run] ✓ run_python: exit=0  duration=103ms
+[run] ✓ run_python: exit=0  duration=117ms
 --- stdout ---
-[1] ✓ insert_at_anchor: после L1 в a.py — +1 стр., +23 Б
+[OK]   list includes alpha/a.py
+[OK]   list includes beta/b.py
+[OK]   list includes alpha/a.md
+[OK]   list includes beta/b.md
 
-[OK]   insert ok (no explicit \n)
-[OK]   newline inserted between anchor and content
-[OK]   second import line intact
-[1] ✓ insert_at_anchor: после L1 в b.py — +1 стр., +6 Б
+== rebuild_index (docs) ==
+[1] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 2, без summary: 0) [v1] [создан, 2 файлов, 15 строк]
+  + alpha/a.md
+  + beta/b.md
 
-[OK]   insert ok (
- in content)
-[OK]   no double newline
-[1] ✓ insert_at_anchor: перед L2 в c.py — +1 стр., +6 Б
+[OK]   rebuild_index ok
+[OK]   INDEX has alpha/a.md
+[OK]   INDEX has beta/b.md
+[OK]   INDEX does NOT have bare a.md without prefix
 
-[OK]   insert before ok
-[OK]   before: newline added after content
-[1] ✓ replace_between: L1–L3 → L1–L1 в d.py — -2 стр., -14 Б
+== rebuild_code_index ==
+[1] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 2, символов: 2) [v1] [создан, 16 строк]
 
-[OK]   replace_between ok
-[OK]   block replaced
-[1] ✓ replace_between: L1–L4 → L1–L1 в e.py — -3 стр., -17 Б
+[OK]   rebuild_code_index ok
+[OK]   CODE_INDEX has alpha/a.py
+[OK]   CODE_INDEX has beta/b.py
+[OK]   alpha_fn symbol
+[OK]   beta_fn symbol
 
-[OK]   multi-line LF anchor matches CRLF file
-[OK]   block replaced
+== disable beta → beta gone from index ==
+[1] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 1, без summary: 0) [v2] [-1]
+  - ## beta/b.md  (6 стр., 0.1 KB, mtime 2026-10-10 22:27)
 
-=== 11 ok, 0 failed ===
+[OK]   rebuild after disable ok
+[OK]   beta gone from INDEX
+[OK]   alpha still in INDEX
 
-[smoke] ✓ run_python: exit=0  duration=83ms
---- stdout ---
-[OK]   toolkit.core
-[OK]   toolkit.core.models
-[OK]   toolkit.core.patcher
-[OK]   toolkit.core.session
-[OK]   toolkit.config
-[OK]   toolkit.config.workspace
-[OK]   toolkit.backends
-[OK]   toolkit.backends.filesystem
-[OK]   toolkit.backends.workspace
-[OK]   toolkit.backends.composite
-[OK]   toolkit.backends.mcp
-[OK]   toolkit.indexers
-[OK]   toolkit.indexers.doc
-[OK]   toolkit.indexers.code
-[OK]   toolkit.tools
-[OK]   toolkit.tools.index
-[OK]   toolkit.tools.status
-[OK]   toolkit.runner.projects
+=== 16 ok, 0 failed ===
+[timing] user (2 actions): 0.12s
 
-=== all imports OK ===
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 22, без summary: 155) [v352] [без изменений]
 
-[commit] ✓ run_python: exit=0  duration=164ms
---- stdout ---
-[add rc=0]
-[commit rc=0]
-[master 3c7f1f7] P1 tool fixes: insert_at_anchor newline guard, replace_between EOL normalisation
- 6 files changed, 307 insertions(+), 108 deletions(-)
- create mode 100644 toolkit/code/toolkit/tests/test_tool_edge_cases.py
-[timing] user (6 actions): 0.38s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 162, символов: 1096) [v400] [+1]
+  + toolkit/code/toolkit/tests/test_multi_root_smoke.py  (157 стр., 6.0 KB)
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 22, без summary: 155) [v350] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v230] [без изменений]
+[timing] auto-rebuild (3 actions): 0.84s
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 164, символов: 1095) [v398] [+1]
-  + toolkit/code/toolkit/tests/test_tool_edge_cases.py  (159 стр., 5.2 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v228] [без изменений]
-[timing] auto-rebuild (3 actions): 0.82s
-
-##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.20s
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.96s
