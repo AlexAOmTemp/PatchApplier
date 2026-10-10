@@ -232,52 +232,74 @@ class WorkspaceBackend:
 
     def write(self, path: str, content: str) -> None:
         target = self._state_write_target(path)
-        if target is None:
-            raise NotImplementedError(
-                "WorkspaceBackend: write to a workspace root is enabled in step 6; "
-                "writes to the state directory (.patch_applier/) are allowed"
-            )
-        fb, rel = target
+        if target is not None:
+            fb, rel = target
+            fb.write(rel, content)
+            return
+        _, rel, fb = self._resolve_root(path)
         fb.write(rel, content)
 
     def create(self, path: str, content: str,
                class_name: str = "ModuleScript") -> None:
         target = self._state_write_target(path)
-        if target is None:
-            raise NotImplementedError(
-                "WorkspaceBackend: create in a workspace root is enabled in step 6; "
-                "creates in the state directory (.patch_applier/) are allowed"
-            )
-        fb, rel = target
+        if target is not None:
+            fb, rel = target
+            fb.write(rel, content)
+            return
+        _, rel, fb = self._resolve_root(path)
         fb.write(rel, content)
 
     def delete(self, path: str) -> None:
         target = self._state_write_target(path)
-        if target is None:
-            raise NotImplementedError(
-                "WorkspaceBackend: delete in a workspace root is enabled in step 6; "
-                "deletes in the state directory (.patch_applier/) are allowed"
-            )
-        fb, rel = target
+        if target is not None:
+            fb, rel = target
+            fb.delete(rel)
+            return
+        _, rel, fb = self._resolve_root(path)
         fb.delete(rel)
 
     def move(self, src: str, dst: str) -> None:
-        s = self._state_write_target(src)
-        d = self._state_write_target(dst)
-        if s is None or d is None:
-            raise NotImplementedError(
-                "WorkspaceBackend: move in a workspace root is enabled in step 6"
+        s_name, s_rel = self._split(src)
+        d_name, d_rel = self._split(dst)
+        # Both ends must be in the same logical storage: state or the same root.
+        if s_name == patchignore.STATE_DIR or d_name == patchignore.STATE_DIR:
+            if s_name != d_name:
+                raise RuntimeError(
+                    f"move across state/root ({s_name} -> {d_name}) is not supported"
+                )
+            if self._state_fs is None:
+                raise FileNotFoundError("state backend not open")
+            self._state_fs.move(s_rel, d_rel)
+            return
+        if s_name != d_name:
+            raise RuntimeError(
+                f"move across roots ({s_name} -> {d_name}) is not supported"
             )
-        s[0].move(s[1], d[1])
+        _, _, fb = self._resolve_root(src)
+        fb.move(s_rel, d_rel)
 
     def copy(self, src: str, dst: str) -> None:
-        s = self._state_write_target(src)
-        d = self._state_write_target(dst)
-        if s is None or d is None:
-            raise NotImplementedError(
-                "WorkspaceBackend: copy in a workspace root is enabled in step 6"
+        s_name, s_rel = self._split(src)
+        d_name, d_rel = self._split(dst)
+        # Cross-root copy is allowed at the FS level (both sides are local
+        # files); the physical copy goes through the source's FS backend.
+        # Cross-state/root is not — different backends.
+        s_state = s_name == patchignore.STATE_DIR
+        d_state = d_name == patchignore.STATE_DIR
+        if s_state != d_state:
+            raise RuntimeError(
+                f"copy across state/root ({s_name} -> {d_name}) is not supported"
             )
-        s[0].copy(s[1], d[1])
+        if s_state:
+            if self._state_fs is None:
+                raise FileNotFoundError("state backend not open")
+            self._state_fs.copy(s_rel, d_rel)
+            return
+        src_fb = self.roots.get(s_name)
+        dst_fb = self.roots.get(d_name)
+        if src_fb is None or dst_fb is None:
+            raise FileNotFoundError(f"copy: unknown root in {src!r} -> {dst!r}")
+        src_fb.copy_to(s_rel, dst_fb, d_rel)
 
     # --- filter ------------------------------------------------------------
 

@@ -124,18 +124,25 @@ def main():
         wb.delete('.patch_applier/note.txt')
         t.expect('delete from state works',
                  wb.exists('.patch_applier/note.txt') is False)
-        t.raises('write to root raises NotImplementedError',
-                 lambda: wb.write('alpha/new.txt', 'x'),
-                 NotImplementedError)
-        t.raises('delete raises NotImplementedError',
-                 lambda: wb.delete('alpha/hello.txt'),
-                 NotImplementedError)
-        t.raises('move raises NotImplementedError',
-                 lambda: wb.move('alpha/a.txt', 'alpha/b.txt'),
-                 NotImplementedError)
-        t.raises('copy raises NotImplementedError',
-                 lambda: wb.copy('alpha/a.txt', 'beta/a.txt'),
-                 NotImplementedError)
+        # --- write into a root ---
+        wb.write('alpha/new.txt', 'from-root')
+        t.expect('write to root works',
+                 wb.read('alpha/new.txt') == 'from-root')
+        t.expect('root file exists', wb.exists('alpha/new.txt') is True)
+        wb.create('alpha/created.txt', 'created')
+        t.expect('create in root works',
+                 wb.read('alpha/created.txt') == 'created')
+        wb.delete('alpha/created.txt')
+        t.expect('delete in root works',
+                 wb.exists('alpha/created.txt') is False)
+        # --- cross-root copy ---
+        wb.copy('alpha/hello.txt', 'beta/hello_copy.txt')
+        t.expect('cross-root copy works',
+                 wb.read('beta/hello_copy.txt') == 'hi alpha')
+        # --- cross-root move is rejected ---
+        t.raises('move across roots rejected',
+                 lambda: wb.move('alpha/hello.txt', 'beta/x.txt'),
+                 RuntimeError)
 
         # --- filter_check: policy on full <basename>/<rel> ---
         spec = FilterSpec(overrides={'alpha': False})

@@ -187,6 +187,19 @@ class FilesystemBackend:
         d.parent.mkdir(parents=True, exist_ok=True)
         s.rename(d)
 
+    def copy_to(self, src_rel: str, other: "FilesystemBackend",
+                dst_rel: str) -> None:
+        """Copy a file into another FilesystemBackend's root.
+
+        Used by WorkspaceBackend to support cross-root copies without
+        exposing one backend's `_root` to the other.
+        """
+        s = self._resolve(src_rel)
+        d = other._resolve(dst_rel)  # noqa: SLF001
+        d.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(s, d)
+
+
     def copy(self, src: str, dst: str) -> None:
         """Byte-exact copy (shutil.copy2 preserves metadata). Works on any file."""
         s = self._resolve(src)
