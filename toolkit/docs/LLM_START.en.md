@@ -128,6 +128,12 @@ The index is the map of the world: files, sections, line ranges, sizes, dependen
 
 **Format is groups.** Each action in its own `[...]`; groups go one after another. The separator (newline or comma) does not matter. A single action is also one group.
 
+**One fence for the whole patch, not per group.** Put the whole reply in one fence with all groups inside. **Do not wrap each `[...]` in its own fence** — that splits the patch into several documents on the user's side, which have to be copied one by one. Correct shape:
+
+- one fence, all groups inside, each group with its own `[...]`;
+- or no fence at all;
+- one fence per group is a mistake — it breaks copying.
+
 **One action — one group.** Never merge several actions into a single array. Groups give independence (see below).
 
 **Why groups.** Each group parses independently. An error in one group (missing comma, bracket, unclosed quote, missing `id`) **does not affect the others**: valid actions apply, the problem group is ignored and described in the `=== Compiler messages ===` block after the log.
@@ -276,6 +282,8 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 - **three parts**: `head` — the declaration (`def f():`, `class C:`, `function f(x)`, `## 3.1 Title`); `annotation` — a short description right after head (docstring `"""..."""`, `--[[ ]]` / `---` in Lua, `<!-- summary: ... -->` in md; may be absent); `body` — everything after head and annotation.
 - **blocks** — numbered elements inside body: statements in a function, methods/attributes in a class, subsections in a section. `block=3`, range `"1-10"`, list `[1,3,7]`.
 
+**Decorators (Python).** A function's / class's head **includes** `@decorator` lines. A module's head does not: the decorator of the first def/class belongs to its block. The asymmetry is deliberate, see MODEL.md §2.
+
 **Module:** head up to the **first** def/class/function; everything from there is body (a global between classes is a block in body, not head).
 
 **The model is the same for `.py`, `.lua`, `.luau`, `.md`.** Where annotation lives physically (AST / comment / HTML) is the tool's business. **Comments between units, individual lines, the contents of a markdown fenced block** are not addressable — use the text tools below. If a unit has no docstring, `part=annotation` returns empty (not an error).
@@ -295,6 +303,8 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 **Write tools.** After the write the source is parsed again; if the new text breaks parsing or loses the unit — `result_syntax_error` / `result_missing_symbol`, file **untouched**. First-line indent and EOL (`\n` vs `\r\n`) are preserved.
 
 **Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_block` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part="body"`. `insert_block position="end"` inserts before `return M` when present.
+
+**Lua in both modes.** Rojo-mode: the path is an ordinary file path (`.luau`), the extension is detected as for `.py`. MCP-mode: the path is `Service.X.Y` without an extension; `.Source` is Luau. The tool detects MCP paths itself (via `is_mcp_path`); a single adapter (`adapter_lua`) serves both modes. `list_units` / `read_unit` behave identically in either mode.
 
 ### Call graph and module-level search
 
@@ -442,6 +452,13 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 3. `replace_block` — replace a block or a range in body. Empty `new_text` deletes (or use `delete_block`).
 4. `insert_block` — insert a block at `start` / `end` / `before anchor` / `after anchor`.
 5. `set_annotation` — replace docstring / summary. **Only if the annotation already exists** — creating one from scratch is not supported.
+
+**Graph navigation:**
+1. `find_symbol query="X"` — where X is defined (name → module).
+2. `find_usages query="path/to/mod"` — module-level walk: who imports me (`used by`), whom I import (`imports`).
+3. `symbol_graph qualname="X" depth=2` — from a known symbol: callees down, callers up. The graph is heuristic (see §7).
+
+**Symbol-level boundary.** Symbolic reverse ("where is `X.foo` called") is implemented for Python only. For Lua, `symbol_graph kind="lua"` returns the symbol's module without callees/callers — the Lua manifest carries no `calls` field. Module-level reverse (`find_usages`) works for Lua over `require` and is approximate.
 
 **Bulk edit across the project:**
 1. Filesystem — `grep` finds matches, `replace_in_file` with `occurrence="all"` edits all in one file.

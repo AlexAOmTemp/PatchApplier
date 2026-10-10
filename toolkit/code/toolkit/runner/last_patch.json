@@ -1,2 +1,37 @@
-[{"id": "fix", "action": "replace_in_file", "arguments": {"file_path": "toolkit/code/manual/metrics_report.py", "search": "_HERE = Path(__file__).resolve()\n_CODE_ROOT = _HERE.parents[2]  # .../toolkit/code\nif str(_CODE_ROOT) not in sys.path:\n    sys.path.insert(0, str(_CODE_ROOT))", "replace": "_HERE = Path(__file__).resolve()\n# .../toolkit/code/manual/metrics_report.py -> .../toolkit/code\n_CODE_ROOT = _HERE.parents[1]\nif str(_CODE_ROOT) not in sys.path:\n    sys.path.insert(0, str(_CODE_ROOT))"}}]
-[{"id": "run", "action": "run_python", "arguments": {"script": "toolkit/code/manual/metrics_report.py"}}]
+[{"id": "wb-s3", "action": "replace_between",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
+    "start_anchor": "**Алгоритм:**",
+    "end_anchor": "**MCP-пути**",
+    "include_start": true,
+    "include_end": false,
+    "new_content": "**Алгоритм:**\n\n1. Первый сегмент до `/` — это `basename`. Если не в `self.roots` — `not_found: root '<basename>' not in workspace`.\n2. Остальное — `rel`. Передать `FilesystemBackend[basename].read(rel)` и т.п.\n3. `list(\"\")` — список basename'ов (см. §4). `list(\"<basename>\")` — файлы внутри этого корня (не рекурсивно, как обычно).\n\n**State-каталог — как сейчас.** `.patch_applier/` (или новый `state_dir`) адресуется либо через корневой путь, если он физически внутри корня (`my-project/.patch_applier/workspace.json`), либо напрямую по сохранённому пути — внутренним механизмом утилиты. LLM туда не ходит: индекс читается `get_index`, политики — `get_status`, конфиг — `get_status`. Прямой `read_file` по state-файлу возможен (он RW), но не рекомендуется. Правило не меняется от multi-root — что сейчас работает, то и продолжит.\n\n**Регистр basename — case-insensitive.** `D:/Docs` и `D:/docs` — коллизия. Сравнение — приведением к нижнему регистру.\n\n**Абсолютные пути — не для LLM.** Внутри утилиты (GUI при выборе каталога, CLI, внутренние тулы) абсолютные пути используются. В патчах LLM видит только `<basename>/<rel>`. Если прилетает абсолютный путь — `wrong_domain: absolute path not allowed in patches`.\n\n"}}]
+
+[{"id": "wb-s5", "action": "replace_between",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
+    "start_anchor": "**Что НЕ policy.**",
+    "end_anchor": "## 6.",
+    "include_start": true,
+    "include_end": false,
+    "new_content": "**State-каталог — захардкоженная политика.** `.patch_applier/` (или новый `state_dir`) всегда RW для внутренних тулов и **никогда** не индексируется. Это не из `workspace.json`, не зависит от корня, не переопределяется. Так уже работает — правило сохраняется. Именно чтобы индексатор не пытался индексировать свои же артефакты (INDEX.md, CODE_INDEX.md, sidecar'ы) и не рекурсировал.\n\n**`.patchignore` / `.mcpignore`** — фильтр видимости, лежат в `state_dir`, применяются в backend'е (не в `Patcher`). Один на workspace, применяется к каждому корню.\n\n"}}]
+
+[{"id": "wb-s7", "action": "replace_unit",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
+    "address": {"section_number": "7"},
+    "part": "body",
+    "new_text": "`state_dir` — каталог, где живут производные файлы. Один на workspace, не на корень:\n\n- **External** (по умолчанию) — `<toolkit_root>/runtime/workspaces/<id>/`.\n- **Embedded** — пользователь выбрал (например, внутри своего проекта).\n\nСодержимое:\n\n```\n<state>/\n  workspace.json\n  .patchignore\n  .mcpignore\n  INDEX.md\n  CODE_INDEX.md\n  CODE_INDEX_LUA.md\n  *.manifest.json\n  *.version\n  .index_meta.json\n  runtime/\n```\n\n**Доступ.** Захардкоженная политика: RW для внутренних тулов, никогда не индексируется (см. §5). LLM к этим файлам обращается через спецметоды: `get_index` (индекс), `get_status` (политики, session), `get_status(sections=[\"indexes\"])` (версии). Прямой `read_file` возможен, но не требуется.\n\n**Индексатор пропускает `state_dir` всегда** — независимо от расположения, без `exclude` глобов. Это знание backend'а, не пользователя.\n\n**Индексы** собираются со всех корней по флагам политики. Один набор `INDEX.md` / `CODE_INDEX.md` / `CODE_INDEX_LUA.md`. Путь в индексе — `<basename>/<rel>`.\n\n**Куда пишутся индексы.** Внутренние тулы (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`) знают `state_dir` из workspace-конфига. `INDEX.md`, `CODE_INDEX.md`, `CODE_INDEX_LUA.md` пишутся туда. Никаких `local_dir` из backend'а — путь берётся из workspace."}}]
+
+[{"id": "wb-s10", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE_BACKEND.md",
+                "search": "- **`tools/index.py`** — `RebuildLuaCodeIndexTool` переписать: `local_dir` больше не из `backend.working_dir`, индексы пишутся в `state/<rel>`.",
+                "replace": "- **`tools/index.py`** — `RebuildLuaCodeIndexTool` переписать: `local_dir` больше не из `backend.working_dir`, а из `state_dir` workspace-конфига.",
+                "search_repr": false}}]
+
+[{"id": "ws7-drop", "action": "replace_between",
+  "arguments": {"file_path": "toolkit/docs/WORKSPACE.md",
+    "start_anchor": "**State-файлы адресуются только как `state/<rel>`.**",
+    "end_anchor": "**Никакого реестра.**",
+    "include_start": true,
+    "include_end": false,
+    "new_content": "**Доступ к state.** `.patch_applier/` (или новый `state_dir`) всегда RW для внутренних тулов и никогда не индексируется — правило сохраняется, не меняется от multi-root. LLM читает индексы через `get_index`, политики — через `get_status`. Прямой `read_file` возможен (state RW), но не требуется — это файлы конфигурации и автогенерируемые артефакты. Если state физически лежит внутри корня (embedded) — он всё равно доступен через корневой путь, и никакого конфликта это не создаёт: LLM по этим путям не работает.\n\n"}}]
+
+[{"id": "rebuild", "action": "rebuild_index", "arguments": {}}]

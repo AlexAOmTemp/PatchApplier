@@ -17,7 +17,34 @@ from pathlib import Path
 # gui package lives at toolkit/runner/gui/__init__.py
 HERE = Path(__file__).resolve().parent          # toolkit/runner/gui/
 RUNNER_DIR = HERE.parent                        # toolkit/runner/
-TOOLKIT_ROOT = RUNNER_DIR.parent                # toolkit/
+
+
+def _find_toolkit_root(start: Path) -> Path:
+    """Locate the toolkit root by walking up from `start`.
+
+    Two markers identify the root in a layout-independent way: the
+    toolkit-wide `.patch_applier.json` file, and `docs/LLM_START.*.md`
+    (the starter text). Either is enough. This makes the toolkit
+    relocatable: move the whole directory anywhere, or reshape its
+    internal structure, without touching this module.
+
+    Falls back to `start.parents[3]` (the current layout) if neither
+    marker is found — e.g. a partially installed toolkit.
+    """
+    p = start
+    for _ in range(8):
+        if (p / ".patch_applier.json").is_file():
+            return p
+        docs = p / "docs"
+        if docs.is_dir() and any(docs.glob("LLM_START.*.md")):
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+    return start.parents[3] if len(start.parents) >= 4 else start
+
+
+TOOLKIT_ROOT = _find_toolkit_root(HERE)                # toolkit/
 PROJECT_ROOT = TOOLKIT_ROOT.parent              # project root
 
 

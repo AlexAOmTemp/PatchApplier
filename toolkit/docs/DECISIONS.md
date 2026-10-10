@@ -215,6 +215,10 @@
 **`find_usages` — реализовано (модульный уровень).** Accessor к индексу: возвращает `imports` и `used_by` для модулей, матчащихся по подстроке пути. Читает тот же manifest, что и `find_symbol`; для Lua — через `manifest_path="CODE_INDEX_LUA.manifest.json"`. Символьный уровень («где вызывается `X.foo`») остаётся в phase 2.
 
 **Ограничения.** Python: `getattr`, `from X import *`, динамические атрибуты — промахи на символьном уровне (на модульном всё точно). Lua: dynamic `require("x" .. suffix)` не виден драйверу; символьный уровень слабее.
+**Lua: `symbol_graph kind="lua"` — только модульный уровень.** Манифест Lua (`lua_runner._build_manifest`) не содержит поля `calls` — драйвер на стороне Studio возвращает только `imports` (по `require`) и `symbols`. Значит `symbol_graph kind="lua"` вернёт модуль символа без callees/callers; `find_usages` работает по `require` (модульный уровень). Символьный reverse для Lua не реализован.
+
+**Lua reverse-dep graph пуст: `script.*`-формы не резолвятся.** Импорты Lua-драйвера приходят script-relative (`script.Parent._Index[...]`, `script.Expectation`), а `_invert_lua_imports` ожидает абсолютные DataModel-пути (`game.ReplicatedStorage.X` → `ReplicatedStorage.X`) и матчит по exact. `script.*` молча пропускается, `used by` пуст у всех модулей. Наблюдалось на `ReplicatedStorage.Packages.TestEZ` (`find_usages query="TestEZ"`, 16 модулей, у всех `used by: (none)`). Направление фикса: либо драйвер резолвит `script.*` до полного DataModel-пути, либо `_invert_lua_imports` получает путь импортёра и разворачивает `script.Parent` от него.
+
 
 **Новые маркеры — открыто.** Кандидаты после первой партии:
 - Структурные: `⚠ large-class` (аналог `⚠ large` для классов, ещё нет), `⚠ god-module` (слишком много символов).
@@ -280,6 +284,8 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 <!-- summary: Хвосты сессии — гигиена файлов и документов, смоуки, .gitignore, переразбиение §1. -->
 
 **_lua_script кэш без mtime.** Правки Lua-скриптов видны только после рестарта GUI. В штатной работе не критично.
+
+**`adapter_lua` — границы внутри Lua-функции не покрыты тестом.** Блоки внутри Lua-функций не нумеруются (`blocks=[]`): token-парсер `formats/lua.py` не даёт statement-границ. Тест `tests/test_unit_bounds.py` проверяет только верхний уровень — что функции не пересекаются. Границы `head` / `body` внутри одной функции (`lua_signature_bounds` / `lua_body_bounds`) не покрыты — потенциальный третий off-by-one того же класса, что нашли в `adapter_md` и `adapter_py`. При доработке Lua-парсера (statement-границы) — добавить проверки на пересечения.
 
 **Unit-тесты на list_with_stat / grep_mcp.** Только live-проверка.
 

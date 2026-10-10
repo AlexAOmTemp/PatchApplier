@@ -59,6 +59,7 @@ DEFAULT_PATCHIGNORE = """\
 # ...except this file itself, so it stays readable in the tree.
 # (`.patch_applier` is hardcoded as service and needs no entry here.)
 !.patchignore
+!.mcpignore
 
 # Non-dot build noise.
 __pycache__

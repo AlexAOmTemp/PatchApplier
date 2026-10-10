@@ -57,7 +57,7 @@ def set_annotation(source: str, path: str, address: dict, text: str) -> str:
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext)
+    _check_parses(new_source, path, unit, ext, source)
     return new_source
 
 
@@ -140,7 +140,7 @@ def replace_unit(source: str, path: str, address: dict,
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext)
+    _check_parses(new_source, path, unit, ext, source)
     return new_source
 
 
@@ -186,7 +186,7 @@ def replace_block(source: str, path: str, address: dict,
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext)
+    _check_parses(new_source, path, unit, ext, source)
     return new_source
 
 
@@ -235,7 +235,7 @@ def insert_block(source: str, path: str, address: dict,
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext)
+    _check_parses(new_source, path, unit, ext, source)
     return new_source
 
 
@@ -270,8 +270,16 @@ def _apply_indent(text: str, indent: str) -> list[str]:
     return out
 
 
-def _check_parses(new_source: str, path: str, unit, ext: str) -> None:
-    """Confirm the edited source still parses and the unit survives."""
+def _check_parses(new_source: str, path: str, unit, ext: str,
+                  old_source: str | None = None) -> None:
+    """Confirm the edited source still parses and the target survives.
+
+    When `old_source` is provided, additionally verify that no *unrelated*
+    unit has been lost. The target and its descendants are allowed to
+    change or vanish (that is the point of the edit); everything else must
+    survive. This catches the markdown off-by-one where `part="body"` on
+    a section used to eat the following section's heading.
+    """
     if ext == ".py":
         import ast
         try:
@@ -307,3 +315,17 @@ def _check_parses(new_source: str, path: str, unit, ext: str) -> None:
         if unit.kind == UnitKind.SECTION:
             if doc.find(number=unit.name) is None and doc.find(title=unit.name) is None:
                 raise ValueError(f"result_missing_section: {unit.name}")
+            if old_source is not None:
+                old_doc = Format.load("default").parse(old_source)
+                old_ids = {str(s.number or s.title) for s in old_doc.flatten()}
+                new_ids = {str(s.number or s.title) for s in doc.flatten()}
+                target = str(unit.name)
+                # Descendants of the target (e.g. 2.1 when target is 2)
+                # may change or vanish — they are the target's own body.
+                lost = {l for l in (old_ids - new_ids)
+                        if l != target and not l.startswith(target + ".")}
+                if lost:
+                    raise ValueError(
+                        f"result_missing_section: unintended loss of "
+                        f"{sorted(lost)} (target \u00a7{target})"
+                    )

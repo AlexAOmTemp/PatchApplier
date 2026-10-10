@@ -144,6 +144,17 @@ def toolkit_runtime_state_dir() -> Path:
     return toolkit_root() / "runtime" / "state"
 
 
+def workspaces_root() -> Path:
+    """<toolkit_root>/runtime/workspaces — workspace state directories.
+
+    Each workspace lives in its own subdirectory named by its id
+    (see config/workspace.py). External by default; a workspace may
+    also point at an embedded state directory elsewhere (the path is
+    then recorded in runtime/recent.json).
+    """
+    return toolkit_root() / "runtime" / "workspaces"
+
+
 def default_bridge_script() -> Path:
     """Bridge ships with the toolkit; its path is derived, not configured."""
     return toolkit_root() / "code" / "bridge" / "bridge.py"

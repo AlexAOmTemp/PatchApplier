@@ -9,9 +9,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from .model import Block, Part, Unit, UnitKind
+from ...core.paths import is_mcp_path
 
 
 def _build(source: str, path: str) -> Unit:
+    # MCP (Roblox) paths carry no extension; their source is Luau.
+    if is_mcp_path(path):
+        from . import adapter_lua as a
+        return a.build(source, path)
     ext = Path(path).suffix.lower()
     if ext == ".py":
         from . import adapter_py as a

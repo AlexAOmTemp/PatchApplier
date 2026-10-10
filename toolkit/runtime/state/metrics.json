@@ -1,41 +1,88 @@
 {
   "since": 1791626376.4806795,
-  "updated": 1791626443.6533878,
+  "updated": 1791652811.153121,
   "counts": {
     "rebuild_index": {
-      "ok": 2
+      "ok": 37
     },
     "rebuild_code_index": {
-      "ok": 2
+      "ok": 30
     },
     "rebuild_lua_code_index": {
-      "ok": 2
+      "ok": 21,
+      "error": 3
     },
     "list_units": {
-      "ok": 1
+      "ok": 12
     },
     "read_unit": {
-      "ok": 1,
+      "ok": 7,
       "error": 2
     },
     "read_file": {
-      "ok": 2
+      "ok": 45,
+      "blocked": 4,
+      "error": 1
     },
     "symbol_graph": {
-      "ok": 1
+      "ok": 4
     },
     "grep": {
-      "ok": 1
+      "ok": 6
     },
     "run_python": {
-      "error": 1,
-      "ok": 1
+      "error": 3,
+      "ok": 4
     },
     "file_stat": {
       "ok": 1
     },
     "replace_in_file": {
+      "ok": 11
+    },
+    "read_symbol": {
+      "ok": 2
+    },
+    "list_files": {
+      "ok": 10
+    },
+    "insert_at_anchor": {
+      "ok": 22
+    },
+    "get_status": {
       "ok": 1
+    },
+    "get_index": {
+      "ok": 7
+    },
+    "replace_unit": {
+      "error": 5,
+      "ok": 13
+    },
+    "file_exists": {
+      "ok": 5,
+      "blocked": 1
+    },
+    "find_usages": {
+      "ok": 1
+    },
+    "list_roblox_studios": {
+      "ok": 1
+    },
+    "search_game_tree": {
+      "ok": 1
+    },
+    "inspect_instance": {
+      "ok": 1
+    },
+    "create_file": {
+      "ok": 6
+    },
+    "overwrite_file": {
+      "ok": 7
+    },
+    "replace_between": {
+      "ok": 4
     }
   },
   "errors": {
@@ -44,7 +91,18 @@
       "block_out_of_range": 1
     },
     "run_python": {
-      "nonzero_exit": 1
+      "nonzero_exit": 3
+    },
+    "file_exists": {
+      "filter": 1
+    },
+    "read_file": {
+      "filter": 4,
+      "not_found": 1
+    },
+    "replace_unit": {
+      "not_found": 3,
+      "no_parts": 1
     }
   }
 }

@@ -38,6 +38,49 @@ class StatusLog(tk.Frame):
             self._text.tag_configure(glyph, foreground=color)
         self._text.tag_configure("_default", foreground="#404040")
 
+        # A `state="disabled"` Text allows mouse selection but ignores
+        # keyboard events, so Ctrl+C does not copy. Bind by *physical*
+        # key code, not by keysym: on a non-Latin layout (e.g. Russian)
+        # the keysym is Cyrillic and a `<Control-c>` binding misses.
+        # Windows virtual-key codes are layout-independent: 67 = C, 65 = A.
+        self._text.bind("<Control-KeyPress>", self._on_ctrl_key)
+        self._menu = tk.Menu(self._text, tearoff=0)
+        self._menu.add_command(label="Копировать", command=self._copy_selection)
+        self._menu.add_command(label="Выделить всё", command=self._select_all)
+        self._text.bind("<Button-3>", self._show_context_menu)
+
+    def _on_ctrl_key(self, event):
+        """Layout-independent Ctrl+C / Ctrl+A for the log widget.
+
+        Uses `event.keycode` — the physical key, stable across keyboard
+        layouts — instead of `event.keysym`, which differs on Cyrillic
+        layouts (`Cyrillic_es` instead of `c`).
+        """
+        if event.keycode == 67:      # physical 'C'
+            return self._copy_selection(event)
+        if event.keycode == 65:      # physical 'A'
+            return self._select_all(event)
+        return None
+
+    def _copy_selection(self, _e=None):
+        try:
+            text = self._text.get("sel.first", "sel.last")
+        except tk.TclError:
+            return "break"
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        return "break"
+
+    def _select_all(self, _e=None):
+        self._text.tag_add("sel", "1.0", "end")
+        return "break"
+
+    def _show_context_menu(self, e):
+        try:
+            self._menu.tk_popup(e.x_root, e.y_root)
+        finally:
+            self._menu.grab_release()
+
     def set(self, msg):
         if msg is None:
             return

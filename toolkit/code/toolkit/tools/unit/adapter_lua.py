@@ -34,13 +34,52 @@ def build(source: str, path: str = "") -> Unit:
     for i, u in enumerate(units, start=1):
         top_blocks.append(Block(index=i, start=u.line_start, end=u.line_end, unit=u))
 
+    mod_ann = _module_annotation(lines)
+    head_start = (mod_ann.end + 1) if mod_ann.is_present() else 1
+    first_func = units[0].line_start if units else (n + 1)
+    head_end = first_func - 1
+    while head_end >= head_start and not lines[head_end - 1].strip():
+        head_end -= 1
+    mod_head = Part(head_start, head_end) if head_end >= head_start else Part()
+    body_start = first_func if units else n + 1
+    mod_body = Part(body_start, n) if top_blocks else Part()
+
     return Unit(
         kind=UnitKind.MODULE, name="<module>", qualname="<module>",
         line_start=1, line_end=n,
-        head=Part(1, 0), annotation=Part(),
-        body=Part(1, n) if top_blocks else Part(),
+        head=mod_head, annotation=mod_ann,
+        body=mod_body,
         blocks=top_blocks,
     )
+
+
+def _module_annotation(lines: list[str]) -> Part:
+    """Top-of-file Lua annotation.
+
+    Two shapes: a `--[[ ... ]]` block starting on line 1 (or line 2 after
+    an optional shebang), or a run of consecutive `---` lines at the top.
+    """
+    if not lines:
+        return Part()
+    i = 0
+    if lines[0].startswith("#!"):
+        i = 1
+    if i >= len(lines):
+        return Part()
+    first = lines[i]
+    if "--[[" in first:
+        for j in range(i, len(lines)):
+            hay = lines[j]
+            start_from = (first.index("--[[") + 4) if j == i else 0
+            if "]]" in hay[start_from:]:
+                return Part(i + 1, j + 1)
+        return Part()
+    if first.lstrip().startswith("---"):
+        j = i
+        while j < len(lines) and lines[j].lstrip().startswith("---"):
+            j += 1
+        return Part(i + 1, j)
+    return Part()
 
 
 def _find_lua_annotation(lines: list[str], func_line: int) -> Part:

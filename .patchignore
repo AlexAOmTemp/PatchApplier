@@ -14,6 +14,7 @@
 .*
 # ...and this file itself, so it stays readable in the tree.
 !.patchignore
+!.mcpignore
 
 # Non-dot build noise.
 __pycache__

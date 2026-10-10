@@ -1,43 +1,22 @@
-[fix] ✓ replace_in_file: toolkit/code/manual/metrics_report.py: заменено 1 вхожд. (последнее) — +1 стр., +44 Б
+[wb-s3] ✓ replace_between: L50–L61 → L50–L61 в toolkit/docs/WORKSPACE_BACKEND.md — +0 стр., +193 Б
 
-[run] ✓ run_python: exit=0  duration=30ms
---- stdout ---
-=== metrics ===
-since:   2026-10-10 12:59:36
-updated: 2026-10-10 13:00:42
-total actions: 14
+[wb-s5] ✓ replace_between: L100–L102 → L100–L103 в toolkit/docs/WORKSPACE_BACKEND.md — +1 стр., +594 Б
 
-top actions (share, errors):
-  read_unit                    3  ( 21.4%)   err/block: 66.7%
-  read_file                    2  ( 14.3%)   err/block:  0.0%
-  rebuild_index                1  (  7.1%)   err/block:  0.0%
-  rebuild_code_index           1  (  7.1%)   err/block:  0.0%
-  rebuild_lua_code_index       1  (  7.1%)   err/block:  0.0%
-  list_units                   1  (  7.1%)   err/block:  0.0%
-  symbol_graph                 1  (  7.1%)   err/block:  0.0%
-  grep                         1  (  7.1%)   err/block:  0.0%
-  run_python                   1  (  7.1%)   err/block: 100.0%
-  file_stat                    1  (  7.1%)   err/block:  0.0%
-  replace_in_file              1  (  7.1%)   err/block:  0.0%
+[wb-s7] ✓ replace_unit: toolkit/docs/WORKSPACE_BACKEND.md: replace_unit применён
 
-buckets:
-  unit model                       4  ( 28.6%)
-  text escape hatch                1  (  7.1%)
-  old symbol model                 0  (  0.0%)
-  other (indexes, exec, ...)       9  ( 64.3%)
+[wb-s10] ✓ replace_in_file: toolkit/docs/WORKSPACE_BACKEND.md: заменено 1 вхожд. (последнее) — +0 стр., -2 Б
 
-errors by action:
-  read_unit: not_found (1), block_out_of_range (1)
-  run_python: nonzero_exit (1)
-[timing] user (2 actions): 0.03s
+[ws7-drop] ✓ replace_between: L159–L161 → L159–L160 в toolkit/docs/WORKSPACE.md — -1 стр., +165 Б
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 18, без summary: 84) [v254] [без изменений]
+[rebuild] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v288] [~4, ⇅6]
+  ~ toolkit/docs/WORKSPACE.md §7. State: external vs embedded (L135–L166, 3.5 KB, ⚠ stale) — State — каталог с workspace.json, индексами, .patchignore/.mcpignore, runtime. По умолчанию external (<toolkit_root>/runtime/workspaces/<id>). Embedded — пользователь кладёт куда хочет. Никакого реестра, только recent.json.
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §3. Routing (L46–L63, 2.1 KB, ⚠ no summary)
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §5. Policy — в Patcher, не в backend (L70–L103, 2.6 KB, ⚠ no summary)
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §7. State dir — где что лежит (L126–L154, 1.8 KB, ⚠ no summary)
+[timing] user (6 actions): 0.04s
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 153, символов: 1023) [v305] [~1, ⇅4]
-  ~ toolkit/code/manual/metrics_report.py  (+1 стр., +0.0 KB)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v289] [без изменений]
+[timing] auto-rebuild (1 actions): 0.03s
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 39, символов: 154) [v157] [без изменений]
-[timing] auto-rebuild (3 actions): 0.78s
-
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.81s
+##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.07s

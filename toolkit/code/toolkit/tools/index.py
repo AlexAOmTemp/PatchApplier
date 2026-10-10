@@ -386,10 +386,13 @@ class RebuildLuaCodeIndexTool:
                 prev_text = ""
 
         try:
+            from ..config import mcpignore
+            mcpignore.ensure_default(local_dir)
             result = build_lua_code_index(
                 backend,
                 roots=roots,
                 filter_spec=_index_spec,
+                project_dir=local_dir,
             )
         except Exception as e:
             return Result(

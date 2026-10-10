@@ -31,7 +31,13 @@ def build(source: str, path: str = "") -> Unit:
         heading_end_off = max(s.heading_start, s.heading_end - 1)
         head_end = line_at(heading_end_off)
         line_start = head_start
-        line_end = line_at(section_full_end(s))
+        # Same off-by-one guard as head_end above. section_full_end(s) is
+        # the byte offset where the *next* heading begins (or EOF), so
+        # line_at() would land us on the next section's line. Anchor on the
+        # byte just before that boundary — the '\n' ending this section's
+        # last line.
+        full_end_off = max(0, section_full_end(s) - 1)
+        line_end = line_at(full_end_off)
 
         ann = Part()
         if s.summary:

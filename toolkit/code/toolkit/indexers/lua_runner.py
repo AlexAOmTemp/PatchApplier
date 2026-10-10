@@ -134,14 +134,39 @@ def _render_index(
     used_by_map: dict[str, list[str]] | None = None,
 ) -> str:
     from ..formats.renderer import CODE_PREAMBLE
+
+    def _is_vendor(p: str) -> bool:
+        # Roblox paths are dotted; check segments, not substrings.
+        # ReplicatedStorage.Packages.TestEZ, X._Index.foo@1.0 — vendor.
+        for seg in p.lower().replace("\\", "/").split("."):
+            if seg in ("packages", "_index", "vendor", "node_modules"):
+                return True
+        return False
+
+    def _is_test(p: str) -> bool:
+        q = "/" + p.lower().replace("\\", "/").lstrip("/")
+        return ".__tests__." in q or ".tests." in q or "/tests/" in q
+
     parts: list[str] = list(CODE_PREAMBLE)
+    items = sorted(
+        items,
+        key=lambda m: (_is_vendor(m.get("path", "")), m.get("path", "")),
+    )
     for m in items:
         path = m.get("path", "")
         lines = m.get("lines", 0)
         size_kb = (m.get("len", 0) or 0) / 1024.0
+        markers: list[str] = []
+        if _is_test(path):
+            markers.append("[tests/]")
+        if _is_vendor(path):
+            markers.append("[vendor/]")
+        if lines > 300 or size_kb > 16.0:
+            markers.append("⚠ large")
+        suffix = ("  " + " ".join(markers)) if markers else ""
         parts.append("")
         parts.append("")
-        parts.append(f"## {path}  ({lines} \u0441\u0442\u0440., {size_kb:.1f} KB)")
+        parts.append(f"## {path}  ({lines} стр., {size_kb:.1f} KB){suffix}")
         parts.append(f"Hash: {m.get('hash', 0)}  Len: {m.get('len', 0)}")
         imports = m.get("imports") or []
         if imports:
@@ -160,7 +185,7 @@ def _render_index(
                 indent = "  " * depth
                 parts.append(
                     f"{indent}- {qn} [{s.get('kind', '?')}] "
-                    f"(L{s.get('line_start', 0)}\u2013L{s.get('line_end', 0)}) "
+                    f"(L{s.get('line_start', 0)}–L{s.get('line_end', 0)}) "
                     f"H{s.get('hash', 0)}"
                 )
     return "\n".join(parts) + "\n"
@@ -170,6 +195,7 @@ def build_lua_index(
     backend: Backend,
     roots: list[str] | None = None,
     filter_spec=None,
+    project_dir: Path | None = None,
 ) -> LuaIndexResult:
     """Build the Lua index via one or more execute_luau calls.
 
@@ -214,6 +240,16 @@ def build_lua_index(
                 f"lua driver cursor did not advance ({cursor} -> {next_cursor})"
             )
         cursor = next_cursor
+
+    # Skip patterns from `.mcpignore` (segment-based, dot-separated paths).
+    # Applied before the reverse graph and rendering so skipped modules
+    # do not leak into `Used by:` lines of user modules.
+    if project_dir is not None:
+        from ..config import mcpignore
+        patterns = mcpignore.read(Path(project_dir))
+        if patterns:
+            items = [m for m in items
+                     if not mcpignore.path_hidden(m.get("path", ""), patterns)]
 
     elapsed = time.time() - t0
     # `sys.stderr` is None under pythonw.exe (no console attached). All

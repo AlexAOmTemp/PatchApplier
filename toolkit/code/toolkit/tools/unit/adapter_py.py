@@ -51,11 +51,13 @@ def _build_module(tree: ast.Module, source: str, path: str) -> Unit:
     if first_def is None:
         head_end = n
         body_part = Part()
-        body_first = None
+        body_first_line = None
     else:
-        body_first = first_def
-        head_end = body_first.lineno - 1
-        body_part = Part(body_first.lineno, n)
+        # Decorators belong to the def/class; use _stmt_start so head does
+        # not swallow the decorator line and blocks do not start above body.
+        body_first_line = _stmt_start(first_def)
+        head_end = body_first_line - 1
+        body_part = Part(body_first_line, n)
 
     head_start = 1
     if ann.is_present() and ann.start == 1:
@@ -65,7 +67,7 @@ def _build_module(tree: ast.Module, source: str, path: str) -> Unit:
     blocks: list[Block] = []
     idx = 1
     for stmt in tree.body:
-        if body_first is None or stmt.lineno < body_first.lineno:
+        if body_first_line is None or _stmt_start(stmt) < body_first_line:
             continue
         if ann.is_present() and stmt.lineno == ann.start:
             continue
@@ -101,7 +103,10 @@ def _build_unit(node: ast.AST, parent_qn: str, parent_is_class: bool) -> Unit:
         return Unit(kind, name, qn, start, end,
                     head=Part(start, end), annotation=Part(), body=Part())
 
-    body_first_line = node.body[0].lineno
+    # _stmt_start, not .lineno: a decorated first body item has decorators
+    # on earlier lines. Using .lineno would put head_end on the decorator
+    # line — same line the first block starts on.
+    body_first_line = _stmt_start(node.body[0])
     head_end = body_first_line - 1
     ann = _docstring_part(node, kind.value)
     body_start = (ann.end + 1) if ann.is_present() else (head_end + 1)
