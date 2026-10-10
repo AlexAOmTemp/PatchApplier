@@ -56,7 +56,31 @@
 
 28. **Конфиг разделён на два файла: tool-wide + per-project.** `<toolkit_root>/.patch_applier.json` — tool-wide: `project_dir`, `recent_projects`, `ui_language`, `format*`, `mcp`, `exec`. `<project>/.patch_applier/config.json` — per-project: `backend`, `filter`, `skip_files`, `code_*`, `lua_*`, `state_dir`, `luau_mode`, `index_*`. `TOOL_FIELDS` (frozenset) определяет границу. `load()` мержит: tool-wide база + per-project overlay; `save()` разбивает merged dict обратно на два. Обоснование: политики, индексы, `state_dir` — per-project; переключение проекта не должно их терять или переносить в чужой проект. GUI при смене пути реактивно перечитывает `config.json` нового проекта в виджеты — никаких диалогов «перенести/загрузить», путь и есть определитель проекта.
 
-29. **`state_dir` вместо `service_subdir`.** Единый служебный каталог (`.patch_applier` по умолчанию) внутри проекта: индексы (`INDEX.md`, `CODE_INDEX*.md`), их `.version` и `.manifest.json`, sidecar `.index_meta.json`, рантайм MCP (`patch.json`, `outputs.json`, `bridge_log.jsonl`). Legacy `service_subdir` читается как fallback (`resolve_state_dir`), новые конфиги пишут `state_dir`. Один каталог вместо двух разбросанных (`Service/` + `toolkit/runtime/state/`) — в `.gitignore` одна строка.
+29. **`state_dir` вместо `service_subdir`.** Единый служебный каталог (`.patch_applier` по умолчанию) внутри проекта: индексы (`INDEX.md`, `CODE_INDEX*.md`), их `.version` и `.manifest.json`, sidecar `.index_meta.json`, рантайм MCP (`patch.json`, `outputs.json`, `bridge_log.jsonl`).
+
+### 2.5 Workspace refactor
+
+<!-- summary: Шаги 1–3 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py read-only + тесты. Шаг 2 (working_dir → _root) тоже закрыт. Открыто: шаг 4 (интеграция в Composite), шаг 5 (индексаторы), шаг 6 (write), шаг 7 (GUI). -->
+<!-- tags: workspace, refactor, history -->
+
+**Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.
+
+**Сделано (шаги 1–3):**
+
+- **Шаг 1 — дизайн.** `WORKSPACE.md` (модель: roots, policy, state) + `WORKSPACE_BACKEND.md` (backends, рефакторинг). Все открытые вопросы закрыты.
+- **Шаг 2 — `config/workspace.py`.** `Workspace` dataclass + `Root` + `RootPolicy` + JSON round-trip + валидация (уникальность basename'а, недопустимость вложенности, запрет имён Roblox-сервисов). Тест `test_workspace.py` (23/23).
+- **Шаг 2.5 — `working_dir` refactor.** Публичный `FilesystemBackend.working_dir` → приватный `_root` (публичный конструктор сохранил имя параметра). `CompositeBackend.working_dir` — property починена через chain `_root → working_dir → None`. `RebuildLuaCodeIndexTool` — `local_dir` через chain. Тест `test_working_dir_removed.py` (9/9). Урок: `getattr(obj, name, default)` не спасает, когда атрибут **есть**, но вернул None — нужен chain через `or`.
+- **Шаг 3 — `backends/workspace.py`.** `WorkspaceBackend` read-only: routing `<basename>/<rel>`, `list("")` → basenames, `filter_check` (policy на полном пути + `.patchignore` из `state_dir` на rel), write-методы → `NotImplementedError`. Экспорт в `backends/__init__.py`. Тест `test_workspace_backend.py` (22/22). **Не подключён в рантайм** — это шаг 4.
+
+**Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git (`commit`, `log`, `status`, `reset-hard`, `show-file`) для чекпоинтов между большими патчами.
+
+**Открыто (шаги 4–7):**
+
+- **Шаг 4 — интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json`. Требует решений: как выбирается активный workspace (recent.json / аргумент CLI / поле в tool-wide config), по какому критерию происходит переключение модели (флаг / наличие workspace.json).
+- **Шаг 5 — индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёрджат.
+- **Шаг 6 — write.** Все корни с `write=true`.
+- **Шаг 7 — GUI.** Вкладки по корням.
+ Legacy `service_subdir` читается как fallback (`resolve_state_dir`), новые конфиги пишут `state_dir`. Один каталог вместо двух разбросанных (`Service/` + `toolkit/runtime/state/`) — в `.gitignore` одна строка.
 
 30. **`tools_schema.json` — toolkit-global, не проектный.** Живёт в `<toolkit_root>/runtime/state/`, не в проекте. Одинаков для всех проектов; не должен копироваться в каждый. `MCPBackend.__init__(tools_file=None)` резолвит через `toolkit_runtime_state_dir()`. GUI читает схему оттуда же для вставки в стартовое сообщение.
 

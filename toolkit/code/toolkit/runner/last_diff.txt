@@ -1,1 +1,7 @@
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v182] [без изменений]
+.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v304] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 161, символов: 1112) [v348] [+2]
+  + toolkit/code/toolkit/backends/workspace.py  (176 стр., 6.4 KB)
+  + toolkit/code/toolkit/tests/test_workspace_backend.py  (151 стр., 5.4 KB)
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v185] [без изменений]

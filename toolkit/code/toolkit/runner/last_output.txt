@@ -1,5 +1,110 @@
-[rb] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v182] [без изменений]
-[timing] user (1 actions): 0.10s
+[ws-backend] ✓ create_file: Файл создан: toolkit/code/toolkit/backends/workspace.py (176 стр., 6536 Б)
 
-##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.10s
+[ws-export] ✓ read_file: toolkit/code/toolkit/backends/__init__.py
+1: '"""Backend implementations: filesystem, mcp, composite."""\r\n'
+2: '\r\n'
+3: 'from .filesystem import FilesystemBackend\r\n'
+4: 'from .mcp import MCPBackend\r\n'
+5: 'from .composite import CompositeBackend\r\n'
+6: '\r\n'
+7: '__all__ = ["FilesystemBackend", "MCPBackend", "CompositeBackend"]\r\n'
+
+[test-wb] ✓ create_file: Файл создан: toolkit/code/toolkit/tests/test_workspace_backend.py (151 стр., 5493 Б)
+
+[run] ✓ run_python: exit=0  duration=77ms
+--- stdout ---
+[OK]   read alpha/hello.txt
+[OK]   read beta/hello.txt
+[OK]   read unknown root -> FileNotFoundError (FileNotFoundError)
+[OK]   exists alpha/hello.txt
+[OK]   exists alpha/nope.txt
+[OK]   exists unknown root -> False
+[OK]   list("") returns sorted basenames
+[OK]   list("alpha") prefixes with basename
+[OK]   list("alpha") includes nested
+[OK]   list("alpha") excludes beta
+[OK]   list unknown root -> empty
+[OK]   stat size
+[OK]   stat is_file
+[OK]   write raises NotImplementedError (NotImplementedError)
+[OK]   delete raises NotImplementedError (NotImplementedError)
+[OK]   move raises NotImplementedError (NotImplementedError)
+[OK]   copy raises NotImplementedError (NotImplementedError)
+[OK]   filter blocks alpha path
+[OK]   filter allows beta path
+[OK]   filter blocks unknown root
+[OK]   filter blocks hidden via state .patchignore
+[OK]   filter allows non-hidden path
+
+=== 22 ok, 0 failed ===
+
+[regress] ✓ run_python: exit=0  duration=70ms
+--- stdout ---
+[OK]   fs._root is Path
+[OK]   fs._root resolves to root
+[OK]   fs.working_dir gone (AttributeError)
+[OK]   composite.working_dir == fs._root
+[OK]   composite falls back to legacy working_dir
+[OK]   composite returns None when FS has no root
+[OK]   composite returns None when no FS sub-backend
+[OK]   read still works
+[OK]   filter_check still works
+
+=== 9 ok, 0 failed ===
+
+[regress2] ✓ run_python: exit=0  duration=65ms
+--- stdout ---
+== lifecycle ==
+[OK]   open enables all
+[OK]   is_alive true when all alive
+[OK]   degraded: composite still alive (fs up)
+[OK]   degraded: mcp sub-backend dead
+
+== routing ==
+[OK]   read fs path routed to fs
+[OK]   no mcp call
+[OK]   read DataModel path routed to mcp
+[OK]   read root file routed to fs
+[OK]   read SSS routed to mcp
+[OK]   read script at root routed to fs
+
+== write / delete / move routing ==
+[OK]   write fs path -> fs
+[OK]   write fs path -> no mcp
+[OK]   write mcp path -> mcp
+[OK]   write mcp path -> no fs
+
+== list routing ==
+[OK]   list('') -> fs
+[OK]   list('toolkit') -> fs
+[OK]   list('ReplicatedStorage') -> mcp
+
+== cross-backend move rejected ==
+[OK]   cross-backend move raises
+
+== filter delegates ==
+[OK]   filter fs path -> fs
+[OK]   filter mcp path -> mcp
+
+== ROBLOX_SERVICES coverage ==
+[OK]   ReplicatedStorage in ROBLOX_SERVICES
+[OK]   ServerScriptService in ROBLOX_SERVICES
+[OK]   ServerStorage in ROBLOX_SERVICES
+[OK]   StarterPlayer in ROBLOX_SERVICES
+[OK]   Workspace in ROBLOX_SERVICES
+[OK]   Players in ROBLOX_SERVICES
+
+=== ИТОГ: 26 ok ===
+[timing] user (6 actions): 0.22s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 20, без summary: 95) [v304] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 161, символов: 1112) [v348] [+2]
+  + toolkit/code/toolkit/backends/workspace.py  (176 стр., 6.4 KB)
+  + toolkit/code/toolkit/tests/test_workspace_backend.py  (151 стр., 5.4 KB)
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v185] [без изменений]
+[timing] auto-rebuild (3 actions): 0.91s
+
+##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.13s

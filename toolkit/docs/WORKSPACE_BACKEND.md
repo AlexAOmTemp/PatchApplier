@@ -225,7 +225,7 @@ CompositeBackend
 Работа не «в одном патче» — по одному модулю, с прогоном тестов между шагами.
 ## 11. Порядок работы
 1. **Дизайн (этот документ).** — Готово.
-2. **Удаление `working_dir`.** Из `FilesystemBackend`, `CompositeBackend`, тулов (`index.py`, `shell.py`), раннеров (`cli.py`, `gui/app.py`). Тулы получают пути явно — из `state_dir` или из переданного корня. Тесты обновляются. **Этот шаг подготовительный: не вводит WorkspaceBackend, только убирает легаси-концепцию.** Старая однокорневая модель продолжает работать через `project_dir` (передаётся в FS-бэкенд как единственный путь).
+2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → `_root` (приватный атрибут; публичный конструктор сохраняет имя `working_dir` для совместимости вызовов). `CompositeBackend.working_dir` — property починена через chain `_root → working_dir → None`; удаление property отложено до шага 3 (пока тулы `RebuildLuaCodeIndexTool` читают её). `RebuildLuaCodeIndexTool` — `local_dir` резолвится через chain. Тест: `tests/test_working_dir_removed.py`. Явные пути в тулах и раннерах — на шаге 3.
 3. **`WorkspaceBackend` read-only.** `open/close/is_alive/read/exists/stat/list/filter_check`. Резолв путей `<basename>/rel`. `filter_check` сохраняет ту же логику (sandbox + state exemption + patchignore + policy) — но с multi-root sandbox: «путь внутри любого из корней».
 4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` при наличии `workspace.json` в state-каталоге. Старая модель (single-root) остаётся как fallback для проектов без workspace.
 5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.
