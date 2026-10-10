@@ -33,6 +33,7 @@ class WorkspaceBackend:
         self.ws = workspace
         self.state_dir = Path(state_dir).resolve()
         self.roots: dict[str, FilesystemBackend] = {}
+        self._state_fs: FilesystemBackend | None = None
         self._patterns: list[tuple[str, bool]] = []
         self._opened = False
 
@@ -48,6 +49,11 @@ class WorkspaceBackend:
             fb = FilesystemBackend(root.path)
             fb.open()
             self.roots[name] = fb
+        # State directory — a separate FS backend. Addressed by the reserved
+        # prefix `.patch_applier/` (patchignore.STATE_DIR), never by a root
+        # basename. Exempt from policy: RW for internal tools, never indexed.
+        self._state_fs = FilesystemBackend(self.state_dir)
+        self._state_fs.open()
         patchignore.ensure_default(self.state_dir)
         self._patterns = patchignore.read(self.state_dir)
         self._opened = True
@@ -56,6 +62,9 @@ class WorkspaceBackend:
         for fb in self.roots.values():
             fb.close()
         self.roots.clear()
+        if self._state_fs is not None:
+            self._state_fs.close()
+            self._state_fs = None
         self._opened = False
 
     def is_alive(self) -> bool:
@@ -99,7 +108,14 @@ class WorkspaceBackend:
         return name, rel
 
     def _resolve_root(self, path: str) -> tuple[str, str, FilesystemBackend]:
+        # See also: list() / list_with_stat() above for walk semantics.
         name, rel = self._split(path)
+        # State directory is addressed by its reserved prefix — never by a
+        # root basename. It is exempt from policy (see filter_check).
+        if name == patchignore.STATE_DIR:
+            if self._state_fs is None:
+                raise FileNotFoundError("state backend not open")
+            return name, rel, self._state_fs
         fb = self.roots.get(name)
         if fb is None:
             raise FileNotFoundError(f"root '{name}' not in workspace")
@@ -124,9 +140,23 @@ class WorkspaceBackend:
 
     def list(self, root: str = "", glob: str = "*") -> list[str]:
         if not root:
-            # Empty path lists root basenames — one per workspace root.
-            return sorted(self.roots.keys())
+            # All files across all roots, prefixed with <basename>/. This is
+            # what indexers expect from list(""). The state directory is
+            # excluded when it happens to be inside a root.
+            out: list[str] = []
+            for name, fb in self.roots.items():
+                state_rel = self._state_rel_for(name)
+                for p in fb.list("", glob):
+                    if state_rel is not None and (
+                            p == state_rel or p.startswith(state_rel + "/")):
+                        continue
+                    out.append(f"{name}/{p}")
+            return sorted(out)
         name, rel = self._split(root)
+        if name == patchignore.STATE_DIR:
+            if self._state_fs is None:
+                return []
+            return [f"{name}/{p}" for p in self._state_fs.list(rel, glob)]
         fb = self.roots.get(name)
         if fb is None:
             return []
@@ -134,41 +164,120 @@ class WorkspaceBackend:
 
     def list_with_stat(self, root: str = "", glob: str = "*"):
         if not root:
-            return []
+            out: list[tuple[str, int, int]] = []
+            for name, fb in self.roots.items():
+                state_rel = self._state_rel_for(name)
+                for (p, size, lines) in fb.list_with_stat("", glob):
+                    if state_rel is not None and (
+                            p == state_rel or p.startswith(state_rel + "/")):
+                        continue
+                    out.append((f"{name}/{p}", size, lines))
+            return sorted(out, key=lambda r: r[0])
         name, rel = self._split(root)
+        if name == patchignore.STATE_DIR:
+            if self._state_fs is None:
+                return []
+            return [(f"{name}/{p}", size, lines)
+                    for (p, size, lines) in self._state_fs.list_with_stat(rel, glob)]
         fb = self.roots.get(name)
         if fb is None:
             return []
         return [(f"{name}/{p}", size, lines)
                 for (p, size, lines) in fb.list_with_stat(rel, glob)]
 
+    def list_roots(self) -> list[str]:
+        """Basenames of all workspace roots (not files).
+
+        For GUI tree tabs and diagnostics. The general `list("")` returns
+        all files across all roots with `<basename>/<rel>` prefixes, which
+        is what the indexers expect.
+        """
+        return sorted(self.roots.keys())
+
+    def _state_rel_for(self, root_name: str) -> str | None:
+        """Relative state path under a root, or None if state is elsewhere.
+
+        state_dir may be inside a root (embedded project folder). We must
+        exclude it from list()-based walks so the indexer does not eat its
+        own artifacts.
+        """
+        fb = self.roots.get(root_name)
+        if fb is None:
+            return None
+        try:
+            rel = self.state_dir.relative_to(fb._root)  # noqa: SLF001
+        except ValueError:
+            return None
+        return str(rel).replace("\\", "/")
+
+
+    def _state_write_target(self, path: str):
+        """Return (state_fs, rel) if path is under the state prefix; else None.
+
+        Writes into the state directory are allowed even though the
+        backend is read-only for workspace roots (step 3 of the plan).
+        The state directory is the toolkit's own — indexes, manifests,
+        .version files — and is hardcoded RW in the old model too
+        (see WORKSPACE_BACKEND.md §5).
+        """
+        name, rel = self._split(path)
+        if name != patchignore.STATE_DIR:
+            return None
+        if self._state_fs is None:
+            raise FileNotFoundError("state backend not open")
+        return self._state_fs, rel
+
+
     # --- write (enabled in step 6) -----------------------------------------
 
     def write(self, path: str, content: str) -> None:
-        raise NotImplementedError(
-            "WorkspaceBackend: write is enabled in step 6 of the plan"
-        )
+        target = self._state_write_target(path)
+        if target is None:
+            raise NotImplementedError(
+                "WorkspaceBackend: write to a workspace root is enabled in step 6; "
+                "writes to the state directory (.patch_applier/) are allowed"
+            )
+        fb, rel = target
+        fb.write(rel, content)
 
     def create(self, path: str, content: str,
                class_name: str = "ModuleScript") -> None:
-        raise NotImplementedError(
-            "WorkspaceBackend: create is enabled in step 6 of the plan"
-        )
+        target = self._state_write_target(path)
+        if target is None:
+            raise NotImplementedError(
+                "WorkspaceBackend: create in a workspace root is enabled in step 6; "
+                "creates in the state directory (.patch_applier/) are allowed"
+            )
+        fb, rel = target
+        fb.write(rel, content)
 
     def delete(self, path: str) -> None:
-        raise NotImplementedError(
-            "WorkspaceBackend: delete is enabled in step 6 of the plan"
-        )
+        target = self._state_write_target(path)
+        if target is None:
+            raise NotImplementedError(
+                "WorkspaceBackend: delete in a workspace root is enabled in step 6; "
+                "deletes in the state directory (.patch_applier/) are allowed"
+            )
+        fb, rel = target
+        fb.delete(rel)
 
     def move(self, src: str, dst: str) -> None:
-        raise NotImplementedError(
-            "WorkspaceBackend: move is enabled in step 6 of the plan"
-        )
+        s = self._state_write_target(src)
+        d = self._state_write_target(dst)
+        if s is None or d is None:
+            raise NotImplementedError(
+                "WorkspaceBackend: move in a workspace root is enabled in step 6"
+            )
+        s[0].move(s[1], d[1])
 
     def copy(self, src: str, dst: str) -> None:
-        raise NotImplementedError(
-            "WorkspaceBackend: copy is enabled in step 6 of the plan"
-        )
+        s = self._state_write_target(src)
+        d = self._state_write_target(dst)
+        if s is None or d is None:
+            raise NotImplementedError(
+                "WorkspaceBackend: copy in a workspace root is enabled in step 6"
+            )
+        s[0].copy(s[1], d[1])
 
     # --- filter ------------------------------------------------------------
 
@@ -176,14 +285,15 @@ class WorkspaceBackend:
         """None = ok. Otherwise a message with a block reason.
 
         Rules (see WORKSPACE_BACKEND.md §5):
+          0. State prefix (`.patch_applier/`) is always OK — RW for internal
+             tools, never indexed. Same exemption as FilesystemBackend.
           1. Root must exist in workspace.
           2. `.patchignore` from state_dir applies to ``rel`` inside the root.
-          3. Policy applies to the *full* ``<basename>/<rel>`` — so
-             workspace-level patterns can distinguish ``docs/x.md`` from
-             ``src/x.md``. This is the workspace model; the FS backend's own
-             filter uses bare ``rel`` for legacy single-root mode.
+          3. Policy applies to the *full* ``<basename>/<rel>``.
         """
         name, rel = self._split(path)
+        if name == patchignore.STATE_DIR:
+            return None
         if name not in self.roots:
             return f"root '{name}' not in workspace"
         rel_norm = rel.replace("\\", "/")

@@ -83,10 +83,20 @@ def main():
         t.expect('exists alpha/nope.txt', wb.exists('alpha/nope.txt') is False)
         t.expect('exists unknown root -> False', wb.exists('gamma/x.txt') is False)
 
-        # --- list("") ---
-        names = wb.list('')
-        t.expect('list("") returns sorted basenames',
-                 names == ['alpha', 'beta'], str(names))
+        # --- list_roots() ---
+        t.expect('list_roots returns sorted basenames',
+                 wb.list_roots() == ['alpha', 'beta'], str(wb.list_roots()))
+
+        # --- list("") = all files across all roots ---
+        files = wb.list('')
+        t.expect('list("") has alpha/hello.txt',
+                 'alpha/hello.txt' in files, str(files))
+        t.expect('list("") has beta/hello.txt',
+                 'beta/hello.txt' in files, str(files))
+        t.expect('list("") has alpha/sub/deep.txt',
+                 'alpha/sub/deep.txt' in files, str(files))
+        t.expect('list("") skips state files',
+                 not any('.patch_applier/' in f for f in files), str(files))
 
         # --- list("alpha") ---
         files = wb.list('alpha')
@@ -105,8 +115,16 @@ def main():
         t.expect('stat size', st.size_bytes == 8, str(st.size_bytes))
         t.expect('stat is_file', st.is_file is True)
 
-        # --- write is not implemented ---
-        t.raises('write raises NotImplementedError',
+        # --- write: state prefix allowed, roots not ---
+        wb.write('.patch_applier/note.txt', 'hello')
+        t.expect('write to state prefix works',
+                 wb.read('.patch_applier/note.txt') == 'hello')
+        t.expect('state file exists',
+                 wb.exists('.patch_applier/note.txt') is True)
+        wb.delete('.patch_applier/note.txt')
+        t.expect('delete from state works',
+                 wb.exists('.patch_applier/note.txt') is False)
+        t.raises('write to root raises NotImplementedError',
                  lambda: wb.write('alpha/new.txt', 'x'),
                  NotImplementedError)
         t.raises('delete raises NotImplementedError',
@@ -125,6 +143,20 @@ def main():
                  wb.filter_check('alpha/hello.txt', spec) is not None)
         t.expect('filter allows beta path',
                  wb.filter_check('beta/hello.txt', spec) is None)
+
+        # --- state directory prefix ---
+        import json as _json
+        (root / 'state' / 'workspace.json').write_text(
+            _json.dumps({'id': 't'}), encoding='utf-8')
+        t.expect('read state/.patch_applier file',
+                 wb.read('.patch_applier/workspace.json').startswith('{'))
+        t.expect('exists state file',
+                 wb.exists('.patch_applier/workspace.json') is True)
+        t.expect('list(".patch_applier") works',
+                 'workspace.json' in ' '.join(wb.list('.patch_applier')), str(wb.list('.patch_applier')))
+        t.expect('filter allows state path',
+                 wb.filter_check('.patch_applier/workspace.json',
+                                 FilterSpec(overrides={'.': False})) is None)
 
         # --- filter_check: unknown root ---
         t.expect('filter blocks unknown root',

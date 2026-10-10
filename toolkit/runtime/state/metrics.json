@@ -1,15 +1,17 @@
 {
   "since": 1791626376.4806795,
-  "updated": 1791656161.8740597,
+  "updated": 1791656865.120926,
   "counts": {
     "rebuild_index": {
-      "ok": 49
+      "ok": 55,
+      "error": 3
     },
     "rebuild_code_index": {
-      "ok": 41
+      "ok": 46,
+      "error": 3
     },
     "rebuild_lua_code_index": {
-      "ok": 29,
+      "ok": 36,
       "error": 7
     },
     "list_units": {
@@ -20,43 +22,44 @@
       "error": 2
     },
     "read_file": {
-      "ok": 61,
-      "blocked": 5,
+      "ok": 68,
+      "blocked": 7,
       "error": 1
     },
     "symbol_graph": {
       "ok": 4
     },
     "grep": {
-      "ok": 8
+      "ok": 9
     },
     "run_python": {
-      "error": 3,
-      "ok": 14
+      "error": 4,
+      "ok": 21
     },
     "file_stat": {
       "ok": 1
     },
     "replace_in_file": {
-      "ok": 19
+      "ok": 19,
+      "error": 3
     },
     "read_symbol": {
       "ok": 2
     },
     "list_files": {
-      "ok": 10
+      "ok": 11
     },
     "insert_at_anchor": {
       "ok": 28
     },
     "get_status": {
-      "ok": 1
+      "ok": 5
     },
     "get_index": {
       "ok": 8
     },
     "replace_unit": {
-      "error": 5,
+      "error": 10,
       "ok": 20
     },
     "file_exists": {
@@ -91,13 +94,13 @@
       "block_out_of_range": 1
     },
     "run_python": {
-      "nonzero_exit": 3
+      "nonzero_exit": 4
     },
     "file_exists": {
       "filter": 1
     },
     "read_file": {
-      "filter": 5,
+      "filter": 7,
       "not_found": 1
     },
     "replace_unit": {

@@ -1,10 +1,3 @@
-.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v307] [~5, ⇅8]
-  ~ toolkit/docs/DECISIONS.md §1. Зафиксировано (L7–L148, 38.7 KB, ⚠ stale) — 44 решения — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру. — [decisions, fixed]
-  ~ toolkit/docs/DECISIONS.md §2.5 Workspace refactor (L61–L148, 23.6 KB, ⚠ stale, ⚠ large) — Шаги 1–3 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py read-only + тесты. Шаг 2 (working_dir → _root) тоже закрыт. Открыто: шаг 4 (интеграция в Composite), шаг 5 (индексаторы), шаг 6 (write), шаг 7 (GUI). — [workspace, refactor, history]
-  ~ toolkit/docs/WORKSPACE.md §8. Жизненный цикл (L167–L203, 4.1 KB, ⚠ stale) — New workspace — юзер добавляет roots через выбор каталога. Валидация: не вложены друг в друга, basename уникален. Каждый root = вкладка с деревом. Open — юзер указывает путь к state-каталогу.
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §7. State dir — где что лежит (L152–L175, 1.4 KB, ⚠ no summary)
-  ~ toolkit/docs/WORKSPACE_BACKEND.md §11. Порядок работы (L221–L236, 1.8 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 20, без summary: 95) [v315] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 161, символов: 1112) [v350] [без изменений]
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v188] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 161, символов: 1119) [v360] [без изменений]
