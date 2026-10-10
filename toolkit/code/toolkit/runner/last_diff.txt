@@ -1,5 +1,11 @@
-.patch_applier/INDEX.md (файлов: 21, без summary: 147) [v347] [без изменений]
+.patch_applier/INDEX.md (файлов: 22, без summary: 155) [v348] [~3, ⇅5, +1]
+  ~ toolkit/docs/DECISIONS.md §1. Зафиксировано (L7–L96, 20.9 KB) — 44 решения + Workspace refactor — toolkit, Result, Session, Policy, verify, symbol-tools, replace_between, Python vs Lua, copy, auto-rebuild, domain routing, grep, LLM_START, unified node model, dependency graph, replace_symbol_signature multiline, config split, state_dir, tools_schema global, suppression, markers, replace_statement, replace_symbol part, read_file axes, CRLF, source_hash, grep paths, транспортный нейминг, grep_replace_mcp, снимок как config, толерантный парсер патча, read_file без границ только для малых, чтение перед правкой, парсинг строк по явному маркеру; Workspace refactor — multi-root, WorkspaceBackend, state-префикс. — [decisions, fixed]
+  ~ toolkit/docs/DECISIONS.md §Workspace refactor (L61–L96, 5.6 KB) — Завершён. Однокорневая модель удалена целиком; единая модель Workspace с пятью флагами PathPolicy (read / write / index_docs / index_py / index_lua) и per-path overrides. Шаги 1-4, 6 закрыты. GUI: File menu + Project settings + recent.json. Открыто: 7.3 (дерево файлов), редактор per-path, multi-root smoke, P1-фиксы тулов.
+  ~ toolkit/docs/WORKSPACE_BACKEND.md §11. Порядок работы (L223–L238, 2.3 KB, ⚠ no summary)
+  + ## toolkit/docs/SESSION_STATE.md  (118 стр., 10.0 KB, mtime 2026-10-10 22:25)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1089) [v396] [без изменений]
+.patch_applier/INDEX.md (файлов: 22, без summary: 155) [v349] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v226] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1089) [v397] [без изменений]
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v227] [без изменений]

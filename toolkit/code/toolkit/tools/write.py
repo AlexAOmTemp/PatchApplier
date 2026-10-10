@@ -221,6 +221,16 @@ class ReplaceBetweenTool:
                 error_code="empty_input",
             )
         before = backend.read(file_path)
+        # Normalise anchor EOLs to match the file. A multi-line anchor written
+        # with \n (LF) must still find a CRLF file, and vice versa. The file is
+        # never modified by this — only the local copies of the anchors.
+        eol = "\r\n" if "\r\n" in before else "\n"
+
+        def _norm_anchor(a: str) -> str:
+            return a.replace("\r\n", "\n").replace("\n", eol)
+
+        start_anchor = _norm_anchor(start_anchor)
+        end_anchor = _norm_anchor(end_anchor)
         starts = _find_all(before, start_anchor)
         ends = _find_all(before, end_anchor)
         if not starts:
@@ -291,7 +301,19 @@ class InsertAtAnchorTool:
             return Result(status="error", message=f"Найдено {len(anchors)} вхождений, нельзя взять #{occ_num}", action="insert_at_anchor", error_code="occurrence_out_of_range")
         pos = anchors[occ_num - 1]
         insert_at = pos if position == "before" else pos + len(anchor)
-        after = before[:insert_at] + new_content + before[insert_at:]
+        # Guard against line-gluing: if the inserted text would touch a non-newline
+        # neighbour without its own newline boundary, add one. This catches the
+        # common footgun "from X import Y" inserted right after an import line.
+        content = new_content
+        if position == "after":
+            if (insert_at > 0 and before[insert_at - 1] != "\n"
+                    and not content.startswith("\n")):
+                content = "\n" + content
+        else:  # before
+            if (insert_at < len(before) and before[insert_at] != "\n"
+                    and not content.endswith("\n")):
+                content = content + "\n"
+        after = before[:insert_at] + content + before[insert_at:]
         backend.write(file_path, after)
         delta = _delta(before, after, 1)
         s_line = before.count("\n", 0, insert_at) + 1

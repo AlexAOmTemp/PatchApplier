@@ -1,87 +1,101 @@
-[dec] ✓ read_file: toolkit/docs/DECISIONS.md L61–L90
-61: '### Workspace refactor\r\n'
-62: '\r\n'
-63: '<!-- summary: Шаги 1–4 и большая часть 6 модели Workspace сделаны: доки, config/workspace.py + тесты, backends/workspace.py (read + write в корни + state-префикс), интеграция в CLI+GUI, workspace.json. Открыто: шаг 5 (много-корневые индексаторы), шаг 7 (GUI-диалог создания проекта). -->\r\n'
-64: '**Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.\r\n'
-65: '\r\n'
-66: '**Сделано (шаги 1–4 + 6):**\r\n'
-67: '\r\n'
-68: '- **Шаг 1 — дизайн.** `WORKSPACE.md` + `WORKSPACE_BACKEND.md`. Все открытые вопросы закрыты.\r\n'
-69: '- **Шаг 2 — `config/workspace.py`.** `Workspace` + `Root` + `RootPolicy` + JSON round-trip + валидация. Тест `test_workspace.py` (23/23).\r\n'
-70: '- **Шаг 2.5 — `working_dir` refactor.** Публичный `FilesystemBackend.working_dir` → `_root`. `CompositeBackend.working_dir` — property через chain. Тест `test_working_dir_removed.py` (9/9). Урок: `getattr(obj, name, default)` не спасает, когда атрибут **есть**, но вернул None — нужен chain через `or`.\r\n'
-71: '- **Шаг 3 — `backends/workspace.py`.** `WorkspaceBackend` с routing `<basename>/<rel>`, `list_roots()`, `filter_check` (policy на полном пути + `.patchignore` из `state_dir`), state-префикс `.patch_applier/` для state-файлов. Тест `test_workspace_backend.py` (33/33).\r\n'
-72: '- **Шаг 4 — интеграция.** CLI `_create_backend` + GUI `_build_backend_for_config` строят `WorkspaceBackend` из `workspace.json`. `config.loader.load_workspace(cfg)`. Ошибка, если `workspace.json` нет — никакого fallback на старую модель.\r\n'
-73: '- **Шаг 6 (частично) — write в корни.** `WorkspaceBackend.write/create/delete` делегируют в FS-бэкенд корня. `move/copy` — кросс-корень запрещён для move, разрешён для copy (через `FilesystemBackend.copy_to`). State-префикс — всегда RW. Policy-проверка — на `Patcher` через `filter_check`, не в backend.\r\n'
-74: '\r\n'
-75: '**Ключевые решения сессии:**\r\n'
-76: '\r\n'
-77: '- **`list("")`** — все файлы всех корней с префиксами `<basename>/<rel>`. Это контракт для индексаторов. `list_roots()` — basenames. State внутри корня исключается через `_state_rel_for`.\r\n'
-78: '- **State-префикс `.patch_applier/`** — адресуется наравне с корнями. В фильтре всегда OK (захардкоженная политика). В `list("")` не попадает.\r\n'
-79: '- **Никаких external/embedded.** Один алгоритм: пользователь выбирает папку проекта, туда кладётся `workspace.json`, `.patchignore`, `.mcpignore`, индексы, `runtime/`. `recent.json` — единственное место про «последнее».\r\n'
-80: '\r\n'
-81: '**Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.\r\n'
-82: '\r\n'
-83: '**Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.\r\n'
-84: '\r\n'
-85: '**Открыто:**\r\n'
-86: '\r\n'
-87: '- **Шаг 5 — индексаторы под multi-root.** Формально уже работают через `list("")`, но это one-root → many. Мёрдж нескольких корней и `router.py` — не проверены.\r\n'
-88: '- **Шаг 7 — GUI.** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`. Сейчас GUI требует существующий `workspace.json`.\r\n'
-89: "- **Root внутри state.** Сейчас `state_dir` (`.patch_applier/`) физически внутри корня `toolkit/`. Работает через `_state_rel_for`, но некрасиво. Возможно, стоит переопределить root'ы (`toolkit/code/`, `toolkit/docs/`) или перенести state наружу.\r\n"
-90: '## 2. Открыто\r\n'
+[ins] ✓ read_unit:     def execute(
+        self,
+        backend: Backend,
+        fmt: Any,
+        file_path: str,
+        anchor: str,
+        position: str,
+        new_content: str,
+        occurrence: int = 1,
+        **_: Any,
+    ) -> Result:
+        if not anchor:
+            return Result(status="error", message="anchor обязателен", action="insert_at_anchor", error_code="empty_input")
+        if position not in ("before", "after"):
+            return Result(status="error", message=f"position должен быть before|after, получено {position!r}", action="insert_at_anchor", error_code="bad_position")
+        before = backend.read(file_path)
+        anchors = _find_all(before, anchor)
+        if not anchors:
+            return Result(status="error", message=f"anchor не найден: {anchor!r}", action="insert_at_anchor", error_code="no_match")
+        try:
+            occ_num = int(occurrence)
+        except (ValueError, TypeError):
+            return Result(status="error", message=f"Некорректное occurrence: {occurrence!r}", action="insert_at_anchor", error_code="bad_occurrence")
+        if occ_num < 1 or occ_num > len(anchors):
+            return Result(status="error", message=f"Найдено {len(anchors)} вхождений, нельзя взять #{occ_num}", action="insert_at_anchor", error_code="occurrence_out_of_range")
+        pos = anchors[occ_num - 1]
+        insert_at = pos if position == "before" else pos + len(anchor)
+        after = before[:insert_at] + new_content + before[insert_at:]
+        backend.write(file_path, after)
+        delta = _delta(before, after, 1)
+        s_line = before.count("\n", 0, insert_at) + 1
+        where = "\u043f\u0435\u0440\u0435\u0434" if position == "before" else "\u043f\u043e\u0441\u043b\u0435"
+        msg = f"{where} L{s_line} \u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411"
+        return Result(
+            status="ok",
+            message=msg,
+            delta=delta,
+            verified=True,
+            action="insert_at_anchor",
+        )
 
-[log] ✓ run_python: exit=0  duration=62ms
---- stdout ---
-9683bc9 docs: session tool-practice notes (TOOL_PRACTICE.md)
-31f8d07 B1b-6: restore FS filter_check no-op (anchor miss)
-c107c8e B1b-5: restore FS filter_check no-op, drop stale policy tests
-0cbca7c B1b-4: restore classmethod, fix policy-override semantics in tests
-046ed81 B1b-3: tests migrated to 5-flag model, policy tests removed
-57f32b9 B2: runner/cli + gui/app cleaned of Policy/policy_io
-1a567db B1b-1: indexers + tools + status under 5-flag model
-4ef6c41 B1a: cut FilterSpec/Policy, 5-flag filter_check(path, op)
-ed6e2e2 pre-model: 5-flag per-path policy refactor
-afcb02b step 7.2: project settings dialog (roots add/remove/toggle, rename)
-e095b6e step 7.1 refactor: move project logic to runner/projects.py
-4662925 step 7.1: File menu with New/Open/Recent project, recent.json
-83d5ecf final: gitignore state, rename DECISIONS section, doc git hygiene
-e1cbe1e session end: workspace refactor steps 1-4+6 done, DECISIONS recorded
-e43d565 cleanup: remove stale toolkit/.patch_applier, doc state-write exception
-6d1c61f step 6 partial: write into workspace roots, cross-root copy
-17337f5 step 4 complete: WorkspaceBackend wired + list("") fixed
-014ba10 step 4: WorkspaceBackend wired into CLI+GUI, workspace.json created
-bb7f2bf docs: single project folder model, no external/embedded
-6f09f07 step 3 complete: WorkspaceBackend read-only + working_dir refactor
-032411a after working_dir refactor
-ab09954 before refactor
-f64221b first commit
+[rep] ✓ read_unit:     def execute(
+        self,
+        backend: Backend,
+        fmt: Any,
+        file_path: str,
+        start_anchor: str,
+        end_anchor: str,
+        new_content: str,
+        include_start: bool = True,
+        include_end: bool = True,
+        occurrence: int = 1,
+        **_: Any,
+    ) -> Result:
+        if not start_anchor or not end_anchor:
+            return Result(
+                status="error",
+                message="start_anchor и end_anchor обязательны",
+                action="replace_between",
+                error_code="empty_input",
+            )
+        before = backend.read(file_path)
+        starts = _find_all(before, start_anchor)
+        ends = _find_all(before, end_anchor)
+        if not starts:
+            return Result(status="error", message=f"start_anchor не найден: {start_anchor!r}", action="replace_between", error_code="no_match")
+        if not ends:
+            return Result(status="error", message=f"end_anchor не найден: {end_anchor!r}", action="replace_between", error_code="no_match")
+        pairs = [(s, e) for s in starts for e in ends if e > s]
+        if not pairs:
+            return Result(status="error", message="end_anchor не следует за start_anchor ни в одном вхождении", action="replace_between", error_code="anchor_order")
+        try:
+            occ_num = int(occurrence)
+        except (ValueError, TypeError):
+            return Result(status="error", message=f"Некорректное occurrence: {occurrence!r}", action="replace_between", error_code="bad_occurrence")
+        if occ_num < 1 or occ_num > len(pairs):
+            return Result(status="error", message=f"Найдено {len(pairs)} пар (start<end), нельзя взять #{occ_num}", action="replace_between", error_code="occurrence_out_of_range")
+        s, e = pairs[occ_num - 1]
+        prefix = before[:s] if include_start else before[:s + len(start_anchor)]
+        suffix = before[e + len(end_anchor):] if include_end else before[e:]
+        after = prefix + new_content + suffix
+        backend.write(file_path, after)
+        s_line = before.count("\n", 0, s) + 1
+        e_full = e + len(end_anchor)
+        e_line = before.count("\n", 0, e_full) + 1
+        new_lines = _count_lines(new_content)
+        old_block = before[s:e_full]
+        delta = _delta(old_block, new_content, 1)
+        msg = (f"L{s_line}\u2013L{e_line} \u2192 L{s_line}\u2013L{s_line + new_lines - 1} "
+               f"\u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411")
+        return Result(
+            status="ok",
+            message=msg,
+            delta=delta,
+            verified=True,
+            action="replace_between",
+        )
+[timing] user (2 actions): 0.02s
 
-
-[wb11] ✓ read_file: toolkit/docs/WORKSPACE_BACKEND.md [## 11. Порядок работы]
-223: '## 11. Порядок работы\n'
-224: '1. **Дизайн.** — Готово (`WORKSPACE.md`, `WORKSPACE_BACKEND.md`).\n'
-225: '\n'
-226: '2. **Удаление `working_dir`.** ✅ **Готово.** `FilesystemBackend.working_dir` → приватный `_root`. `CompositeBackend.working_dir` — chain `_root → working_dir → None`. `RebuildLuaCodeIndexTool` — через chain. Тест `test_working_dir_removed.py` (9/9).\n'
-227: '\n'
-228: '3. **`WorkspaceBackend` read-only.** ✅ **Готово.** `open/close/is_alive/read/exists/stat/list/filter_check`, routing `<basename>/<rel>`, `list("")` → basenames. Тест `test_workspace_backend.py` (22/22). В рантайм не подключён.\n'
-229: '\n'
-230: '4. **Интеграция в `CompositeBackend`.** Замена `FilesystemBackend` на `WorkspaceBackend` как единственного FS-бэкенда. **Однокорневая модель удаляется целиком:** поля `project_dir` и `recent_projects` из tool-wide config, `resolve_state_dir` / `STATE_DIR` из `config/loader.py`, fallback на `FilesystemBackend(project_dir)` при отсутствии `workspace.json`. Загрузка проекта — по пути из `recent.json`.\n'
-231: '\n'
-232: '5. **Индексаторы под multi-root.** `rebuild_*` ходят по всем корням, мёржат. `router.py` — какой домен пересобирать после write.\n'
-233: '\n'
-234: '6. **Write (шаг 4 из WORKSPACE.md).** Все корни с `write=true`. Все write-методы `WorkspaceBackend` включаются.\n'
-235: '\n'
-236: '7. **GUI (шаг 5 из WORKSPACE.md).** Диалог создания проекта (выбор папки + имя + roots), вкладки по корням, `recent.json`.\n'
-237: '\n'
-238: 'Каждый шаг самодостаточен, откатывается.\n'
-[timing] user (3 actions): 0.07s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 21, без summary: 147) [v347] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 163, символов: 1089) [v396] [без изменений]
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v226] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
-
-##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.87s
+##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.02s
