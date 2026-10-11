@@ -1,19 +1,2 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 178) [v397] [~4, ⇅7, +6, -4] ⚠
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §7. Открытые вопросы (L139–L181, 3.1 KB, ⚠ no summary)
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §5. Порядок записи в `workspace.json` (L178–L181, 0.5 KB, ⚠ no summary)
-  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §8. Порядок работы (L182–L194, 1.2 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L308–L343, 2.6 KB, ⚠ no summary)
-  + toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L49, 3.9 KB, ⚠ no summary)
-  + toolkit/docs/SESSION_STATE.md §Что открыто (L39–L49, 1.3 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `replace_unit` с пустым `new_text` (L332–L335, 0.3 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `get_status` — roots в сессии (L336–L339, 0.3 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §P2: `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §P2: `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §P3: `replace_unit` с пустым `new_text` — явный error_code (L332–L335, 0.2 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §P3: `get_status` — показывать roots для WorkspaceBackend (L336–L339, 0.3 KB, ⚠ no summary)
-
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1165) [v443] [без изменений]
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v272] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1165) [v445] [+1]
+  + toolkit/code/manual/_show_metrics.py  (12 стр., 0.4 KB)
