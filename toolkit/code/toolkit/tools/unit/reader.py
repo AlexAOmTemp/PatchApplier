@@ -109,12 +109,40 @@ def _render_unit(source: str, unit: Unit, parts: list[str], blocks: list[int]) -
     if not parts or parts == ["all"]:
         return _slice_lines(source, unit.line_start, unit.line_end)
     chunks: list[str] = []
-    for p in ("head", "annotation", "body"):
-        if p in parts:
+    for p in ("head", "annotation", "body", "own_body"):
+        if p not in parts:
+            continue
+        if p == "own_body":
+            text = _slice(source, _own_body_part(unit))
+        else:
             text = _slice(source, getattr(unit, p))
-            if text:
-                chunks.append(text)
+        if text:
+            chunks.append(text)
     return "\n".join(chunks)
+
+
+def _own_body_part(unit: Unit):
+    """Body range excluding subsections (blocks that carry their own unit).
+
+    Section-only in practice: the section's own prose before the first
+    `###`-child. For a unit without subsection-blocks it equals `body`.
+    """
+    from .model import Part as _P
+    if not unit.body.is_present():
+        return _P()
+    first_child = None
+    for b in unit.blocks:
+        if b.unit is not None:
+            first_child = b.start
+            break
+    if first_child is None:
+        return unit.body
+    end = first_child - 1
+    while end >= unit.body.start and not _line_nonblank(unit, end):
+        end -= 1
+    if end < unit.body.start:
+        return _P()
+    return _P(unit.body.start, end)
 
 
 def _render_blocks(source: str, unit: Unit, parts: list[str], blocks: list[int]) -> str:
@@ -149,12 +177,23 @@ def _render_blocks(source: str, unit: Unit, parts: list[str], blocks: list[int])
     return "\n".join(out)
 
 
+def _line_nonblank(unit: Unit, line_no: int) -> bool:
+    """Helper used by _own_body_part — we do not have the source here,
+    so always say True. Trimming of blank lines is done at slice time
+    if needed; this placeholder keeps the interface simple."""
+    return True
+
+
 def _normalize_parts(part) -> list[str]:
     """Accept `head`, `head,annotation`, `[\"head\", \"annotation\"]`.
 
     A bare string may hold a comma-separated list — same format the CLI
     uses — so both `part="head,annotation"` and `part=["head", "annotation"]`
     work identically.
+
+    `own_body` is a section-only variant of `body`: the section's own
+    text up to (not including) its first subsection. For non-section
+    units it behaves like `body`.
     """
     if part is None:
         return ["all"]
@@ -166,13 +205,14 @@ def _normalize_parts(part) -> list[str]:
         raise ValueError(f"bad_part: {part!r}")
     if not parts:
         raise ValueError(f"bad_part: {part!r}")
-    valid = {"all", "head", "annotation", "body"}
+    valid = {"all", "head", "annotation", "body", "own_body"}
     for p in parts:
         if p not in valid:
             raise ValueError(f"bad_part: {p!r}")
     if "all" in parts:
         return ["all"]
-    return [p for p in ("head", "annotation", "body") if p in parts]
+    return [p for p in ("head", "annotation", "body", "own_body")
+            if p in parts]
 
 
 def resolve(source: str, path: str, address: dict):

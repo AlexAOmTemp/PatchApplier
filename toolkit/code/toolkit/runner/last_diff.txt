@@ -1,7 +1,12 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v393] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v394] [~5, ⇅32, +1, -1] ⚠
+  ~ toolkit/docs/LLM_START.en.md §7. Available actions (L202–L359, 15.2 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.en.md §Writing (text tools, escape hatch) (L221–L253, 3.0 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L204–L361, 20.3 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §Запись (текстовые тулы, escape hatch) (L223–L255, 3.9 KB, ⚠ no summary)
+  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L308–L343, 2.5 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `replace_in_file` — tier-2 tolerance + tier-3 диагностика (L320–L323, 0.5 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P2: `replace_in_file` — при провале показать похожие строки (L320–L323, 0.4 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 168, символов: 1157) [v439] [~1, ⇅5]
-  ~ toolkit/code/toolkit/tests/test_replace_in_file.py  (+30 стр., +1.4 KB)
-      ~ toolkit/code/toolkit/tests/test_replace_in_file.py :: main  [function]  L57–L191 → L64–L221
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 168, символов: 1157) [v440] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v268] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v269] [без изменений]

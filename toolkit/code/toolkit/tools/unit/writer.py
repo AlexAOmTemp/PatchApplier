@@ -115,12 +115,22 @@ def replace_unit(source: str, path: str, address: dict,
     ext = Path(path).suffix.lower()
     unit = reader.resolve(source, path, address)
     parts = reader._normalize_parts(part)
+    # Empty text with part=all would delete the unit. That is a
+    # different intent — delete_block is for that. Reject explicitly
+    # instead of failing later with result_missing_symbol.
+    if parts == ["all"] and not (new_text or "").strip():
+        raise ValueError(
+            "empty_input_use_delete_block: replace_unit does not delete a unit"
+        )
     if parts == ["all"]:
         start, end = unit.line_start, unit.line_end
     else:
         start, end = None, None
         for p in parts:
-            ps = getattr(unit, p)
+            if p == "own_body":
+                ps = _own_body_part(unit)
+            else:
+                ps = getattr(unit, p)
             if ps.is_present():
                 if start is None or ps.start < start:
                     start = ps.start
@@ -268,6 +278,24 @@ def _apply_indent(text: str, indent: str) -> list[str]:
         else:
             out.append(indent + line)
     return out
+
+
+def _own_body_part(unit):
+    """Body range excluding subsections (same rule as reader._own_body_part)."""
+    from .model import Part as _P
+    if not unit.body.is_present():
+        return _P()
+    first_child = None
+    for b in unit.blocks:
+        if b.unit is not None:
+            first_child = b.start
+            break
+    if first_child is None:
+        return unit.body
+    end = first_child - 1
+    if end < unit.body.start:
+        return _P()
+    return _P(unit.body.start, end)
 
 
 def _check_parses(new_source: str, path: str, unit, ext: str,

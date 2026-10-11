@@ -1,74 +1,253 @@
-[test] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/tests/test_replace_in_file.py (+30 стр., +1411 Б)
+[r1] ✓ read_unit:     def execute(
+        self,
+        backend: Backend,
+        fmt: Any,
+        file_path: str,
+        file_content: str,
+        class_name: str = "ModuleScript",
+        **_: Any,
+    ) -> Result:
+        if backend.exists(file_path):
+            return Result(
+                status="error",
+                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
+                action="create_file",
+                error_code="already_exists",
+            )
+        create_fn = getattr(backend, "create", None)
+        try:
+            if callable(create_fn):
+                create_fn(file_path, file_content, class_name=class_name)
+            else:
+                backend.write(file_path, file_content)
+        except FileExistsError:
+            return Result(
+                status="error",
+                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
+                action="create_file",
+                error_code="already_exists",
+            )
+        except Exception as e:
+            return Result(
+                status="error",
+                message=f"Не удалось создать {file_path}: {e}",
+                action="create_file",
+                error_code="create_failed",
+            )
+        st = backend.stat(file_path)
+        return Result(
+            status="ok",
+            message=f"Файл создан: {file_path} ({st.lines} стр., {st.size_bytes} Б)",
+            action="create_file",
+        )
 
-[run] ✓ run_python: exit=0  duration=101ms
---- stdout ---
-[1] ✓ replace_in_file: a.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+[r2] ✓ read_unit:     def execute(
+        self,
+        backend: Backend,
+        fmt: Any,
+        file_path: str,
+        file_content: str,
+        **_: Any,
+    ) -> Result:
+        existed = backend.exists(file_path)
+        before_lines = 0
+        before_bytes = 0
+        if existed:
+            try:
+                st = backend.stat(file_path)
+                before_lines = st.lines
+                before_bytes = st.size_bytes
+            except Exception:
+                pass
+        backend.write(file_path, file_content)
+        st_after = backend.stat(file_path)
+        verb = "перезаписан" if existed else "создан"
+        delta_lines = st_after.lines - before_lines
+        delta_bytes = st_after.size_bytes - before_bytes
+        sign_l = f"+{delta_lines}" if delta_lines >= 0 else str(delta_lines)
+        sign_b = f"+{delta_bytes}" if delta_bytes >= 0 else str(delta_bytes)
+        return Result(
+            status="ok",
+            message=f"Файл {verb}: {file_path} ({sign_l} стр., {sign_b} Б)",
+            action="overwrite_file",
+        )
 
-[OK]   tier1 ok
-[OK]   tier1 applied
-[OK]   tier1 no marker
-[1] ✓ replace_in_file: b.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+[r3] ✓ read_unit: def _normalize_parts(part) -> list[str]:
+    """Accept `head`, `head,annotation`, `[\"head\", \"annotation\"]`.
 
-[OK]   tier1 substring ok
-[OK]   substring keeps trailing ws
-[OK]   substring no normalisation marker
-[1] ✓ replace_in_file: c.py: заменено 1 вхожд. (последнее) — +0 стр., -2 Б  (matched with trailing-whitespace normalisation; verify the line above)
+    A bare string may hold a comma-separated list — same format the CLI
+    uses — so both `part="head,annotation"` and `part=["head", "annotation"]`
+    work identically.
+    """
+    if part is None:
+        return ["all"]
+    if isinstance(part, str):
+        parts = [p.strip() for p in part.split(",") if p.strip()]
+    elif isinstance(part, list):
+        parts = [str(p).strip() for p in part if str(p).strip()]
+    else:
+        raise ValueError(f"bad_part: {part!r}")
+    if not parts:
+        raise ValueError(f"bad_part: {part!r}")
+    valid = {"all", "head", "annotation", "body"}
+    for p in parts:
+        if p not in valid:
+            raise ValueError(f"bad_part: {p!r}")
+    if "all" in parts:
+        return ["all"]
+    return [p for p in ("head", "annotation", "body") if p in parts]
 
-[OK]   tier2 ok
-[OK]   tier2 replaced
-[OK]   tier2 marked in message
-[1] ✗ replace_in_file: Строка не найдена в d.py
-  Searched: 'def x():\n    pass'
-  Similar lines (invisible chars shown):
-    L1: 'def a():␣␣'
-    L4: 'def b():␣␣'
+[r4] ✓ read_unit: def replace_unit(source: str, path: str, address: dict,
+                 new_text: str, part=None) -> str:
+    """Replace a unit — wholly (part=all) or one/more of its parts.
 
-[OK]   no match for unrelated needle
-[1] ✓ replace_in_file: e.py: заменено 1 вхожд. (последнее) — +0 стр., -2 Б  (matched with trailing-whitespace normalisation; verify the line above)
+    `part` follows the same conventions as `read_unit`: bare string,
+    comma-separated string, or list. `part=all` (default) replaces the
+    entire unit (head+annotation+body); `part=["body"]` replaces only the
+    body, leaving head and annotation intact.
 
-[OK]   tier2 unique ok
-[OK]   tier2 unique applied
-[OK]   tier2 second function untouched
-[1] ✗ replace_in_file: Строка не найдена в f.py
-  Searched: 'from .core import Something'
-  Similar lines (invisible chars shown):
-    L1: 'from .model import Block, Part, Unit, UnitKind␣␣'
+    The new text is inserted literally; indentation of the first line is
+    preserved (the replacement block is re-indented to match). Validated
+    after write — if the file no longer parses, the change is rejected.
+    """
+    if new_text is None:
+        raise ValueError("empty_input")
+    ext = Path(path).suffix.lower()
+    unit = reader.resolve(source, path, address)
+    parts = reader._normalize_parts(part)
+    if parts == ["all"]:
+        start, end = unit.line_start, unit.line_end
+    else:
+        start, end = None, None
+        for p in parts:
+            ps = getattr(unit, p)
+            if ps.is_present():
+                if start is None or ps.start < start:
+                    start = ps.start
+                if end is None or ps.end > end:
+                    end = ps.end
+        if start is None:
+            raise KeyError("no_parts: none of the requested parts are present")
 
-[OK]   tier3 no_match
-[OK]   tier3 mentions searched
-[OK]   tier3 shows similar lines
-[OK]   tier3 marks trailing space
-[1] ✓ replace_in_file: r.py: заменено 1 вхожд. (осталось 2) — +0 стр., -1 Б
+    lines = source.splitlines()
+    first_line = lines[start - 1]
+    indent = _line_indent(first_line)
+    new_lines = _apply_indent(new_text, indent)
+    out_lines = lines[:start - 1] + new_lines + lines[end:]
 
-[OK]   regex ok
-[OK]   regex replaced first only
-[1] ✓ replace_in_file: s.py: заменено 2 вхожд. (все) — +0 стр., -2 Б
+    eol = "\r\n" if "\r\n" in source else "\n"
+    new_source = eol.join(out_lines)
+    if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
+        new_source += eol
 
-[OK]   regex all ok
-[OK]   regex all replaced
-[1] ✓ replace_in_file: t.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+    _check_parses(new_source, path, unit, ext, source)
+    return new_source
 
-[OK]   regex backref ok
-[OK]   regex backref swapped
-[1] ✗ replace_in_file: Regex не нашёл совпадений в u.py
-  Pattern: 'qq\\d+'
+[r5] ✓ read_unit: def _check_parses(new_source: str, path: str, unit, ext: str,
+                  old_source: str | None = None) -> None:
+    """Confirm the edited source still parses and the target survives.
 
-[OK]   regex no match
-[1] ✗ replace_in_file: Плохой regex: missing ), unterminated subpattern at position 0
+    When `old_source` is provided, additionally verify that no *unrelated*
+    unit has been lost. The target and its descendants are allowed to
+    change or vanish (that is the point of the edit); everything else must
+    survive. This catches the markdown off-by-one where `part="body"` on
+    a section used to eat the following section's heading.
+    """
+    if ext == ".py":
+        import ast
+        try:
+            tree = ast.parse(new_source)
+        except SyntaxError as e:
+            raise ValueError(f"result_syntax_error: {e}")
+        # qualname must still be present
+        if unit.qualname != "<module>":
+            found = False
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    name = node.name
+                    if name == unit.name:
+                        found = True
+                        break
+            if not found:
+                raise ValueError(f"result_missing_symbol: {unit.qualname}")
+    elif ext in (".lua", ".luau"):
+        from ...formats import lua as _lua
+        try:
+            syms = _lua.parse_lua_symbols(new_source)
+        except Exception as e:
+            raise ValueError(f"result_parse_error: {e}")
+        if unit.qualname != "<module>":
+            if not any(s.qualname == unit.qualname for s in syms):
+                raise ValueError(f"result_missing_symbol: {unit.qualname}")
+    else:  # .md
+        from ...formats import Format
+        try:
+            doc = Format.load("default").parse(new_source)
+        except Exception as e:
+            raise ValueError(f"result_parse_error: {e}")
+        if unit.kind == UnitKind.SECTION:
+            if doc.find(number=unit.name) is None and doc.find(title=unit.name) is None:
+                raise ValueError(f"result_missing_section: {unit.name}")
+            if old_source is not None:
+                old_doc = Format.load("default").parse(old_source)
+                old_ids = {str(s.number or s.title) for s in old_doc.flatten()}
+                new_ids = {str(s.number or s.title) for s in doc.flatten()}
+                target = str(unit.name)
+                # Descendants of the target (e.g. 2.1 when target is 2)
+                # may change or vanish — they are the target's own body.
+                lost = {l for l in (old_ids - new_ids)
+                        if l != target and not l.startswith(target + ".")}
+                if lost:
+                    raise ValueError(
+                        f"result_missing_section: unintended loss of "
+                        f"{sorted(lost)} (target \u00a7{target})"
+                    )
 
-[OK]   regex bad pattern
+[r6] ✓ read_unit:     def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: dict | None = None,
+        new_text: str = "",
+        part=None,
+        **_: Any,
+    ) -> Result:
+        return _write_call(
+            backend, file_path, "replace_unit", address,
+            lambda src: writer.replace_unit(src, file_path, address, new_text, part),
+        )
 
-=== 25 ok, 0 failed ===
-[timing] user (2 actions): 0.10s
+[r7] ✓ read_file: toolkit/code/toolkit/tools/status.py L133–L160
+133: '            ctx = self._context\r\n'
+134: '            lines = ["## Session"]\r\n'
+135: '            lines.append(f"project:  {ctx.get(\'project_name\') or \'(unknown)\'}")\r\n'
+136: '            lines.append(f"backend:  {ctx.get(\'backend\') or \'(unknown)\'}")\r\n'
+137: '            lines.append(f"luau:     {ctx.get(\'luau_mode\') or \'mcp\'}")\r\n'
+138: '            enabled = ctx.get("backends_enabled") or {"filesystem"}\r\n'
+139: '            lines.append(f"format:   {ctx.get(\'format_preset\') or \'default\'}")\r\n'
+140: '            if ctx.get("exec_enabled"):\r\n'
+141: '                interp = ctx.get("exec_interpreter") or "sys.executable"\r\n'
+142: '                lines.append(f"exec:     enabled  ({interp})")\r\n'
+143: '            else:\r\n'
+144: '                lines.append("exec:     disabled")\r\n'
+145: '            if "mcp" in enabled:\r\n'
+146: '                if ctx.get("native_tools_enabled"):\r\n'
+147: '                    allow = ctx.get("native_tools_allow") or []\r\n'
+148: '                    allow_s = ", ".join(allow) if allow else "(no allowlist -> all)"\r\n'
+149: '                    lines.append(f"native:   enabled  ({allow_s})")\r\n'
+150: '                else:\r\n'
+151: '                    lines.append("native:   disabled")\r\n'
+152: '            return "\\n".join(lines)\r\n'
+153: '\r\n'
+154: '    # --- indexes ----------------------------------------------------------\r\n'
+155: '\r\n'
+156: '    def _render_indexes(self, backend: Backend) -> str:\r\n'
+157: '        ctx = self._context\r\n'
+158: '        paths = ctx.get("index_paths") or {}\r\n'
+159: '        enabled = ctx.get("backends_enabled") or {"filesystem"}\r\n'
+160: '\r\n'
+[timing] user (7 actions): 0.01s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v393] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 168, символов: 1157) [v439] [~1, ⇅5]
-  ~ toolkit/code/toolkit/tests/test_replace_in_file.py  (+30 стр., +1.4 KB)
-      ~ toolkit/code/toolkit/tests/test_replace_in_file.py :: main  [function]  L57–L191 → L64–L221
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v268] [без изменений]
-[timing] auto-rebuild (3 actions): 0.77s
-
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.88s
+##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.01s

@@ -61,9 +61,11 @@ class GetStatusTool:
         native_tools_allow: list | None = None,
         index_paths: dict | None = None,
         backends_enabled: set | None = None,
+        roots: list | None = None,
     ) -> None:
         cls._context = {
             "project_name": project_name or "",
+            "roots": list(roots or []),
             "backend": backend or "",
             "luau_mode": luau_mode or "mcp",
             "format_preset": format_preset or "default",
@@ -133,6 +135,9 @@ class GetStatusTool:
             ctx = self._context
             lines = ["## Session"]
             lines.append(f"project:  {ctx.get('project_name') or '(unknown)'}")
+            _roots = ctx.get("roots") or []
+            if _roots:
+                lines.append(f"roots:    {', '.join(_roots)}")
             lines.append(f"backend:  {ctx.get('backend') or '(unknown)'}")
             lines.append(f"luau:     {ctx.get('luau_mode') or 'mcp'}")
             enabled = ctx.get("backends_enabled") or {"filesystem"}

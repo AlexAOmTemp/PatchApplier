@@ -11,6 +11,31 @@ from ..core.backend import Backend
 from ..core.models import Result
 
 
+def _check_content_syntax(file_path: str, content: str) -> str | None:
+    """Syntax-check content for formats we can parse. Returns None if OK.
+
+    .py -> ast.parse; .json -> json.loads. Other extensions are not
+    checked (md, txt, custom formats). This catches the common footgun
+    where an LLM mis-escapes a triple quote and creates a .py file that
+    cannot be imported.
+    """
+    from pathlib import Path as _P
+    ext = _P(file_path).suffix.lower()
+    if ext == ".py":
+        import ast
+        try:
+            ast.parse(content)
+        except SyntaxError as e:
+            return f"content_syntax_error: {e}"
+    elif ext == ".json":
+        import json
+        try:
+            json.loads(content)
+        except json.JSONDecodeError as e:
+            return f"content_syntax_error: {e}"
+    return None
+
+
 class CreateFileTool:
     name = "create_file"
     op = "write"
@@ -32,6 +57,14 @@ class CreateFileTool:
                 message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
                 action="create_file",
                 error_code="already_exists",
+            )
+        err = _check_content_syntax(file_path, file_content)
+        if err is not None:
+            return Result(
+                status="error",
+                message=f"Не создаю {file_path}: {err}",
+                action="create_file",
+                error_code="content_syntax_error",
             )
         create_fn = getattr(backend, "create", None)
         try:
@@ -75,6 +108,14 @@ class OverwriteFileTool:
         file_content: str,
         **_: Any,
     ) -> Result:
+        err = _check_content_syntax(file_path, file_content)
+        if err is not None:
+            return Result(
+                status="error",
+                message=f"Не перезаписываю {file_path}: {err}",
+                action="overwrite_file",
+                error_code="content_syntax_error",
+            )
         existed = backend.exists(file_path)
         before_lines = 0
         before_bytes = 0
