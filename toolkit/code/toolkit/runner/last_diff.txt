@@ -1,11 +1,19 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 175) [v396] [~5, ⇅6, +1]
-  ~ toolkit/code/manual/unit_proto/MODEL.md §4. Части (part) и блоки (block) (L77–L154, 5.6 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.en.md §7. Available actions (L202–L359, 15.5 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.en.md §Unit operations: a unified model for `.py` / `.lua` / `.md` (priority) (L286–L318, 4.0 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L204–L361, 20.6 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.ru.md §Unit-операции: единая модель для `.py` / `.lua` / `.md` (приоритетно) (L288–L320, 5.3 KB, ⚠ no summary)
-  + toolkit/code/manual/unit_proto/MODEL.md §`own_body` — вид на `body` (L96–L115, 1.5 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 23, без summary: 178) [v397] [~4, ⇅7, +6, -4] ⚠
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §7. Открытые вопросы (L139–L181, 3.1 KB, ⚠ no summary)
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §5. Порядок записи в `workspace.json` (L178–L181, 0.5 KB, ⚠ no summary)
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §8. Порядок работы (L182–L194, 1.2 KB, ⚠ no summary)
+  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L308–L343, 2.6 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L49, 3.9 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Что открыто (L39–L49, 1.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `replace_unit` с пустым `new_text` (L332–L335, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `get_status` — roots в сессии (L336–L339, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P2: `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P2: `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P3: `replace_unit` с пустым `new_text` — явный error_code (L332–L335, 0.2 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P3: `get_status` — показывать roots для WorkspaceBackend (L336–L339, 0.3 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1165) [v442] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1165) [v443] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v271] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v272] [без изменений]

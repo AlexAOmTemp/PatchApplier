@@ -1,154 +1,47 @@
-[r1] ✓ read_file: toolkit/docs/GUI_PROJECT_SETTINGS.md L15–L70
-15: '## 2. Что в окне\n'
-16: '\n'
-17: '### 2.1. Имя проекта (top)\n'
-18: '\n'
-19: 'Одна строка: `Entry` со значением `workspace.name`. Редактируется, сохраняется через `projects.rename_project`.\n'
-20: '\n'
-21: '**Не путь.** Путь проекта — свойство сессии, не проекта. Он виден в главном окне (метка под логом) и в заголовке окна настроек серым.\n'
-22: '\n'
-23: '### 2.2. Каталоги (roots) — центральный блок\n'
-24: '\n'
-25: "**Табы по root'ам.** Один root = один таб. Заголовок таба = basename root'а.\n"
-26: '\n'
-27: '**Внутри таба:**\n'
-28: '\n'
-29: "- **Дерево каталогов** root'а. Только каталоги, без файлов (см. §3). У каждого каталога — пять флагов `R / W / Id / Ip / Il` (как в старом дереве политики, но 5 вместо 3). Клик по флагу. Три состояния: `·` (нет override), `+` (override с True), `−` (override с False). Семантика клика:\n"
-30: '\n'
-31: "  - **Из `·`** — создать override: остальные флаги берутся из effective (ближайший override вверх или дефолт root'а), **кликнутый флаг инвертируется** (чтобы клик дал видимый эффект).\n"
-32: '  - **Из `+`** — клик → `−` (только этот флаг).\n'
-33: '  - **Из `−`** — клик → `+` (только этот флаг).\n'
-34: '  - **Возврат в `·`** (удаление override целиком) — отдельный жест (Ctrl+клик или контекстное меню). В этой итерации не реализовано.\n'
-35: '\n'
-36: '  Почему **не полный цикл `·→+→−→·`**: `PathPolicy` — полная замена, не per-flag merge. Если override содержит `read=False, write=False`, возврат в `·` удалил бы настройки по обоим флагам. Сброс override — осознанное действие.\n'
-37: '\n'
-38: '  **Shift+клик** — на всё поддерево. В этой итерации не реализовано.\n'
-39: '- **Строка `[root]`** — дефолт root\'а (`overrides["."]`). Действует на всё, что не переопределено ниже.\n'
-40: '- **Скрытые каталоги** (`.`-prefixed, `.patchignore`-скрытые) — не показываются по галке «show hidden» внизу.\n'
-41: '\n'
-42: '**Рядом с табами:** кнопки `Add root…` и `Remove root` (удаляет активный root). Добавление вызывает `filedialog`, валидация через `projects.add_root` (уникальность basename, недопустимость вложенности, запрет имён Roblox-сервисов).\n'
-43: '\n'
-44: '### 2.3. Исключения (exceptions)\n'
-45: '\n'
-46: 'Две кнопки, обе открывают небольшой редактор (listbox + add/remove + reset-to-default):\n'
-47: '\n'
-48: '- **`.patchignore`** — правила видимости FS.\n'
-49: '- **`.mcpignore`** — правила видимости MCP (активна только при `luau: mcp`).\n'
-50: '\n'
-51: 'Оба файла лежат в `state_dir` проекта. Кнопка показывает `<name>: N` (количество правил).\n'
-52: '\n'
-53: '### 2.4. Источники и runtime\n'
-54: '\n'
-55: '- **Index docs / python / lua** — три чекбокса. `lua` disabled если MCP выключен.\n'
-56: '- **MCP** — чекбокс «включить MCP-бэкенд». При включении активны native_tools и luau-mode.\n'
-57: '- **Luau mode** — radio: `mcp` / `rojo`.\n'
-58: '- **Exec** — чекбокс «разрешить run_python».\n'
-59: '\n'
-60: 'Эти параметры живут в `.patch_applier.json` (tool-wide) и `<project>/.patch_applier/config.json` (per-project), но редактируются в этом окне без прямого доступа к JSON.\n'
-61: '\n'
-62: '### 2.5. Кнопки\n'
-63: '\n'
-64: '`OK` — применить (rename + add/remove roots + policy + исключения + toggles), перезапустить сессию.\n'
-65: '`Cancel` — закрыть без изменений.\n'
-66: '\n'
-67: '## 3. Только каталоги, без файлов\n'
-68: '\n'
-69: '**Решение:** дерево показывает **только каталоги**. Файлы не показываются никогда.\n'
-70: '\n'
+[gps-2] ✗ replace_unit: ambiguous: section_number='2' — matches at L15, L147; pass occurrence
 
-[r2] ✓ read_file: toolkit/docs/GUI_PROJECT_SETTINGS.md L130–L180
-130: 'policy = root.overrides  # dict[str, PathPolicy]\n'
-131: '```\n'
-132: '\n'
-133: 'Дерево строится из `paths`, флаги — из `overrides`. При сохранении — `projects.update_root_policy` для `["."]` или набор `overrides` пишется в `workspace.json`.\n'
-134: '\n'
-135: '**`.patchignore` / `.mcpignore`** — читаются и пишутся напрямую (как в старом `open_pi_editor`).\n'
-136: '\n'
-137: '**MCP / Exec** — через `CONFIG` (per-project overlay).\n'
-138: '\n'
-139: '## 7. Открытые вопросы\n'
-140: '\n'
-141: '### 1. Где живёт state активного таба\n'
-142: '\n'
-143: '**Не храним.** По алфавиту корней — первая вкладка. Согласовано.\n'
-144: '\n'
-145: 'Если в будущем понадобится — хранить **в `workspace.json`** (`ui.active_root`), а не в `CONFIG` и не в `recent.json`. Обоснование: это свойство проекта, при переключении между проектами должно восстанавливаться само. `recent.json` — только путь к папке проекта, туда UI-мелочи не пишем.\n'
-146: '\n'
-147: '### 2. Автообновление дерева\n'
-148: '\n'
-149: '**Не авто.** Обновление:\n'
-150: '- при открытии окна,\n'
-151: '- при переключении таба (если данные разошлись — не должно),\n'
-152: '- по кнопке `↻` в заголовке таба.\n'
-153: '\n'
-154: 'Согласовано.\n'
-155: '\n'
-156: '### 3. Клик на каталог (не на флаг)\n'
-157: '\n'
-158: '**Ничего.** Только просмотр. Двойной клик — тоже ничего. Копирование пути — если попросят, отдельным шагом.\n'
-159: '\n'
-160: 'Согласовано.\n'
-161: '\n'
-162: '### 4. Что делать с кнопкой ⚙ в правом панели\n'
-163: '\n'
-164: '**✅ Сделано.** Кнопка ⚙ удалена из правого panel. Один вход: `File → Project settings…`.\n'
-165: '\n'
-166: 'Workflow проекта: пользователь создаёт проект, задаёт настройки, дальше в них не заходит в 90% случаев. Настройки — отдельное окно, которое открывается осознанно. На экране — минимум того, что нужно постоянно (Выполнить, Повторить, лог, статус); периодическое — за раскрывающейся панелью; разовое — за окном.\n'
-167: '\n'
-168: '### 4a. Уточнение: что где живёт\n'
-169: '\n'
-170: '| Данные | Где | Кто пишет |\n'
-171: '|---|---|---|\n'
-172: '| Путь к папке проекта | `recent.json` | GUI (при открытии) |\n'
-173: '| Имя проекта, roots, policy, format | `<project>/.patch_applier/workspace.json` | GUI (это окно) |\n'
-174: '| `.patchignore`, `.mcpignore` | `<project>/.patch_applier/` | GUI (редакторы) |\n'
-175: '| Backend / index toggles / exec / mcp | `<project>/.patch_applier/config.json` + tool-wide | GUI (это окно) |\n'
-176: '| UI-мелочи (если появятся) | `workspace.json`, поле `ui.*` | GUI |\n'
-177: '\n'
-178: '### 5. Порядок записи в `workspace.json`\n'
-179: '\n'
-180: 'Сейчас `projects.update_root_policy` пишет только дефолт (`["."]`). Для per-path — нужна новая функция `set_override(folder, root, rel_path, PathPolicy)`. Добавляется по ходу.\n'
+[gps-7] ✓ replace_in_file: toolkit/docs/GUI_PROJECT_SETTINGS.md: заменено 1 вхожд. (последнее) — +0 стр., +263 Б
 
-[r3] ✓ grep: Найдено 6 совпадений:
-toolkit/docs/TOOL_PRACTICE.md:320: ### ✅ P2 (закрыто): `replace_in_file` — tier-2 tolerance + tier-3 диагностика
-toolkit/docs/TOOL_PRACTICE.md:324: ### P2: `create_file` / `overwrite_file` — syntax check
-toolkit/docs/TOOL_PRACTICE.md:328: ### P2: `replace_unit` для md — `part="own_body"`
-toolkit/docs/TOOL_PRACTICE.md:332: ### P3: `replace_unit` с пустым `new_text` — явный error_code
-toolkit/docs/TOOL_PRACTICE.md:336: ### P3: `get_status` — показывать roots для WorkspaceBackend
-toolkit/docs/TOOL_PRACTICE.md:340: ### P3: LLM_START cheat-sheet «задача → тул»
+[gps-8] ✓ replace_unit: toolkit/docs/GUI_PROJECT_SETTINGS.md: replace_unit применён
 
-[r4] ✓ read_file: toolkit/docs/SESSION_STATE.md L1–L30
-1: '# SESSION_STATE — состояние между сессиями\n'
-2: '\n'
-3: '<!-- summary: Snapshot of what was done in the last big session (Workspace refactor) and what to pick up next. Update on session close, read on session start. -->\n'
-4: '<!-- tags: session, state, bridge -->\n'
-5: '\n'
-6: '## Зачем этот документ\n'
-7: '\n'
-8: 'LLM_START — стабильная инструкция. DECISIONS — почему так решено. SESSION_STATE — **где мы прямо сейчас**: что закрыто в последней сессии, что открыто, что первым делом проверить при следующем старте.\n'
-9: '\n'
-10: 'Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.\n'
-11: '\n'
-12: '## Сессия: Workspace refactor (закрыта)\n'
-13: '\n'
-14: '**Длительность:** одна большая сессия, ~22 коммита, от `ab09954 before refactor` до `9683bc9 docs: session tool-practice notes`.\n'
-15: '\n'
-16: '**Тема:** переход от однокорневой модели (`project_dir` = `working_dir` = место state) к **multi-root Workspace** с per-root и per-path policy.\n'
-17: '\n'
-18: '### Что сделано\n'
-19: '\n'
-20: '**Дизайн:**\n'
-21: '- `docs/WORKSPACE.md` — модель: roots, policy, state. Все открытые вопросы закрыты.\n'
-22: '- `docs/WORKSPACE_BACKEND.md` — backends, рефакторинг протокола.\n'
-23: '- `docs/TOOL_PRACTICE.md` — рецепты и наблюдения по тулам (новое).\n'
-24: '\n'
-25: '**Модель:**\n'
-26: '- `config/workspace.py` — `Workspace` + `Root` + `PathPolicy` (пять флагов: `read / write / index_docs / index_py / index_lua`). Per-path overrides через `Root.overrides: dict[path, PathPolicy]`, nearest-match. Тест `test_workspace.py` (30/30).\n'
-27: '- Старая модель (`FilterSpec` / `Policy` / `RootPolicy`) **удалена целиком**. Никакой обратной совместимости.\n'
-28: '\n'
-29: '**Backends:**\n'
-30: '- `FilesystemBackend.working_dir` → приватный `_root`.\n'
-[timing] user (4 actions): 0.00s
+[tp-1] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +19 Б
 
-##RESULT:{"ok": 4, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+[tp-2] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., -15 Б
+
+[tp-3] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +16 Б
+
+[tp-4] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +74 Б
+
+[ss-new] ✓ insert_at_anchor: перед L12 в toolkit/docs/SESSION_STATE.md — +38 стр., +4043 Б
+
+[commit] ✓ run_python: exit=0  duration=159ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master 7f6e646] docs: close GUI settings and tool-polish batch
+ 7 files changed, 254 insertions(+), 282 deletions(-)
+[timing] user (9 actions): 0.17s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 178) [v397] [~4, ⇅7, +6, -4] ⚠
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §7. Открытые вопросы (L139–L181, 3.1 KB, ⚠ no summary)
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §5. Порядок записи в `workspace.json` (L178–L181, 0.5 KB, ⚠ no summary)
+  ~ toolkit/docs/GUI_PROJECT_SETTINGS.md §8. Порядок работы (L182–L194, 1.2 KB, ⚠ no summary)
+  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L308–L343, 2.6 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L49, 3.9 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Что открыто (L39–L49, 1.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `replace_unit` с пустым `new_text` (L332–L335, 0.3 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `get_status` — roots в сессии (L336–L339, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P2: `create_file` / `overwrite_file` — syntax check (L324–L327, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P2: `replace_unit` для md — `part="own_body"` (L328–L331, 0.3 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P3: `replace_unit` с пустым `new_text` — явный error_code (L332–L335, 0.2 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §P3: `get_status` — показывать roots для WorkspaceBackend (L336–L339, 0.3 KB, ⚠ no summary)
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1165) [v443] [без изменений]
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v272] [без изменений]
+[timing] auto-rebuild (3 actions): 0.78s
+
+##RESULT:{"ok": 11, "errors": 1, "skipped": 0, "failed": [1], "blocked": []}
+[timing] total: 0.95s
