@@ -331,6 +331,8 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 
 `rebuild_*` return `[vN]` — the index version — and a structured diff against what was on disk before the rebuild.
 
+**`⚠` at the end of the diff line** means there were **removals** (`-N`). Removals are the one type of change a write tool should not produce without intent: adding or editing is normal, dropping an unrelated unit is an anomaly. If you see `⚠` — check that what disappeared was meant to disappear before moving on. Normal rebuilds (only `~` and `+`) show no `⚠`.
+
 ### Execution
 
 | Action | Arguments |

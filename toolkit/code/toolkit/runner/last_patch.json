@@ -1,18 +1,39 @@
-[{"id": "mcp-label", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/settings_window.py",
-    "search": "    # Row 3: MCP + Hide modules button (right-aligned)\n    r_mcp = tk.Frame(src)\n    r_mcp.pack(fill=\"x\", pady=(4, 0))\n    tk.Checkbutton(r_mcp, text=\"MCP (Roblox scene + code)\", variable=mcp_var,\n                   anchor=\"w\").pack(side=\"left\")",
-    "replace": "    # Row 3: MCP + Hide modules button (right-aligned)\n    # Label adapts to Luau source: when code comes from disk (Rojo), the\n    # bridge is only used for the scene; when code goes through .Source,\n    # it carries both. Neutral fallback while both are off.\n    mcp_label_var = tk.StringVar(value=\"MCP (Roblox bridge)\")\n    r_mcp = tk.Frame(src)\n    r_mcp.pack(fill=\"x\", pady=(4, 0))\n    tk.Checkbutton(r_mcp, textvariable=mcp_label_var, variable=mcp_var,\n                   anchor=\"w\").pack(side=\"left\")",
+[{"id": "code", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/diff.py",
+    "search": "    parts = []\n    if changed_mods: parts.append(f\"~{len(changed_mods)}\")\n    if added_mods: parts.append(f\"+{len(added_mods)}\")\n    if removed_mods: parts.append(f\"-{len(removed_mods)}\")\n    if total_shifted: parts.append(f\"\\u21c5{total_shifted}\")\n    header = f\" [{', '.join(parts)}]\"",
+    "replace": "    parts = []\n    if changed_mods: parts.append(f\"~{len(changed_mods)}\")\n    if added_mods: parts.append(f\"+{len(added_mods)}\")\n    if removed_mods: parts.append(f\"-{len(removed_mods)}\")\n    if total_shifted: parts.append(f\"\\u21c5{total_shifted}\")\n    header = f\" [{', '.join(parts)}]\"\n    # Removals never happen by accident — a write tool should not drop\n    # unrelated code. Flag the header so the anomaly is visible without\n    # reading the diff body. See LLM_START section \"Index versions and diffs\".\n    if removed_mods:\n        header += \" \\u26a0\"",
     "search_repr": false}}]
 
-[{"id": "mcp-sync", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/settings_window.py",
-    "search": "    def _sync_all():\n        _sync_exec_state()\n        _sync_luau_state()\n        _sync_visibility_buttons()\n        _sync_roots_visibility()\n        _sync_tree_columns()",
-    "replace": "    def _sync_mcp_label():\n        mcp = bool(mcp_var.get())\n        rojo = bool(rojo_var.get())\n        if mcp and luau_var.get() == \"mcp\":\n            mcp_label_var.set(\"MCP (Roblox bridge: scene + code)\")\n        elif mcp and luau_var.get() == \"rojo\":\n            mcp_label_var.set(\"MCP (Roblox bridge: scene only)\")\n        elif mcp:\n            mcp_label_var.set(\"MCP (Roblox bridge)\")\n        else:\n            mcp_label_var.set(\"MCP (Roblox bridge)\")\n\n    def _sync_all():\n        _sync_exec_state()\n        _sync_luau_state()\n        _sync_visibility_buttons()\n        _sync_roots_visibility()\n        _sync_tree_columns()\n        _sync_mcp_label()",
+[{"id": "index", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/diff.py",
+    "search": "    parts: list[str] = []\n    if changed: parts.append(f\"~{len(changed)}\")\n    if shifted: parts.append(f\"⇅{len(shifted)}\")\n    n_add = len(added) + len(added_files)\n    n_rem = len(removed) + len(removed_files)\n    if n_add: parts.append(f\"+{n_add}\")\n    if n_rem: parts.append(f\"-{n_rem}\")\n    header = f\" [{', '.join(parts)}]\"",
+    "replace": "    parts: list[str] = []\n    if changed: parts.append(f\"~{len(changed)}\")\n    if shifted: parts.append(f\"⇅{len(shifted)}\")\n    n_add = len(added) + len(added_files)\n    n_rem = len(removed) + len(removed_files)\n    if n_add: parts.append(f\"+{n_add}\")\n    if n_rem: parts.append(f\"-{n_rem}\")\n    header = f\" [{', '.join(parts)}]\"\n    # Removals are the one type of change a write tool should not produce\n    # without intent. Flag the header; the body still lists them.\n    if n_rem:\n        header += \" \\u26a0\"",
     "search_repr": false}}]
 
-[{"id": "smoke-gui", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
+[{"id": "struct", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/diff.py",
+    "search": "    parts = []\n    if changed: parts.append(f\"~{len(changed)}\")\n    if shifted: parts.append(f\"⇅{len(shifted)}\")\n    if added: parts.append(f\"+{len(added)}\")\n    if removed: parts.append(f\"-{len(removed)}\")\n    header = f\" [{', '.join(parts)}]\"",
+    "replace": "    parts = []\n    if changed: parts.append(f\"~{len(changed)}\")\n    if shifted: parts.append(f\"⇅{len(shifted)}\")\n    if added: parts.append(f\"+{len(added)}\")\n    if removed: parts.append(f\"-{len(removed)}\")\n    header = f\" [{', '.join(parts)}]\"\n    if removed:\n        header += \" \\u26a0\"",
+    "search_repr": false}}]
+
+[{"id": "llm-ru", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
+    "search": "`rebuild_*` возвращают `[vN]` — версию индекса — и структурированный diff от того, что лежало на диске до rebuild.",
+    "replace": "`rebuild_*` возвращают `[vN]` — версию индекса — и структурированный diff от того, что лежало на диске до rebuild.\n\n**`⚠` в конце diff-строки** означает, что были **удаления** (`-N`). Удаления — единственный тип изменения, который write-тул не должен производить без намерения: добавить файл или изменить его — норма, удалить соседний unit — аномалия. Если видишь `⚠` — проверь, что удалённое действительно должно было исчезнуть, прежде чем идти дальше. В обычном rebuild (только `~` и `+`) `⚠` не появляется.",
+    "search_repr": false}}]
+
+[{"id": "llm-en", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+    "search": "`rebuild_*` return `[vN]` — the index version — and a structured diff against what was on disk before the rebuild.",
+    "replace": "`rebuild_*` return `[vN]` — the index version — and a structured diff against what was on disk before the rebuild.\n\n**`⚠` at the end of the diff line** means there were **removals** (`-N`). Removals are the one type of change a write tool should not produce without intent: adding or editing is normal, dropping an unrelated unit is an anomaly. If you see `⚠` — check that what disappeared was meant to disappear before moving on. Normal rebuilds (only `~` and `+`) show no `⚠`.",
+    "search_repr": false}}]
+
+[{"id": "smoke", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
+
+[{"id": "run-diff", "action": "run_python",
+  "arguments": {"script": "toolkit/code/toolkit/tests/test_code_diff.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["settings: MCP label reflects luau source"]}}]
+                "args": ["diff: warn-mark on any removal in header"]}}]

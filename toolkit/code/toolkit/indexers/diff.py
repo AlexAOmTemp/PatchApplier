@@ -161,6 +161,11 @@ def diff_code_index(prev_text: str, new_text: str) -> CodeDiffResult:
     if removed_mods: parts.append(f"-{len(removed_mods)}")
     if total_shifted: parts.append(f"\u21c5{total_shifted}")
     header = f" [{', '.join(parts)}]"
+    # Removals never happen by accident — a write tool should not drop
+    # unrelated code. Flag the header so the anomaly is visible without
+    # reading the diff body. See LLM_START section "Index versions and diffs".
+    if removed_mods:
+        header += " \u26a0"
 
     lines: list[str] = []
     for path, pm, nm in changed_mods[:20]:
@@ -329,6 +334,10 @@ def diff_index(prev_text: str, new_text: str) -> DiffResult:
     if n_add: parts.append(f"+{n_add}")
     if n_rem: parts.append(f"-{n_rem}")
     header = f" [{', '.join(parts)}]"
+    # Removals are the one type of change a write tool should not produce
+    # without intent. Flag the header; the body still lists them.
+    if n_rem:
+        header += " \u26a0"
 
     lines: list[str] = []
 
@@ -392,6 +401,8 @@ def diff_structures(
     if added: parts.append(f"+{len(added)}")
     if removed: parts.append(f"-{len(removed)}")
     header = f" [{', '.join(parts)}]"
+    if removed:
+        header += " \u26a0"
 
     lines: list[str] = []
 
