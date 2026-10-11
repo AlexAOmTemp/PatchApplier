@@ -102,6 +102,56 @@ def main():
         t.expect('original preserved',
                  (root / 'a.py').read_text(encoding='utf-8') == 'x = 1\n')
 
+    # --- scope: required / conflict ---
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / 'a.py').write_text('def foo():\n    return 1\n', encoding='utf-8')
+
+        # Neither part nor block
+        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+            'file_path': 'a.py',
+            'address': {'qualname': 'foo'},
+            'new_text': 'x',
+        }}])[0]
+        t.expect('scope_required when no part/block',
+                 r.status == 'error' and r.error_code == 'scope_required',
+                 f'{r.status}/{r.error_code}')
+
+        # Both part and block
+        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+            'file_path': 'a.py',
+            'address': {'qualname': 'foo'},
+            'part': 'body',
+            'block': 1,
+            'new_text': 'x',
+        }}])[0]
+        t.expect('scope_conflict when both part and block',
+                 r.status == 'error' and r.error_code == 'scope_conflict',
+                 f'{r.status}/{r.error_code}')
+
+        # block= works through replace_unit
+        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+            'file_path': 'a.py',
+            'address': {'qualname': 'foo'},
+            'block': 1,
+            'new_text': 'return 42',
+        }}])[0]
+        t.expect('replace_unit(block=1) works', r.status == 'ok', r.message)
+        body = (root / 'a.py').read_text(encoding='utf-8')
+        t.expect('block replaced', 'return 42' in body and 'return 1' not in body)
+
+        # block= with empty new_text = delete that block
+        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+            'file_path': 'a.py',
+            'address': {'qualname': 'foo'},
+            'block': 1,
+            'new_text': '',
+        }}])[0]
+        t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',
+                 f'{r.status}/{r.error_code}')
+        body = (r.status == 'ok') and (root / 'a.py').read_text(encoding='utf-8')
+        t.expect('block gone', 'return 42' not in body)
+
     # --- section_title resolution ---
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -169,6 +219,7 @@ def main():
         r = _run(root, [{'action': 'replace_unit', 'arguments': {
             'file_path': 'a.py',
             'address': {'qualname': 'foo'},
+            'part': 'all',
             'new_text': '',
         }}])[0]
         t.expect('empty part=all rejected with dedicated code',

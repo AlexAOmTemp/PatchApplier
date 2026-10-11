@@ -1,5 +1,5 @@
 """Tests for the unit model tools: read_unit, list_units, set_annotation,
-replace_unit, replace_block, delete_block, insert_block.
+replace_unit (with part / block), insert_block.
 
 Covers Python, markdown, and Luau. Uses a temp project; exercises the
 model end to end via Session.apply_patches so path policy applies as in
@@ -195,7 +195,7 @@ def main():
 
             # --- replace_block ---
             print("== replace_block: single ===")
-            r = run("replace_block", file_path="a.py",
+            r = run("replace_unit", file_path="a.py",
                     address={"qualname": "Widget.fetch"},
                     block=3, new_text="return 42")
             t.expect("ok", r.status == "ok", r.message)
@@ -203,7 +203,7 @@ def main():
             t.expect("new return", "return 42" in after)
 
             print("== replace_block: range deletes ===")
-            r = run("replace_block", file_path="a.py",
+            r = run("replace_unit", file_path="a.py",
                     address={"qualname": "Widget.fetch"},
                     block="1-2", new_text="")
             t.expect("ok", r.status == "ok", r.message)
@@ -213,7 +213,7 @@ def main():
             t.expect("return 42 kept", "return 42" in after)
 
             print("== replace_block: bad range ===")
-            r = run("replace_block", file_path="a.py",
+            r = run("replace_unit", file_path="a.py",
                     address={"qualname": "Widget.fetch"},
                     block="1,3", new_text="x")
             t.expect("error", r.status == "error")
@@ -224,8 +224,8 @@ def main():
             (root / "b.py").write_text(
                 "def f():\n    a = 1\n    b = 2\n    return a + b\n",
                 encoding="utf-8")
-            r = run("delete_block", file_path="b.py",
-                    address={"qualname": "f"}, block=1)
+            r = run("replace_unit", file_path="b.py",
+                    address={"qualname": "f"}, block=1, new_text="")
             t.expect("ok", r.status == "ok", r.message)
             after = (root / "b.py").read_text(encoding="utf-8")
             t.expect("a=1 gone", "a = 1" not in after)
@@ -275,14 +275,14 @@ def main():
 
             # --- lua: not_applicable for block ops ---
             print("== Luau: replace_block not_applicable ===")
-            r = run("replace_block", file_path="m.lua",
+            r = run("replace_unit", file_path="m.lua",
                     address={"qualname": "M.add"}, block=1, new_text="x")
             t.expect("error", r.status == "error")
             t.expect("not_applicable", r.error_code == "not_applicable", r.error_code)
 
             # --- syntax error recovery ---
             print("== replace_block: result_syntax_error ===")
-            r = run("replace_block", file_path="c.py",
+            r = run("replace_unit", file_path="c.py",
                     address={"qualname": "f"}, block=1, new_text="def bad(:")
             t.expect("error", r.status == "error")
             t.expect("result_syntax_error",
