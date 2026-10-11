@@ -43,7 +43,7 @@ This file describes the **toolkit**. Three blocks follow, in this order:
 
 **If Roblox mode is off** — read this document only; no addenda will follow.
 
-**Tool priority.** Always prefer **unified toolkit tools** — the unit model (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`); call graph and module search (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); text escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); indexes and execution (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). They are covered by path policy, logged, pass verify-after-write, and **handle backend quirks themselves** — including known bridge bugs: the toolkit hides those inside, you never work around them by hand.
+**Tool priority.** Always prefer **unified toolkit tools** — the unit model (`list_units`, `read_unit`, `replace_unit`, `insert_block`, `set_annotation`); call graph and module search (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); text escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); indexes and execution (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). They are covered by path policy, logged, pass verify-after-write, and **handle backend quirks themselves** — including known bridge bugs: the toolkit hides those inside, you never work around them by hand.
 
 **Native MCP bridge tools** (`multi_edit`, `execute_luau`, `script_read`, `search_game_tree`, `insert_asset`, `generate_mesh`, `inspect_instance`, `http_get`, ...) are for cases **where no unified tool exists** for the operation. That covers:
 
@@ -53,7 +53,7 @@ This file describes the **toolkit**. Three blocks follow, in this order:
 
 If a unified tool solves the task — **do not** switch to a native one, even if the native looks simpler. "Simpler" here means "no policy, no verify, no log".
 
-**Example of the conflict.** `MCPBridgeRules.md` §5 says: "edits to existing `Script.Source` go through `execute_luau` + `string.gsub`". That rule applies to **native** calls. Unified `replace_unit` / `replace_block` do exactly that internally — you do not write gsub by hand. The toolkit wins: use `replace_unit` / `replace_block`; `execute_luau`+gsub only for a chunk of `.Source` with no structural tool of its own.
+**Example of the conflict.** `MCPBridgeRules.md` §5 says: "edits to existing `Script.Source` go through `execute_luau` + `string.gsub`". That rule applies to **native** calls. Unified `replace_unit` does exactly that internally — you do not write gsub by hand. The toolkit wins: use `replace_unit`; `execute_luau`+gsub only for a chunk of `.Source` with no structural tool of its own.
 
 **The schemas live in different places.** Unified tools are listed in this document (§Available actions). Native tools are in `tools_schema.json`, attached to the starter text when the user enabled `mcp.native_tools.enabled`. If the gate is off, a native call returns `error_code="native_tools_disabled"` — that is a gate, not an error.
 
@@ -185,7 +185,7 @@ The tools `replace_range` (by line numbers) and `replace_in_file` (by text) exis
 - **`replace_range`** — line numbers shift after any previous edit. Several `replace_range` calls on the same file in one patch easily delete the wrong block. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**.
 - **`replace_in_file`** — fails on whitespace, indentation, invisible characters; the same string may appear in several places, `occurrence` helps but is not always enough. A separate pitfall is escapes: `\u0413` in JSON and the character `Г` in the source produce the same text, but `replace_in_file` matches **file bytes**, and `\u0413` is not there.
 
-For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Address by qualname (Python/Lua) or `section_number` / `section_title` (md); parts `head` / `annotation` / `body`; blocks inside body. These tools recompute positions from the AST or the document structure and are independent of prior edits.
+For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `insert_block` / `set_annotation`. Address by `qualname` (single key across formats: `Foo.bar`, `3`, `Format`, `<module>`) or `title_match` (substring matcher on a section's title). Parts `head` / `annotation` / `body`; blocks inside body via `block`. These tools recompute positions from the AST or the document structure and are independent of prior edits.
 
 **Text escape hatch** (`replace_between`, `replace_in_file`, `insert_at_anchor`, `replace_range`) — only for what the unit model does not address: comments between units, individual lines inside a statement, files without a parser, fenced blocks inside md.
 
@@ -292,7 +292,7 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 **Model.** A file is a tree of **units**. A unit is a named entity:
 
 - **kind**: `module` / `function` / `method` / `class` / `section`.
-- **address** (JSON): `{"qualname": "Foo.bar"}` — Python/Lua; `{"section_number": "3.1"}` or `{"section_title": "Format"}` — markdown; `{"qualname": "<module>"}` — module.
+- **address** (JSON): one key — `qualname`. Python/Lua: `{"qualname": "Foo.bar"}`. Markdown: `{"qualname": "3"}` for a numbered section, `{"qualname": "Format"}` for a bare one (qualname = full title). Module: `{"qualname": "<module>"}`. Plus a matcher `{"title_match": "Format"}` — substring in a section's title (search, not address). Legacy aliases `section_number` → `qualname`, `section_title` → `title_match` are accepted but not to be used in new patches.
 - **three parts**: `head` — the declaration (`def f():`, `class C:`, `function f(x)`, `## 3.1 Title`); `annotation` — a short description right after head (docstring `"""..."""`, `--[[ ]]` / `---` in Lua, `<!-- summary: ... -->` in md; may be absent); `body` — everything after head and annotation.
 - **blocks** — numbered elements inside body: statements in a function, methods/attributes in a class, subsections in a section. `block=3`, range `"1-10"`, list `[1,3,7]`.
 
@@ -309,14 +309,13 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 | `list_units` | `file_path` — map of units: qualname + kind + L-range + block count |
 | `read_unit` | `file_path`, `address` (JSON); optional `part`, `block`. Text. Block range — with `=== block N ===` markers |
 | `replace_unit` | `file_path`, `address`, `new_text`; optional `part` (`all` default — replace entirely; `"body"` — body only, head and annotation preserved) |
-| `replace_block` | `file_path`, `address`, `block` (int / `"1-4"` / list), `new_text`. Contiguous range; a gap → `bad_block_range`. Empty `new_text` = delete. Comment above the block is preserved |
-| `delete_block` | same as `replace_block` with empty `new_text` |
+_(replaced by `replace_unit` with `block=` — see above)_
 | `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — block number or qualname of a child unit (required for `before`/`after`) |
 | `set_annotation` | `file_path`, `address`, `text` — replace annotation. **Only if it already exists** (otherwise `no_annotation`). Form is chosen by the tool |
 
 **Write tools.** After the write the source is parsed again; if the new text breaks parsing or loses the unit — `result_syntax_error` / `result_missing_symbol`, file **untouched**. First-line indent and EOL (`\n` vs `\r\n`) are preserved.
 
-**Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_block` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part="body"`. `insert_block position="end"` inserts before `return M` when present.
+**Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_unit(block=...)` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part="body"`. `insert_block position="end"` inserts before `return M` when present.
 
 **Lua in both modes.** Rojo-mode: the path is an ordinary file path (`.luau`), the extension is detected as for `.py`. MCP-mode: the path is `Service.X.Y` without an extension; `.Source` is Luau. The tool detects MCP paths itself (via `is_mcp_path`); a single adapter (`adapter_lua`) serves both modes. `list_units` / `read_unit` behave identically in either mode.
 
@@ -446,7 +445,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 | Read a section / file | `read_file` / `read_unit` |
 | Replace a function body | `replace_unit part="body"` |
 | Replace only a section's own text | `replace_unit part="own_body"` |
-| Delete a method from a class | `delete_block` |
+| Delete a method from a class | `replace_unit(block=N, new_text="")` |
 | Insert a statement into a function | `insert_block` |
 | Find a unit by name | `find_symbol` |
 | Who calls X | `symbol_graph qualname="X"` |
@@ -484,7 +483,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 **Edit a unit:**
 1. `read_unit` — see the current state.
 2. `replace_unit` — replace the whole unit (`part=all`) or only a part (`part="body"` keeps head and annotation).
-3. `replace_block` — replace a block or a range in body. Empty `new_text` deletes (or use `delete_block`).
+3. `replace_unit(block=N)` — replace a block or a range in body. Empty `new_text` deletes.
 4. `insert_block` — insert a block at `start` / `end` / `before anchor` / `after anchor`.
 5. `set_annotation` — replace docstring / summary. **Only if the annotation already exists** — creating one from scratch is not supported.
 
@@ -539,7 +538,9 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - `bad_occurrence` — `occurrence` is not an integer.
 - `bad_part` — `part` is not one of `all|head|annotation|body`.
 - `bad_block` — the `block` string did not parse (`block="abc"`).
-- `bad_block_range` — `replace_block` / `delete_block` received non-adjacent blocks (`"1,3"`); only a contiguous range is allowed.
+- `bad_block_range` — `replace_unit(block=...)` received non-adjacent blocks (`"1,3"`); only a contiguous range is allowed.
+- `scope_required` — `replace_unit` without `part` or `block`. Pass exactly one.
+- `scope_conflict` — `replace_unit` with both `part` and `block`. Pass exactly one.
 - `ambiguous_input` — `run_python`: both or neither of `script`/`module`.
 
 **Parsing:**
@@ -596,11 +597,11 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 ## 14. What not to do
 
 - **Do not use `replace_in_file` for multi-line replacements.** Even 2–3 lines of context easily miss on whitespace, invisible characters, or escapes. For block edits, use `replace_between` — two short anchors instead of a long `search`.
-- **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.
+- **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `insert_block`, `set_annotation`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.
 - **Do not use `replace_range` more than once per file per patch.** Line numbers shift between actions.
 - **Do not confuse `part` and `block`.** `part` is `head` / `annotation` / `body` (the unit's three parts). `block` is a numbered element **inside** body. They cannot be combined: `part`+`block` in one call is an error.
 - **Do not try to write an annotation where none exists.** `set_annotation` only **replaces an existing one**. If absent — `no_annotation`. To create one — `replace_unit part="body"` (insert by hand) or `insert_block`.
-- **Do not use `replace_block` for a non-contiguous range.** `"1,3"` → `bad_block_range`. Only contiguous (`"1-3"`). For gaps — several calls.
+- **Do not use `replace_unit(block=...)` for a non-contiguous range.** `"1,3"` → `bad_block_range`. Only contiguous (`"1-3"`). For gaps — several calls.
 - **Do not stack diffs from memory.** If the version gap is more than 1–2, re-read `get_index`.
 - **Do not build call chains through a series of `read_unit`.** If you need "who calls X" or "what X calls" — `symbol_graph qualname="X"` in a single call.
 - **Do not ignore `⚠ stale`.** Before editing a section, refresh the annotation via `set_annotation`.

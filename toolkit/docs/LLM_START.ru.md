@@ -45,7 +45,7 @@
 
 **Если Roblox-режим не включён** — читаешь только этот документ; дополнений ниже не будет.
 
-**Приоритет инструментов.** Всегда предпочитай **унифицированные инструменты утилиты** — unit-модель (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`); граф и модульный поиск (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); текстовый escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); индексы и исполнение (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). Они покрыты path-политикой, логируются, проходят verify-after-write и **сами обрабатывают особенности backend'а** — включая известные проблемы моста: утилита прячет их внутри себя, тебе не нужно обходить их руками.
+**Приоритет инструментов.** Всегда предпочитай **унифицированные инструменты утилиты** — unit-модель (`list_units`, `read_unit`, `replace_unit`, `insert_block`, `set_annotation`); граф и модульный поиск (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); текстовый escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); индексы и исполнение (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). Они покрыты path-политикой, логируются, проходят verify-after-write и **сами обрабатывают особенности backend'а** — включая известные проблемы моста: утилита прячет их внутри себя, тебе не нужно обходить их руками.
 
 **Нативные инструменты MCP-моста** (`multi_edit`, `execute_luau`, `script_read`, `search_game_tree`, `insert_asset`, `generate_mesh`, `inspect_instance`, `http_get`, ...) — **только когда нет унифицированного инструмента** для нужной операции. Это относится к:
 
@@ -55,7 +55,7 @@
 
 Если задача решается унифицированным тулом — **не переключайся** на нативный, даже если тот кажется проще. «Проще» здесь означает «без политики, без verify, без лога».
 
-**Пример конфликта.** `MCPBridgeRules.md` §5 говорит: «правки существующих `Script.Source` делай через `execute_luau` + `string.gsub`». Это правило для **нативных** вызовов. Унифицированные `replace_unit` / `replace_block` делают то же самое внутри себя — тебе не нужно писать gsub вручную. Приоритет у утилиты: используй `replace_unit` / `replace_block`; `execute_luau`+gsub только если правишь произвольный фрагмент `.Source`, для которого нет структурного тула.
+**Пример конфликта.** `MCPBridgeRules.md` §5 говорит: «правки существующих `Script.Source` делай через `execute_luau` + `string.gsub`». Это правило для **нативных** вызовов. Унифицированный `replace_unit` делает то же самое внутри себя — тебе не нужно писать gsub вручную. Приоритет у утилиты: используй `replace_unit`; `execute_luau`+gsub только если правишь произвольный фрагмент `.Source`, для которого нет структурного тула.
 
 **Схемы разделены.** Схема унифицированных инструментов — таблицы в этом документе (§Действия, доступные тебе). Схема нативных — `tools_schema.json`, приложенная в стартовом тексте ниже, если пользователь включил `mcp.native_tools.enabled`. Если гейт выключен, вызов нативного инструмента вернёт `error_code="native_tools_disabled"` — это не ошибка, а гейт.
 
@@ -187,7 +187,7 @@
 - **`replace_range`** — номера строк смещаются после любой предыдущей правки. В одном патче несколько `replace_range` по одному файлу легко приводят к тому, что удаляется не тот блок, что задумывался. Дополнительная защита — параметр `expected_first_line`: если текст на `start_line` не совпадает, патч падает с `content_mismatch`, и **файл не трогается**.
 - **`replace_in_file`** — падает на пробелах, отступах, невидимых символах; одна и та же строка может встречаться в нескольких местах, `occurrence` помогает, но не всегда. Отдельная беда — эскейпы: `\u0413` в JSON и символ `Г` в исходнике дают один и тот же текст, но `replace_in_file` матчит по **байтам файла**, а `\u0413` там нет.
 
-Для **всех поддерживаемых форматов** (`.py`, `.lua`, `.luau`, `.md`) используй unit-модель: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Адрес — по qualname (Python/Lua) или `section_number` / `section_title` (md); части `head` / `annotation` / `body`; блоки внутри body. Эти тулы сами пересчитывают позиции от AST или структуры документа и не зависят от предыдущих правок.
+Для **всех поддерживаемых форматов** (`.py`, `.lua`, `.luau`, `.md`) используй unit-модель: `read_unit` / `replace_unit` / `insert_block` / `set_annotation`. Адрес — `qualname` (единый ключ для всех форматов: `Foo.bar`, `3`, `Format`, `<module>`) или `title_match` (матчер по подстроке в заголовке секции). Части `head` / `annotation` / `body`; блоки внутри body — через `block`. Эти тулы сами пересчитывают позиции от AST или структуры документа и не зависят от предыдущих правок.
 
 **Текстовый escape hatch** (`replace_between`, `replace_in_file`, `insert_at_anchor`, `replace_range`) — только для того, что unit-модель не адресует: комментарии между unit'ами, отдельные строки внутри statement'а, файлы без парсера, fenced-код внутри md.
 
@@ -294,7 +294,7 @@
 **Модель.** Файл — дерево **unit'ов**. Unit — именованная сущность:
 
 - **kind**: `module` / `function` / `method` / `class` / `section`.
-- **адрес** (JSON): `{"qualname": "Foo.bar"}` — Python/Lua; `{"section_number": "3.1"}` или `{"section_title": "Format"}` — markdown; `{"qualname": "<module>"}` — модуль.
+- **адрес** (JSON): один ключ — `qualname`. Python/Lua: `{"qualname": "Foo.bar"}`. Markdown: `{"qualname": "3"}` для нумерованной секции, `{"qualname": "Format"}` для безномерной (qualname = весь заголовок). Модуль: `{"qualname": "<module>"}`. Плюс матчер `{"title_match": "Format"}` — подстрока в заголовке секции (не адрес, а поиск). Legacy-алиасы `section_number` → `qualname`, `section_title` → `title_match` принимаются, но в новых патчах не использовать.
 - **три части**: `head` — объявление (`def f():`, `class C:`, `function f(x)`, `## 3.1 Title`); `annotation` — описание сразу после head (docstring `"""..."""`, `--[[ ]]` или `---` в Lua, `<!-- summary: ... -->` в md; может отсутствовать); `body` — тело после head и annotation.
 - **blocks** — нумерованные элементы внутри body: statements в функции, методы/атрибуты в классе, подсекции в секции. `block=3`, диапазон `"1-10"`, список `[1,3,7]`.
 
@@ -310,15 +310,13 @@
 |---|---|
 | `list_units` | `file_path` — карта unit'ов: qualname + kind + L-range + число блоков |
 | `read_unit` | `file_path`, `address` (JSON); опц. `part`, `block`. Текст. Диапазон блоков — с метками `=== block N ===` |
-| `replace_unit` | `file_path`, `address`, `new_text`; опц. `part` (`all` дефолт — заменить целиком; `"body"` — только тело, head и annotation сохраняются) |
-| `replace_block` | `file_path`, `address`, `block` (число / `"1-4"` / список), `new_text`. Непрерывный диапазон; разрыв → `bad_block_range`. Пустой `new_text` = удалить. Комментарий над блоком сохраняется |
-| `delete_block` | то же, что `replace_block` с пустым `new_text` |
+| `replace_unit` | `file_path`, `address`, `new_text`, **ровно одно из `part` / `block`** (нет дефолта — иначе `scope_required`). `part="all"` — заменить целиком; `part="body"` — только тело, head и annotation сохраняются; `part="own_body"` — тело без подсекций. `block` (число / `"1-4"` / список) — блоки в body; пустой `new_text` с `block` удаляет их; пустой `new_text` с `part` → `empty_input_use_delete_block` |
 | `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — номер блока или qualname дочернего unit'а (обязателен для `before`/`after`) |
 | `set_annotation` | `file_path`, `address`, `text` — заменить annotation. **Только если она уже есть** (иначе `no_annotation`). Форму выбирает тул |
 
 **Write-тулы.** После записи текст **парсится повторно**; если новый текст ломает парсинг или теряет unit — `result_syntax_error` / `result_missing_symbol`, файл **не тронут**. Отступ первой строки и EOL (`\n` vs `\r\n`) сохраняются.
 
-**Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_block` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part="body"`. `insert_block position="end"` вставит перед `return M`, если он есть.
+**Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_unit(block=...)` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part="body"`. `insert_block position="end"` вставит перед `return M`, если он есть.
 
 **Lua в обоих режимах.** Rojo-mode: путь — обычный файловый (`.luau`), расширение определяется как для `.py`. MCP-mode: путь — `Service.X.Y` без расширения, `.Source` — это Luau. Утилита распознаёт MCP-путь сама (через `is_mcp_path`); один адаптер (`adapter_lua`) для обоих режимов. `list_units` / `read_unit` работают одинаково.
 
@@ -448,7 +446,7 @@ Write без объявленных `path_args` (например, `run_python`)
 | Прочитать секцию / файл | `read_file` / `read_unit` |
 | Заменить тело функции | `replace_unit part="body"` |
 | Заменить только «своё» тело секции | `replace_unit part="own_body"` |
-| Удалить метод из класса | `delete_block` |
+| Удалить метод из класса | `replace_unit(block=N, new_text="")` |
 | Вставить statement в функцию | `insert_block` |
 | Найти unit по имени | `find_symbol` |
 | Кто вызывает X | `symbol_graph qualname="X"` |
@@ -486,7 +484,7 @@ Write без объявленных `path_args` (например, `run_python`)
 **Править unit:**
 1. `read_unit` — посмотреть текущее состояние.
 2. `replace_unit` — заменить unit целиком (`part=all`) или только часть (`part="body"` — head и annotation сохраняются).
-3. `replace_block` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить (или `delete_block`).
+3. `replace_unit(block=N)` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить.
 4. `insert_block` — вставить блок в `start` / `end` / `before anchor` / `after anchor`.
 5. `set_annotation` — заменить docstring / summary. **Только если annotation уже есть** — создание с нуля не поддержано.
 
@@ -541,7 +539,9 @@ Write без объявленных `path_args` (например, `run_python`)
 - `bad_occurrence` — `occurrence` не целое.
 - `bad_part` — `part` не из `all|head|annotation|body`.
 - `bad_block` — строка `block` не разобралась (`block="abc"`).
-- `bad_block_range` — `replace_block` / `delete_block` получили несоседние блоки (`"1,3"`); допустим только непрерывный диапазон.
+- `bad_block_range` — `replace_unit(block=...)` получил несоседние блоки (`"1,3"`); допустим только непрерывный диапазон.
+- `scope_required` — `replace_unit` без `part` и без `block`. Передай одно из двух.
+- `scope_conflict` — `replace_unit` с `part` и `block` одновременно. Ровно одно.
 - `ambiguous_input` — `run_python`: оба из `script`/`module` или ни одного.
 
 **Парсинг:**
@@ -598,11 +598,11 @@ Write без объявленных `path_args` (например, `run_python`)
 ## 14. Чего не делать
 
 - **Не использовать `replace_in_file` для многострочных замен.** Даже 2–3 строки контекста легко промахиваются по пробелам, невидимым символам или эскейпам. Для блочных замен есть `replace_between` — два коротких якоря вместо длинного `search`.
-- **Не использовать `replace_range` для правок в поддерживаемых форматах.** Для `.py` / `.lua` / `.md` всегда есть unit-тулы (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) и `replace_between`. `replace_range` уместен только для module-level top region и файлов без парсера. Если всё же нужен — передавай `expected_first_line`.
+- **Не использовать `replace_range` для правок в поддерживаемых форматах.** Для `.py` / `.lua` / `.md` всегда есть unit-тулы (`replace_unit`, `insert_block`, `set_annotation`) и `replace_between`. `replace_range` уместен только для module-level top region и файлов без парсера. Если всё же нужен — передавай `expected_first_line`.
 - **Не использовать `replace_range` больше одного раза на файл за патч.** Номера строк сдвигаются между действиями.
 - **Не путать `part` и `block`.** `part` — `head` / `annotation` / `body` (три части unit'а). `block` — нумерованный элемент **внутри** body. Вместе не используются: `part`+`block` в одном вызове → ошибка.
 - **Не пытаться записать annotation там, где её нет.** `set_annotation` работает **только на замену существующей**. Если annotation отсутствует — `no_annotation`. Создание с нуля — через `replace_unit part="body"` (вставить руками) или `insert_block`.
-- **Не использовать `replace_block` для разрывного диапазона.** `"1,3"` → `bad_block_range`. Только непрерывный (`"1-3"`). Разрывные — несколькими вызовами.
+- **Не использовать `replace_unit(block=...)` для разрывного диапазона.** `"1,3"` → `bad_block_range`. Только непрерывный (`"1-3"`). Разрывные — несколькими вызовами.
 - **Не складывать diff'ы из памяти.** Если разрыв версий больше 1–2 — перечитай `get_index`.
 - **Не строить цепочки вызовов через серию `read_unit`.** Если нужно «кто зовёт X» или «что зовёт X» — `symbol_graph qualname="X"` одним вызовом.
 - **Не игнорировать `⚠ stale`.** Перед правкой секции — актуализируй annotation через `set_annotation`.

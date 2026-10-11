@@ -1,225 +1,202 @@
-[rename-call] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 5 вхожд. (все) — +0 стр., -5 Б
+[r1] ✓ grep: Найдено 65 совпадений:
+toolkit/docs/DECISIONS.md:31: 20. **Копирование — отдельные тулы.** `copy_file` (байтовая копия) и `copy_unit` (структурная единица: секция `.md` или символ `.py`/`.lua`). Оба **не трогают source** — в этом их отличие от `move_file`/`move_symbol`. `copy_unit` — первый опыт унификации: тип единицы определяется ключом в `selector` (`section_number` / `section_title` / `qualname`), а не отдельным тулом. Если схема приживётся — кандидат на объединение `replace_section` / `replace_symbol` под общим `replace_unit`. `copy_file` работает на любых файлах (бинарники тоже); `copy_unit` — только на текстовых (markdown / Python / Lua), потому что ему нужен структурный парсер.
+toolkit/docs/DECISIONS.md:106: <!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7. -->
+toolkit/docs/DECISIONS.md:118: - **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес: `{qualname}`, `{section_number}`, `{section_title}`, `{qualname: "<module>"}`.
+toolkit/docs/DECISIONS.md:134: - `replace_block` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python) и структурные случаи `replace_between`. Кросс-форматно.
+toolkit/docs/DECISIONS.md:136: - `delete_block` — удаление блоков по индексу или диапазону. Заменяет `delete_symbol`.
+toolkit/docs/DECISIONS.md:142: **Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `delete_block` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.
+toolkit/docs/LLM_START.en.md:46: **Tool priority.** Always prefer **unified toolkit tools** — the unit model (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`); call graph and module search (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); text escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); indexes and execution (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). They are covered by path policy, logged, pass verify-after-write, and **handle backend quirks themselves** — including known bridge bugs: the toolkit hides those inside, you never work around them by hand.
+toolkit/docs/LLM_START.en.md:56: **Example of the conflict.** `MCPBridgeRules.md` §5 says: "edits to existing `Script.Source` go through `execute_luau` + `string.gsub`". That rule applies to **native** calls. Unified `replace_unit` / `replace_block` do exactly that internally — you do not write gsub by hand. The toolkit wins: use `replace_unit` / `replace_block`; `execute_luau`+gsub only for a chunk of `.Source` with no structural tool of its own.
+toolkit/docs/LLM_START.en.md:188: For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Address by qualname (Python/Lua) or `section_number` / `section_title` (md); parts `head` / `annotation` / `body`; blocks inside body. These tools recompute positions from the AST or the document structure and are independent of prior edits.
+toolkit/docs/LLM_START.en.md:212: | `read_file` | `file_path` + one of: `section_number` (`"4"`, `"4.1"`), `section_title` (substring), `start_line`+`end_line`; otherwise the whole file. Optional `numbered` (default `true`), `escape` (default `perline`), `max_bytes`. Legacy `raw` (`repr`/`text`/`numbered`) is accepted |
+toolkit/docs/LLM_START.en.md:221: `read_file` with no arguments reads the whole file — only for small ones. For a section inside a multi-file index use `section_number` (numbers are more reliable than titles: titles can repeat).
+toolkit/docs/LLM_START.en.md:295: - **address** (JSON): `{"qualname": "Foo.bar"}` — Python/Lua; `{"section_number": "3.1"}` or `{"section_title": "Format"}` — markdown; `{"qualname": "<module>"}` — module.
+toolkit/docs/LLM_START.en.md:312: | `replace_block` | `file_path`, `address`, `block` (int / `"1-4"` / list), `new_text`. Contiguous range; a gap → `bad_block_range`. Empty `new_text` = delete. Comment above the block is preserved |
+toolkit/docs/LLM_START.en.md:313: | `delete_block` | same as `replace_block` with empty `new_text` |
+toolkit/docs/LLM_START.en.md:319: **Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_block` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part="body"`. `insert_block position="end"` inserts before `return M` when present.
+toolkit/docs/LLM_START.en.md:449: | Delete a method from a class | `delete_block` |
+toolkit/docs/LLM_START.en.md:463: 2. `read_file section_number="N"` — precisely.
+toolkit/docs/LLM_START.en.md:467: 1. `read_file section_number="N"` — read the section.
+toolkit/docs/LLM_START.en.md:487: 3. `replace_block` — replace a block or a range in body. Empty `new_text` deletes (or use `delete_block`).
+toolkit/docs/LLM_START.en.md:542: - `bad_block_range` — `replace_block` / `delete_block` received non-adjacent blocks (`"1,3"`); only a contiguous range is allowed.
+toolkit/docs/LLM_START.en.md:585: - `bad_selector` — `copy_unit`: `selector` is not a dict or does not have exactly one of `section_number` / `section_title` / `qualname`.
+toolkit/docs/LLM_START.en.md:599: - **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.
+toolkit/docs/LLM_START.en.md:603: - **Do not use `replace_block` for a non-contiguous range.** `"1,3"` → `bad_block_range`. Only contiguous (`"1-3"`). For gaps — several calls.
+toolkit/docs/LLM_START.en.md:627:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.en.md:632:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.en.md:638:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.en.md:667: [{"id": "repl", "action": "replace_block",
+toolkit/docs/LLM_START.en.md:674: `block=3` is the third top-level statement. For several edits, replace a range (`block="3-5"`) or the **whole body** via `replace_unit part="body"` (one call instead of several `replace_block` with index shifts in between).
+toolkit/docs/LLM_START.en.md:692: [{"id": "del", "action": "delete_block",
+toolkit/docs/LLM_START.ru.md:48: **Приоритет инструментов.** Всегда предпочитай **унифицированные инструменты утилиты** — unit-модель (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`); граф и модульный поиск (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); текстовый escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); индексы и исполнение (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). Они покрыты path-политикой, логируются, проходят verify-after-write и **сами обрабатывают особенности backend'а** — включая известные проблемы моста: утилита прячет их внутри себя, тебе не нужно обходить их руками.
+toolkit/docs/LLM_START.ru.md:58: **Пример конфликта.** `MCPBridgeRules.md` §5 говорит: «правки существующих `Script.Source` делай через `execute_luau` + `string.gsub`». Это правило для **нативных** вызовов. Унифицированные `replace_unit` / `replace_block` делают то же самое внутри себя — тебе не нужно писать gsub вручную. Приоритет у утилиты: используй `replace_unit` / `replace_block`; `execute_luau`+gsub только если правишь произвольный фрагмент `.Source`, для которого нет структурного тула.
+toolkit/docs/LLM_START.ru.md:190: Для **всех поддерживаемых форматов** (`.py`, `.lua`, `.luau`, `.md`) используй unit-модель: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Адрес — по qualname (Python/Lua) или `section_number` / `section_title` (md); части `head` / `annotation` / `body`; блоки внутри body. Эти тулы сами пересчитывают позиции от AST или структуры документа и не зависят от предыдущих правок.
+toolkit/docs/LLM_START.ru.md:214: | `read_file` | `file_path` + одно из: `section_number` (`"4"`, `"4.1"`), `section_title` (подстрока), `start_line`+`end_line`; иначе весь файл. Опц. `numbered` (дефолт `true`), `escape` (дефолт `perline`), `max_bytes`. Legacy `raw` (`repr`/`text`/`numbered`) принимается |
+toolkit/docs/LLM_START.ru.md:223: `read_file` без параметров читает файл целиком — только для маленьких. Для секции в многофайловом индексе используй `section_number` (номер надёжнее заголовка: заголовки могут повторяться).
+toolkit/docs/LLM_START.ru.md:297: - **адрес** (JSON): `{"qualname": "Foo.bar"}` — Python/Lua; `{"section_number": "3.1"}` или `{"section_title": "Format"}` — markdown; `{"qualname": "<module>"}` — модуль.
+toolkit/docs/LLM_START.ru.md:314: | `replace_block` | `file_path`, `address`, `block` (число / `"1-4"` / список), `new_text`. Непрерывный диапазон; разрыв → `bad_block_range`. Пустой `new_text` = удалить. Комментарий над блоком сохраняется |
+toolkit/docs/LLM_START.ru.md:315: | `delete_block` | то же, что `replace_block` с пустым `new_text` |
+toolkit/docs/LLM_START.ru.md:321: **Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_block` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part="body"`. `insert_block position="end"` вставит перед `return M`, если он есть.
+toolkit/docs/LLM_START.ru.md:451: | Удалить метод из класса | `delete_block` |
+toolkit/docs/LLM_START.ru.md:465: 2. `read_file section_number="N"` — точечно.
+toolkit/docs/LLM_START.ru.md:469: 1. `read_file section_number="N"` — прочитай секцию.
+toolkit/docs/LLM_START.ru.md:489: 3. `replace_block` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить (или `delete_block`).
+toolkit/docs/LLM_START.ru.md:544: - `bad_block_range` — `replace_block` / `delete_block` получили несоседние блоки (`"1,3"`); допустим только непрерывный диапазон.
+toolkit/docs/LLM_START.ru.md:587: - `bad_selector` — `copy_unit`: `selector` не dict или содержит не ровно один ключ из `section_number` / `section_title` / `qualname`.
+toolkit/docs/LLM_START.ru.md:601: - **Не использовать `replace_range` для правок в поддерживаемых форматах.** Для `.py` / `.lua` / `.md` всегда есть unit-тулы (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) и `replace_between`. `replace_range` уместен только для module-level top region и файлов без парсера. Если всё же нужен — передавай `expected_first_line`.
+toolkit/docs/LLM_START.ru.md:605: - **Не использовать `replace_block` для разрывного диапазона.** `"1,3"` → `bad_block_range`. Только непрерывный (`"1-3"`). Разрывные — несколькими вызовами.
+toolkit/docs/LLM_START.ru.md:629:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.ru.md:634:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.ru.md:640:                 "address": {"section_number": "3"},
+toolkit/docs/LLM_START.ru.md:669: [{"id": "repl", "action": "replace_block",
+toolkit/docs/LLM_START.ru.md:676: `block=3` — третий top-level statement. Если правок несколько — заменяй диапазон (`block="3-5"`) или **всё тело** через `replace_unit part="body"` (один вызов вместо нескольких `replace_block` с пересчётом номеров после каждой правки).
+toolkit/docs/LLM_START.ru.md:694: [{"id": "del", "action": "delete_block",
+toolkit/docs/SESSION_STATE.md:31: - ✅ P3: `replace_unit` с пустым `new_text` → `empty_input_use_delete_block`.
+toolkit/docs/SESSION_STATE.md:49: - `Unit.title` — новое поле, `section_title` матчит человеческий текст заголовка (не номер). `not_found` в unit-тулах возвращает `Did you mean: ...` top-5 + хинт `list_units`.
+toolkit/docs/TOOL_PRACTICE.md:40: | `replace_block` | Замену метода делал через `replace_between` / `overwrite` — следовало использовать этот |
+toolkit/docs/TOOL_PRACTICE.md:41: | `delete_block` | Удаление метода делал через `replace_between` — следовало использовать этот |
+toolkit/docs/TOOL_PRACTICE.md:52: **Главный вывод по неиспользованным:** unit-write тулы (`replace_block` / `delete_block` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка.
+toolkit/docs/TOOL_PRACTICE.md:71: read_unit(qualname="Class.method")  →  list_units(file)  →  delete_block(address=Class, block=N)
+toolkit/docs/TOOL_PRACTICE.md:74: **Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `delete_block` был бы одним вызовом.
+toolkit/docs/TOOL_PRACTICE.md:76: **Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `delete_block` его сохранит (block исключает комментарий сверху).
+toolkit/docs/TOOL_PRACTICE.md:270: **Мораль:** это **фича** (защита), но неочевидная. Для удаления — `delete_block` (метод как блок в классе) или `replace_between`.
+toolkit/docs/TOOL_PRACTICE.md:274: ### Unit-write тулы (`replace_block`, `delete_block`, `insert_block`)
+toolkit/docs/TOOL_PRACTICE.md:276: Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `delete_block(Class, block=N)` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.
+toolkit/docs/TOOL_PRACTICE.md:347: Реализовано: `empty_input_use_delete_block` в `writer.replace_unit` для `part=all` + пустой текст. Сообщение: «replace_unit does not delete a unit».
+toolkit/docs/TOOL_PRACTICE.md:361: 1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `delete_block`.
 
-[rename-del] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+[r2] ✓ grep: Найдено 1 совпадений:
+toolkit/code/manual/unit_proto/MODEL.md:206: AST видит только `foo(x)`, а `# ...` — вне unit'а. `replace_block(..., block=1)` заменит `foo(x)` и **комментарий потеряет**.
 
-[delete-call] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., +13 Б
+[r3] ✓ read_file: toolkit/docs/LLM_START.ru.md [### Unit-операции: единая модель для `.py` / `.lua` / `.md` (приоритетно)]
+292: '### Unit-операции: единая модель для `.py` / `.lua` / `.md` (приоритетно)\r\n'
+293: '\r\n'
+294: "**Модель.** Файл — дерево **unit'ов**. Unit — именованная сущность:\r\n"
+295: '\r\n'
+296: '- **kind**: `module` / `function` / `method` / `class` / `section`.\r\n'
+297: '- **адрес** (JSON): `{"qualname": "Foo.bar"}` — Python/Lua; `{"section_number": "3.1"}` или `{"section_title": "Format"}` — markdown; `{"qualname": "<module>"}` — модуль.\r\n'
+298: '- **три части**: `head` — объявление (`def f():`, `class C:`, `function f(x)`, `## 3.1 Title`); `annotation` — описание сразу после head (docstring `"""..."""`, `--[[ ]]` или `---` в Lua, `<!-- summary: ... -->` в md; может отсутствовать); `body` — тело после head и annotation.\r\n'
+299: '- **blocks** — нумерованные элементы внутри body: statements в функции, методы/атрибуты в классе, подсекции в секции. `block=3`, диапазон `"1-10"`, список `[1,3,7]`.\r\n'
+300: '\r\n'
+301: '**Декораторы (Python).** Голова функции/класса **включает** строки `@decorator`. Голова модуля — нет: декоратор первого def/class принадлежит его блоку. Асимметрия намеренная, см. MODEL.md §2.\r\n'
+302: '\r\n'
+303: '**Модуль:** head до **первого** def/class/function; всё от него — body (глобал между классами — блок в body, не head).\r\n'
+304: '\r\n'
+305: "**Модель работает одинаково для `.py`, `.lua`, `.luau`, `.md`.** Физическое расположение annotation (AST / комментарий / HTML) — забота тула. **Комментарии между unit'ами, отдельные строки, содержимое fenced-кода в md** — не адресуются, для них текстовые тулы ниже. Если unit без docstring — `part=annotation` вернёт пусто (не ошибка).\r\n"
+306: '\r\n'
+307: '**`part`** — строка или список (`"head"`, `"head,annotation"`, `["head","body"]`), канонический порядок `head → annotation → body`. У секций markdown есть ещё `own_body` — тело без подсекций (вид на `body`, не четвёртая часть): для секции с `###`-детьми это её собственный текст до первой подсекции; для функции и модуля совпадает с `body`. **`block`** — только в body (`not_applicable` иначе). `part` и `block` вместе не используются. При неоднозначности — `occurrence=N` (иначе `ambiguous_symbol`).\r\n'
+308: '\r\n'
+309: '| Действие | Аргументы |\r\n'
+310: '|---|---|\r\n'
+311: "| `list_units` | `file_path` — карта unit'ов: qualname + kind + L-range + число блоков |\r\n"
+312: '| `read_unit` | `file_path`, `address` (JSON); опц. `part`, `block`. Текст. Диапазон блоков — с метками `=== block N ===` |\r\n'
+313: '| `replace_unit` | `file_path`, `address`, `new_text`; опц. `part` (`all` дефолт — заменить целиком; `"body"` — только тело, head и annotation сохраняются) |\r\n'
+314: '| `replace_block` | `file_path`, `address`, `block` (число / `"1-4"` / список), `new_text`. Непрерывный диапазон; разрыв → `bad_block_range`. Пустой `new_text` = удалить. Комментарий над блоком сохраняется |\r\n'
+315: '| `delete_block` | то же, что `replace_block` с пустым `new_text` |\r\n'
+316: "| `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — номер блока или qualname дочернего unit'а (обязателен для `before`/`after`) |\r\n"
+317: '| `set_annotation` | `file_path`, `address`, `text` — заменить annotation. **Только если она уже есть** (иначе `no_annotation`). Форму выбирает тул |\r\n'
+318: '\r\n'
+319: '**Write-тулы.** После записи текст **парсится повторно**; если новый текст ломает парсинг или теряет unit — `result_syntax_error` / `result_missing_symbol`, файл **не тронут**. Отступ первой строки и EOL (`\\n` vs `\\r\\n`) сохраняются.\r\n'
+320: '\r\n'
+321: '**Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_block` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part="body"`. `insert_block position="end"` вставит перед `return M`, если он есть.\r\n'
+322: '\r\n'
+323: '**Lua в обоих режимах.** Rojo-mode: путь — обычный файловый (`.luau`), расширение определяется как для `.py`. MCP-mode: путь — `Service.X.Y` без расширения, `.Source` — это Luau. Утилита распознаёт MCP-путь сама (через `is_mcp_path`); один адаптер (`adapter_lua`) для обоих режимов. `list_units` / `read_unit` работают одинаково.\r\n'
+324: '\r\n'
 
-[head-comment] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., -9 Б
+[r4] ✓ read_file: toolkit/code/manual/unit_proto/MODEL.md [## 3. Адрес]
+65: '## 3. Адрес\n'
+66: '\n'
+67: 'Адрес — JSON-объект. Три формы:\n'
+68: '\n'
+69: '- `{"qualname": "Foo.bar"}` — Python или Luau. Для вложенных — через точку (`Foo.Inner.method`).\n'
+70: '- `{"section_number": "3.1"}` — markdown, по номеру.\n'
+71: '- `{"section_title": "Format"}` — markdown, по подстроке в заголовке.\n'
+72: '\n'
+73: 'Модуль адресуется как `{"qualname": "<module>"}`.\n'
+74: '\n'
+75: 'При неоднозначности (несколько одноимённых unit\'ов — например, `def f()` в разных местах) добавляется `occurrence`: `{"qualname": "f", "occurrence": 2}` — второй сверху вниз. Без `occurrence` в неоднозначном случае возвращается ошибка `ambiguous`.\n'
+76: '\n'
 
-[strict-empty] ✓ replace_in_file: toolkit/code/toolkit/tests/test_strictness.py: заменено 1 вхожд. (последнее) — +1 стр., +27 Б
+[r5] ✓ read_file: toolkit/code/manual/unit_proto/MODEL.md [## 4. Части (part) и блоки (block)]
+77: '## 4. Части (part) и блоки (block)\n'
+78: '\n'
+79: '### `part`\n'
+80: '\n'
+81: 'Принимает строку или список строк. Одно из:\n'
+82: '\n'
+83: '- `all` (по умолчанию) — весь unit.\n'
+84: '- `head` — только объявление.\n'
+85: '- `annotation` — только описание.\n'
+86: '- `body` — только тело.\n'
+87: '\n'
+88: 'Список возвращает несколько частей. Порядок всегда каноничный: `head → annotation → body` — независимо от порядка в запросе. Если между выбранными частями есть пропуск (например, `part=["head", "body"]` без annotation), пропуск не заполняется — возвращается разрыв.\n'
+89: '\n'
+90: 'Полезные комбинации:\n'
+91: '\n'
+92: '- `part=["head", "annotation"]` — «сигнатура с описанием, без тела».\n'
+93: '- `part=["annotation", "body"]` — «что делает, без сигнатуры».\n'
+94: '- `part=["head", "body"]` — «всё, кроме описания».\n'
+95: '\n'
+96: '### `own_body` — вид на `body`\n'
+97: '\n'
+98: 'Есть ещё одно значение `part`, которого нет в трёхчастном каноне: **`own_body`**.\n'
+99: '\n'
+100: 'Это **не четвёртая часть**, а **вид на `body`** — тело без подсекций. Для\n'
+101: "секции с детьми `###` это текст секции до первой подсекции; для unit'а\n"
+102: 'без подсекций совпадает с `body`. Аналогично, у модуля `own_body` —\n'
+103: 'глобальные определения **между** def/class, если они есть; у функции —\n'
+104: 'её тело (у неё подсекций не бывает).\n'
+105: '\n'
+106: '**Зачем.** `part="body"` у секции включает подсекции. Часто надо заменить\n'
+107: 'именно «свой» текст секции, оставив детей нетронутыми. Без `own_body`\n'
+108: 'приходится вручную считать строки или использовать `replace_between`\n'
+109: 'с якорями.\n'
+110: '\n'
+111: '**Статус.** Синтаксический ярлык. Формально модель предписывает\n'
+112: 'выражать это параметром (`body_scope=own|with_children`) — см. DECISIONS\n'
+113: '§25. До поры оставлено ярлыком; если появится третий вид (например,\n'
+114: '`body` без блоков-атрибутов у класса), переделаем в честный параметр.\n'
+115: '\n'
+116: '### `block`\n'
+117: '\n'
+118: 'Работает **только в body**. В head и annotation блоков нет (голова и описание — цельные сущности). Запрос `block` в head или annotation возвращает `not_applicable`.\n'
+119: '\n'
+120: 'Принимает:\n'
+121: '\n'
+122: '- **целое число** — один блок: `block=3`.\n'
+123: '- **строку-диапазон** — `block="1-10"` (блоки 1..10), `block="1,3,7-9"` (смешанное), `block="5"` (эквивалент `block=5`).\n'
+124: '- **список** — `block=[1, 3, 7]`. Элементы — числа или строки-диапазоны.\n'
+125: '\n'
+126: 'Список и диапазон эквивалентны: `block="1-10"` и `block=[1,2,3,4,5,6,7,8,9,10]` дают один результат.\n'
+127: '\n'
+128: '`block` **применяется к каждому блоку независимо**, если задан `part`. Пример: `block="1-5", part="head"` вернёт сигнатуры первых пяти блоков.\n'
+129: '\n'
+130: '**Метки.** Если в ответе больше одного блока, каждый блок предваряется строкой-меткой:\n'
+131: '\n'
+132: '```\n'
+133: '=== block 1 ===\n'
+134: '<содержимое блока 1>\n'
+135: '\n'
+136: '=== block 3 ===\n'
+137: '<содержимое блока 3>\n'
+138: '```\n'
+139: '\n'
+140: 'При одном блоке метки нет — ответ это просто текст блока. Формат `=== block N ===` выбран так, чтобы не спутаться с номерами строк (которые в `read_unit` не выводятся вообще; для чтения с номерами есть `read_file`).\n'
+141: '\n'
+142: 'Если `part` задан вместе с несколькими блоками и от каждой части что-то есть (например, `part="head", block="1-3"`), метки блоков идут в том же формате, каждая со своим `=== block N ===`.\n'
+143: '\n'
+144: '### Блоки по форматам\n'
+145: '\n'
+146: '- **Python функция/метод** — top-level statements в теле (`ast.FunctionDef.body`).\n'
+147: '- **Python класс** — методы и атрибуты класса по порядку. Метод — unit и блок одновременно.\n'
+148: '- **Python модуль** — top-level def/class/присваивания по порядку. `def foo` — unit и блок. `X = 5` — plain блок.\n'
+149: '- **Luau функция** — statements в теле.\n'
+150: '- **Luau модуль** — top-level statements по порядку (включая финальный `return M` как последний блок).\n'
+151: '- **Markdown секция** — подсекции и абзацы по порядку. Подсекция — unit и блок. Абзац — plain блок.\n'
+152: '\n'
+153: '**Блок может быть вложенным.** Block внутри block — теоретически возможно (`{"qualname": "X", "block": 2, "block": 1}`), на практике редко нужно. Модель допускает, но не поощряет: если дело дошло до вложенных блоков, скорее всего это уже текст, и нужен текстовый тул.\n'
+154: '\n'
+[timing] user (5 actions): 0.01s
 
-[strict-new-tests] ✓ replace_in_file: toolkit/code/toolkit/tests/test_strictness.py: заменено 1 вхожд. (последнее) — +50 стр., +2058 Б
-
-[run-unit] ✓ run_python: exit=0  duration=109ms
---- stdout ---
-== read_unit: Python head ===
-[1] ✓ read_unit: def helper(x: int) -> int:
-
-[OK]   ok
-[OK]   has def helper
-[OK]   no body
-== read_unit: Python annotation ===
-[1] ✓ read_unit:     """A widget."""
-
-[OK]   ok
-[OK]   docstring
-== read_unit: block range ===
-[1] ✓ read_unit: === block 1 ===
-        a = 1
-=== block 2 ===
-        b = 2
-
-[OK]   ok
-[OK]   block marker
-[OK]   has a=1
-[OK]   has b=2
-[OK]   no return
-== read_unit: markdown section ===
-[1] ✓ read_unit: <!-- summary: first section -->
-
-[OK]   ok
-[OK]   summary
-== read_unit: Luau annotation ===
-[1] ✓ read_unit: --- Adds.
-
-[OK]   ok
-[OK]   annotation
-== read_unit: bad part ===
-[1] ✗ read_unit: bad_part: 'nose'
-
-[OK]   error
-[OK]   bad_part
-== read_unit: block out of range ===
-[1] ✗ read_unit: block_out_of_range: 999 (max 1)
-
-[OK]   error
-[OK]   block_out_of_range
-== list_units: Python ===
-[1] ✓ list_units: <module>                                 [module  ] L1-21  blocks=2
-helper                                   [function] L7-9  blocks=1
-Widget                                   [class   ] L12-21  blocks=2
-Widget.render                            [method  ] L15-16  blocks=1
-Widget.fetch                             [method  ] L18-21  blocks=3
-
-[OK]   ok
-[OK]   has helper
-[OK]   has Widget.render
-== set_annotation: replace Python docstring ===
-[1] ✓ set_annotation: a.py: annotation обновлён
-
-[OK]   ok
-[OK]   new doc in file
-[OK]   old doc gone
-== set_annotation: no annotation fails ===
-[1] ✗ set_annotation: no_annotation: Widget.render
-
-[OK]   error
-[OK]   no_annotation
-== set_annotation: markdown summary ===
-[1] ✓ set_annotation: doc.md: annotation обновлён
-
-[OK]   ok
-[OK]   new summary
-== replace_block: single ===
-[1] ✓ replace_unit: a.py: replace_unit применён
-
-[OK]   ok
-[OK]   new return
-== replace_block: range deletes ===
-[1] ✓ replace_unit: a.py: replace_unit применён
-
-[OK]   ok
-[OK]   a=1 gone
-[OK]   b=2 gone
-[OK]   return 42 kept
-== replace_block: bad range ===
-[1] ✗ replace_unit: bad_block_range: blocks 1 and 3 are not adjacent
-
-[OK]   error
-[OK]   bad_block_range
-== delete_block ===
-[1] ✓ replace_unit: b.py: replace_unit применён
-
-[OK]   ok
-[OK]   a=1 gone
-[OK]   b=2 kept
-== insert_block: before anchor ===
-[1] ✓ insert_block: c.py: insert_block применён
-
-[OK]   ok
-[OK]   inserted
-[OK]   order correct
-== insert_block: bad position ===
-[1] ✗ insert_block: bad_position: 'middle'
-
-[OK]   error
-[OK]   bad_position
-== insert_block: anchor_required ===
-[1] ✗ insert_block: anchor_required: before/after need an anchor
-
-[OK]   error
-[OK]   anchor_required
-== replace_unit: body only ===
-[1] ✓ replace_unit: d.py: replace_unit применён
-
-[OK]   ok
-[OK]   new body
-[OK]   old gone
-[OK]   docstring kept
-== Luau: replace_block not_applicable ===
-[1] ✗ replace_unit: not_applicable: this unit has no blocks
-
-[OK]   error
-[OK]   not_applicable
-== replace_block: result_syntax_error ===
-[1] ✗ replace_unit: result_syntax_error: invalid syntax (<unknown>, line 2)
-
-[OK]   error
-[OK]   result_syntax_error
-[OK]   file unchanged
-
-=== 55 ok, 0 failed ===
-
-[run-strict] ✗ run_python: exit=1  duration=100ms
---- stdout ---
-[1] ✗ create_file: Не создаю bad.py: content_syntax_error: invalid syntax (<unknown>, line 1)
-
-[OK]   create .py syntax error rejected
-[OK]   file not created
-[1] ✓ create_file: Файл создан: good.py (1 стр., 6 Б)
-
-[OK]   create .py valid OK
-[1] ✗ create_file: Не создаю bad.json: content_syntax_error: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
-
-[OK]   create .json syntax error rejected
-[1] ✓ create_file: Файл создан: x.md (1 стр., 16 Б)
-
-[OK]   create .md not checked
-[1] ✗ overwrite_file: Не перезаписываю a.py: content_syntax_error: invalid syntax (<unknown>, line 1)
-
-[OK]   overwrite .py syntax error rejected
-[OK]   original preserved
-[1] ✗ replace_unit: scope_required: pass part= or block= (part=all replaces the whole unit; block=N replaces N-th block)
-
-[FAIL] scope_required when no part/block -- error/bad_argument
-[1] ✗ replace_unit: scope_conflict: use part= or block=, not both
-
-[FAIL] scope_conflict when both part and block -- error/bad_argument
-[1] ✓ replace_unit: a.py: replace_unit применён
-
-[OK]   replace_unit(block=1) works
-[OK]   block replaced
-[1] ✗ replace_unit: result_syntax_error: expected an indented block after function definition on line 1 (<unknown>, line 1)
-
-[FAIL] replace_unit(block=, empty) deletes -- error/result_syntax_error
---- stderr ---
-Traceback (most recent call last):
-  File "D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_strictness.py", line 301, in <module>
-    sys.exit(main())
-             ~~~~^^
-  File "D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_strictness.py", line 153, in main
-    t.expect('block gone', 'return 42' not in body)
-                           ^^^^^^^^^^^^^^^^^^^^^^^
-TypeError: argument of type 'bool' is not a container or iterable
-
-[smoke] ✓ run_python: exit=0  duration=73ms
---- stdout ---
-[OK]   toolkit.core
-[OK]   toolkit.core.models
-[OK]   toolkit.core.patcher
-[OK]   toolkit.core.session
-[OK]   toolkit.config
-[OK]   toolkit.config.workspace
-[OK]   toolkit.backends
-[OK]   toolkit.backends.filesystem
-[OK]   toolkit.backends.workspace
-[OK]   toolkit.backends.composite
-[OK]   toolkit.backends.mcp
-[OK]   toolkit.indexers
-[OK]   toolkit.indexers.doc
-[OK]   toolkit.indexers.code
-[OK]   toolkit.tools
-[OK]   toolkit.tools.index
-[OK]   toolkit.tools.status
-[OK]   toolkit.runner.projects
-
-=== all imports OK ===
-
-[commit] ✓ run_python: exit=0  duration=156ms
---- stdout ---
-[add rc=0]
-[commit rc=0]
-[master ffccce7] tests: migrate to replace_unit(block=...), add scope tests
- 6 files changed, 160 insertions(+), 75 deletions(-)
-[timing] user (10 actions): 0.45s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v407] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v456] [~1]
-  ~ toolkit/code/toolkit/tests/test_unit_model.py  (+0 стр., +0.0 KB)
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v282] [без изменений]
-[timing] auto-rebuild (3 actions): 0.78s
-
-##RESULT:{"ok": 12, "errors": 1, "skipped": 0, "failed": [8], "blocked": []}
-[timing] total: 1.23s
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.01s
