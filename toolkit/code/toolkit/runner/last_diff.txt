@@ -1,7 +1,1 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v415] [~2, ⇅10]
-  ~ toolkit/code/manual/unit_proto/MODEL.md §2. Модель (L12–L72, 5.5 KB, ⚠ no summary)
-  ~ toolkit/code/manual/unit_proto/MODEL.md §Module как unit (L43–L72, 2.4 KB, ⚠ no summary)
-
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v464] [без изменений]
-
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v288] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v292] [без изменений]

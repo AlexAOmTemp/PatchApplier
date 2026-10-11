@@ -1,15 +1,16 @@
-[{"id": "not-found", "action": "replace_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/reader.py",
-    "address": {"qualname": "_not_found_message"},
-    "part": "all",
-    "new_text": "def _not_found_message(root: Unit, label: str, query, key: str) -> str:\n    \"\"\"Not-found message with up to 5 closest candidates + kind hint.\n\n    Candidates come from `difflib.get_close_matches`. The point is to\n    give the next guess, not a map — `list_units` is for that.\n\n    Special case: if the file has no sections at all — say so explicitly\n    instead of just listing empty candidates. That is a recurring source\n    of \"why does section_number='2' not work here\".\n    \"\"\"\n    import difflib\n    units = list(_iter_units(root))\n    if key == \"qualname\":\n        pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]\n    else:  # title_match\n        pool = [u.title or u.name for u in units\n                if u.kind == UnitKind.SECTION]\n    q = str(query)\n    parts = [f\"not_found: {label}\"]\n    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)\n    if similar:\n        parts.append(\"  Did you mean: \" + \", \".join(similar))\n    # Extra hint: no sections in the file at all.\n    has_sections = any(u.kind == UnitKind.SECTION for u in units)\n    if not has_sections:\n        parts.append(\"  This file has no sections (markdown headings `## `); \"\n                     \"if it is a .py/.lua file, address by qualname only.\")\n    parts.append(\"  (or list_units for the full map of the file)\")\n    return \"\\n\".join(parts)"}}]
-
-[{"id": "test", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_strictness.py"}}]
-
-[{"id": "smoke", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
-
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["unit: not_found hints about empty sections"]}}]
+                "args": ["commit", "checkpoint: before MVP step 3a (gui refactor)"]}}]
+
+[{"id": "grep-session", "action": "grep",
+  "arguments": {"pattern": "_session|msg_queue|_session_lock|_session_backend_name",
+                "paths": ["toolkit/code/toolkit/runner/gui/app.py"],
+                "fixed_strings": false, "max_results": 50}}]
+
+[{"id": "grep-worker", "action": "grep",
+  "arguments": {"pattern": "^def worker|^def _run_patch|^def _start_session_in_background",
+                "paths": ["toolkit/code/toolkit/runner/gui/app.py"]}}]
+
+[{"id": "read-worker", "action": "read_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+                "address": {"qualname": "worker"}}}]
