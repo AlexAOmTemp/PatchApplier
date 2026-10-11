@@ -235,6 +235,15 @@ def main(argv=None) -> int:
     from toolkit.tools.index import install_index_paths
     install_index_paths(cfg)
 
+    _roots: list[str] = []
+    try:
+        from toolkit.config import loader as _l
+        _ws = _l.load_workspace(cfg)
+        if _ws is not None:
+            _roots = list(_ws.root_names())
+    except Exception:
+        _roots = []
+
     patches: list[dict] = []
     only_patches: list[dict] = []
     parsed = None
@@ -305,6 +314,7 @@ def main(argv=None) -> int:
             "code": cfg.get("code_index_output") or "CODE_INDEX.md",
             "lua":  cfg.get("lua_index_output") or "CODE_INDEX_LUA.md",
         },
+        roots=_roots,
         backends_enabled=_enabled_backends,
     )
 

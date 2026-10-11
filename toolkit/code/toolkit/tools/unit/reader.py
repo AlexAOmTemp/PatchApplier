@@ -124,8 +124,10 @@ def _render_unit(source: str, unit: Unit, parts: list[str], blocks: list[int]) -
 def _own_body_part(unit: Unit):
     """Body range excluding subsections (blocks that carry their own unit).
 
-    Section-only in practice: the section's own prose before the first
-    `###`-child. For a unit without subsection-blocks it equals `body`.
+    A view on `body`, not a fourth part. For a section with `###`-children
+    it is the section's own prose up to (but not including) the first
+    child; for a unit without subsection-blocks it equals `body`.
+    See MODEL.md section 4.
     """
     from .model import Part as _P
     if not unit.body.is_present():
@@ -138,8 +140,6 @@ def _own_body_part(unit: Unit):
     if first_child is None:
         return unit.body
     end = first_child - 1
-    while end >= unit.body.start and not _line_nonblank(unit, end):
-        end -= 1
     if end < unit.body.start:
         return _P()
     return _P(unit.body.start, end)
@@ -175,13 +175,6 @@ def _render_blocks(source: str, unit: Unit, parts: list[str], blocks: list[int])
                         if t:
                             out.append(t)
     return "\n".join(out)
-
-
-def _line_nonblank(unit: Unit, line_no: int) -> bool:
-    """Helper used by _own_body_part — we do not have the source here,
-    so always say True. Trimming of blank lines is done at slice time
-    if needed; this placeholder keeps the interface simple."""
-    return True
 
 
 def _normalize_parts(part) -> list[str]:

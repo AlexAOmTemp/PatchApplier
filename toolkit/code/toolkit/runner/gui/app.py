@@ -879,6 +879,15 @@ def _start_session_in_background():
             else:
                 _backs = {"filesystem"}
             _paths = resolve_index_paths(CONFIG)
+            _roots: list[str] = []
+            try:
+                _proj = CONFIG.get("project_dir", "").strip()
+                if _proj:
+                    _state_sub = _cfg.resolve_state_dir(CONFIG)
+                    _ws = _projects.load_workspace(_proj, _state_sub)
+                    _roots = list(_ws.root_names())
+            except Exception:
+                _roots = []
             GetStatusTool.set_context(
                 project_name=Path(CONFIG.get("project_dir", "")).name,
                 backend=name,
@@ -893,6 +902,7 @@ def _start_session_in_background():
                     "code": _paths["code"],
                     "lua":  _paths["lua"],
                 },
+                roots=_roots,
                 backends_enabled=_backs,
             )
             s = Session(backend, fmt=fmt, tools=TOOL_MAP)

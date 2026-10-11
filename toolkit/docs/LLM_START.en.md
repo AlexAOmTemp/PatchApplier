@@ -298,7 +298,7 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 
 **The model is the same for `.py`, `.lua`, `.luau`, `.md`.** Where annotation lives physically (AST / comment / HTML) is the tool's business. **Comments between units, individual lines, the contents of a markdown fenced block** are not addressable — use the text tools below. If a unit has no docstring, `part=annotation` returns empty (not an error).
 
-**`part`** — a string or a list (`"head"`, `"head,annotation"`, `["head","body"]`), canonical order `head → annotation → body`. **`block`** — body only (`not_applicable` otherwise). `part` and `block` cannot be combined. On ambiguity — `occurrence=N` (otherwise `ambiguous_symbol`).
+**`part`** — a string or a list (`"head"`, `"head,annotation"`, `["head","body"]`), canonical order `head → annotation → body`. Markdown sections also accept `own_body` — the body without subsections (a view on `body`, not a fourth part): for a section with `###` children it is its own text up to the first child; for functions and modules it equals `body`. **`block`** — body only (`not_applicable` otherwise). `part` and `block` cannot be combined. On ambiguity — `occurrence=N` (otherwise `ambiguous_symbol`).
 
 | Action | Arguments |
 |---|---|

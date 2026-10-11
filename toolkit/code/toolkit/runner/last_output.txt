@@ -1,253 +1,204 @@
-[r1] ✓ read_unit:     def execute(
-        self,
-        backend: Backend,
-        fmt: Any,
-        file_path: str,
-        file_content: str,
-        class_name: str = "ModuleScript",
-        **_: Any,
-    ) -> Result:
-        if backend.exists(file_path):
-            return Result(
-                status="error",
-                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
-                action="create_file",
-                error_code="already_exists",
-            )
-        create_fn = getattr(backend, "create", None)
-        try:
-            if callable(create_fn):
-                create_fn(file_path, file_content, class_name=class_name)
-            else:
-                backend.write(file_path, file_content)
-        except FileExistsError:
-            return Result(
-                status="error",
-                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
-                action="create_file",
-                error_code="already_exists",
-            )
-        except Exception as e:
-            return Result(
-                status="error",
-                message=f"Не удалось создать {file_path}: {e}",
-                action="create_file",
-                error_code="create_failed",
-            )
-        st = backend.stat(file_path)
-        return Result(
-            status="ok",
-            message=f"Файл создан: {file_path} ({st.lines} стр., {st.size_bytes} Б)",
-            action="create_file",
-        )
+[g1] ✓ read_unit: def _write_call(backend, file_path, action, address, apply_fn) -> Result:
+    if not file_path:
+        return Result(status="error", message="file_path required",
+                      action=action, error_code="bad_input")
+    if not isinstance(address, dict):
+        return Result(status="error", message="address must be a JSON object",
+                      action=action, error_code="bad_input")
+    try:
+        src = backend.read(file_path)
+    except FileNotFoundError as e:
+        return Result(status="error", message=str(e),
+                      action=action, error_code="not_found")
+    except PermissionError as e:
+        return Result(status="blocked", message=str(e),
+                      action=action, error_code="filter")
+    try:
+        new = apply_fn(src)
+    except KeyError as e:
+        msg = e.args[0] if e.args else str(e)
+        code = "not_found"
+        for p in ("not_applicable", "block_out_of_range", "anchor_not_found",
+                  "no_parts", "no_annotation"):
+            if msg.startswith(p):
+                code = p
+                break
+        if msg.startswith("ambiguous"):
+            code = "ambiguous_symbol"
+        return Result(status="error", message=msg, action=action, error_code=code)
+    except ValueError as e:
+        msg = str(e)
+        code = "bad_argument"
+        for p in ("empty_input", "bad_block_range", "bad_block", "bad_position",
+                  "anchor_required", "bad_anchor", "bad_text",
+                  "result_syntax_error", "result_missing_symbol",
+                  "result_parse_error", "result_missing_section"):
+            if msg.startswith(p):
+                code = p
+                break
+        return Result(status="error", message=msg, action=action, error_code=code)
+    try:
+        backend.write(file_path, new)
+    except PermissionError as e:
+        return Result(status="blocked", message=str(e),
+                      action=action, error_code="filter")
+    from ...core.models import Delta
+    old_lines = src.count("\n") + (0 if src.endswith("\n") else 1)
+    new_lines = new.count("\n") + (0 if new.endswith("\n") else 1)
+    delta = Delta(lines=new_lines - old_lines,
+                  bytes=len(new.encode("utf-8")) - len(src.encode("utf-8")),
+                  occurrences=1)
+    return Result(status="ok", message=f"{file_path}: {action} применён",
+                  delta=delta, verified=True, action=action)
 
-[r2] ✓ read_unit:     def execute(
-        self,
-        backend: Backend,
-        fmt: Any,
-        file_path: str,
-        file_content: str,
-        **_: Any,
-    ) -> Result:
-        existed = backend.exists(file_path)
-        before_lines = 0
-        before_bytes = 0
-        if existed:
+[g2] ✓ read_unit: def _own_body_part(unit: Unit):
+    """Body range excluding subsections (blocks that carry their own unit).
+
+    Section-only in practice: the section's own prose before the first
+    `###`-child. For a unit without subsection-blocks it equals `body`.
+    """
+    from .model import Part as _P
+    if not unit.body.is_present():
+        return _P()
+    first_child = None
+    for b in unit.blocks:
+        if b.unit is not None:
+            first_child = b.start
+            break
+    if first_child is None:
+        return unit.body
+    end = first_child - 1
+    while end >= unit.body.start and not _line_nonblank(unit, end):
+        end -= 1
+    if end < unit.body.start:
+        return _P()
+    return _P(unit.body.start, end)
+
+[g3] ✓ read_unit: def _start_session_in_background():
+    """Close any existing session and start a new one from CONFIG.
+
+    Reports via msg_queue 'mcp_status' events. On success, assigns the global
+    _session. Safe to call multiple times (restarts the session).
+    """
+    global _last_mcp_ready, _last_mcp_state
+    _last_mcp_ready = False
+    _last_mcp_state = ""
+    def _run():
+        global _session, _session_backend_name
+        with _session_lock:
+            old = _session
+            _session = None
+        if old is not None:
             try:
-                st = backend.stat(file_path)
-                before_lines = st.lines
-                before_bytes = st.size_bytes
+                old.__exit__(None, None, None)
             except Exception:
                 pass
-        backend.write(file_path, file_content)
-        st_after = backend.stat(file_path)
-        verb = "перезаписан" if existed else "создан"
-        delta_lines = st_after.lines - before_lines
-        delta_bytes = st_after.size_bytes - before_bytes
-        sign_l = f"+{delta_lines}" if delta_lines >= 0 else str(delta_lines)
-        sign_b = f"+{delta_bytes}" if delta_bytes >= 0 else str(delta_bytes)
-        return Result(
-            status="ok",
-            message=f"Файл {verb}: {file_path} ({sign_l} стр., {sign_b} Б)",
-            action="overwrite_file",
-        )
 
-[r3] ✓ read_unit: def _normalize_parts(part) -> list[str]:
-    """Accept `head`, `head,annotation`, `[\"head\", \"annotation\"]`.
+        backend, name = _build_backend_for_config()
+        if backend is None:
+            msg_queue.put(("status", f"\u2717 {name}"))
+            return
 
-    A bare string may hold a comma-separated list — same format the CLI
-    uses — so both `part="head,annotation"` and `part=["head", "annotation"]`
-    work identically.
-    """
-    if part is None:
-        return ["all"]
-    if isinstance(part, str):
-        parts = [p.strip() for p in part.split(",") if p.strip()]
-    elif isinstance(part, list):
-        parts = [str(p).strip() for p in part if str(p).strip()]
-    else:
-        raise ValueError(f"bad_part: {part!r}")
-    if not parts:
-        raise ValueError(f"bad_part: {part!r}")
-    valid = {"all", "head", "annotation", "body"}
-    for p in parts:
-        if p not in valid:
-            raise ValueError(f"bad_part: {p!r}")
-    if "all" in parts:
-        return ["all"]
-    return [p for p in ("head", "annotation", "body") if p in parts]
-
-[r4] ✓ read_unit: def replace_unit(source: str, path: str, address: dict,
-                 new_text: str, part=None) -> str:
-    """Replace a unit — wholly (part=all) or one/more of its parts.
-
-    `part` follows the same conventions as `read_unit`: bare string,
-    comma-separated string, or list. `part=all` (default) replaces the
-    entire unit (head+annotation+body); `part=["body"]` replaces only the
-    body, leaving head and annotation intact.
-
-    The new text is inserted literally; indentation of the first line is
-    preserved (the replacement block is re-indented to match). Validated
-    after write — if the file no longer parses, the change is rejected.
-    """
-    if new_text is None:
-        raise ValueError("empty_input")
-    ext = Path(path).suffix.lower()
-    unit = reader.resolve(source, path, address)
-    parts = reader._normalize_parts(part)
-    if parts == ["all"]:
-        start, end = unit.line_start, unit.line_end
-    else:
-        start, end = None, None
-        for p in parts:
-            ps = getattr(unit, p)
-            if ps.is_present():
-                if start is None or ps.start < start:
-                    start = ps.start
-                if end is None or ps.end > end:
-                    end = ps.end
-        if start is None:
-            raise KeyError("no_parts: none of the requested parts are present")
-
-    lines = source.splitlines()
-    first_line = lines[start - 1]
-    indent = _line_indent(first_line)
-    new_lines = _apply_indent(new_text, indent)
-    out_lines = lines[:start - 1] + new_lines + lines[end:]
-
-    eol = "\r\n" if "\r\n" in source else "\n"
-    new_source = eol.join(out_lines)
-    if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
-        new_source += eol
-
-    _check_parses(new_source, path, unit, ext, source)
-    return new_source
-
-[r5] ✓ read_unit: def _check_parses(new_source: str, path: str, unit, ext: str,
-                  old_source: str | None = None) -> None:
-    """Confirm the edited source still parses and the target survives.
-
-    When `old_source` is provided, additionally verify that no *unrelated*
-    unit has been lost. The target and its descendants are allowed to
-    change or vanish (that is the point of the edit); everything else must
-    survive. This catches the markdown off-by-one where `part="body"` on
-    a section used to eat the following section's heading.
-    """
-    if ext == ".py":
-        import ast
-        try:
-            tree = ast.parse(new_source)
-        except SyntaxError as e:
-            raise ValueError(f"result_syntax_error: {e}")
-        # qualname must still be present
-        if unit.qualname != "<module>":
-            found = False
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    name = node.name
-                    if name == unit.name:
-                        found = True
-                        break
-            if not found:
-                raise ValueError(f"result_missing_symbol: {unit.qualname}")
-    elif ext in (".lua", ".luau"):
-        from ...formats import lua as _lua
-        try:
-            syms = _lua.parse_lua_symbols(new_source)
-        except Exception as e:
-            raise ValueError(f"result_parse_error: {e}")
-        if unit.qualname != "<module>":
-            if not any(s.qualname == unit.qualname for s in syms):
-                raise ValueError(f"result_missing_symbol: {unit.qualname}")
-    else:  # .md
+        from ...core import Session
         from ...formats import Format
+        from ...tools import TOOL_MAP
         try:
-            doc = Format.load("default").parse(new_source)
+            preset = CONFIG.get("format_preset", "default")
+            fmt = Format.load(preset, CONFIG.get("format") or None)
+            from ...tools.shell import RunPythonTool
+            RunPythonTool.set_config(
+                CONFIG.get("exec"),
+                CONFIG.get("project_dir", ""),
+            )
+            from ...tools.index import install_index_paths
+            install_index_paths(CONFIG)
+            from ...tools.status import GetStatusTool
+            from ...config.loader import resolve_index_paths
+            _mcp_cfg = CONFIG.get("mcp") or {}
+            _native_cfg = _mcp_cfg.get("native_tools") or {}
+            if name == "composite":
+                _backs = {"filesystem", "mcp"}
+            elif name == "mcp":
+                _backs = {"mcp"}
+            else:
+                _backs = {"filesystem"}
+            _paths = resolve_index_paths(CONFIG)
+            GetStatusTool.set_context(
+                project_name=Path(CONFIG.get("project_dir", "")).name,
+                backend=name,
+                luau_mode=(CONFIG.get("luau_mode") or "mcp"),
+                format_preset=preset,
+                exec_enabled=bool((CONFIG.get("exec") or {}).get("enabled")),
+                exec_interpreter=(CONFIG.get("exec") or {}).get("interpreter"),
+                native_tools_enabled=bool(_native_cfg.get("enabled", True)),
+                native_tools_allow=_native_cfg.get("allow") or [],
+                index_paths={
+                    "docs": _paths["docs"],
+                    "code": _paths["code"],
+                    "lua":  _paths["lua"],
+                },
+                backends_enabled=_backs,
+            )
+            s = Session(backend, fmt=fmt, tools=TOOL_MAP)
+            s.open_async()
+            with _session_lock:
+                _session = s
+                _session_backend_name = name
+            if name == "composite":
+                msg_queue.put(("status", "\u23f3 Session: fs \u0433\u043e\u0442\u043e\u0432, mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
+            elif name == "mcp":
+                msg_queue.put(("status", "\u23f3 Session: mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
+            else:
+                msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (filesystem)"))
+            threading.Thread(target=_initialize_project, daemon=True).start()
         except Exception as e:
-            raise ValueError(f"result_parse_error: {e}")
-        if unit.kind == UnitKind.SECTION:
-            if doc.find(number=unit.name) is None and doc.find(title=unit.name) is None:
-                raise ValueError(f"result_missing_section: {unit.name}")
-            if old_source is not None:
-                old_doc = Format.load("default").parse(old_source)
-                old_ids = {str(s.number or s.title) for s in old_doc.flatten()}
-                new_ids = {str(s.number or s.title) for s in doc.flatten()}
-                target = str(unit.name)
-                # Descendants of the target (e.g. 2.1 when target is 2)
-                # may change or vanish — they are the target's own body.
-                lost = {l for l in (old_ids - new_ids)
-                        if l != target and not l.startswith(target + ".")}
-                if lost:
-                    raise ValueError(
-                        f"result_missing_section: unintended loss of "
-                        f"{sorted(lost)} (target \u00a7{target})"
-                    )
+            msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0441\u0442\u0430\u0440\u0442\u043e\u0432\u0430\u043b\u0430 ({name}): {e}"))
 
-[r6] ✓ read_unit:     def execute(
-        self,
-        backend: Backend,
-        fmt: Any = None,
-        file_path: str = "",
-        address: dict | None = None,
-        new_text: str = "",
-        part=None,
-        **_: Any,
-    ) -> Result:
-        return _write_call(
-            backend, file_path, "replace_unit", address,
-            lambda src: writer.replace_unit(src, file_path, address, new_text, part),
-        )
+    threading.Thread(target=_run, daemon=True).start()
 
-[r7] ✓ read_file: toolkit/code/toolkit/tools/status.py L133–L160
-133: '            ctx = self._context\r\n'
-134: '            lines = ["## Session"]\r\n'
-135: '            lines.append(f"project:  {ctx.get(\'project_name\') or \'(unknown)\'}")\r\n'
-136: '            lines.append(f"backend:  {ctx.get(\'backend\') or \'(unknown)\'}")\r\n'
-137: '            lines.append(f"luau:     {ctx.get(\'luau_mode\') or \'mcp\'}")\r\n'
-138: '            enabled = ctx.get("backends_enabled") or {"filesystem"}\r\n'
-139: '            lines.append(f"format:   {ctx.get(\'format_preset\') or \'default\'}")\r\n'
-140: '            if ctx.get("exec_enabled"):\r\n'
-141: '                interp = ctx.get("exec_interpreter") or "sys.executable"\r\n'
-142: '                lines.append(f"exec:     enabled  ({interp})")\r\n'
-143: '            else:\r\n'
-144: '                lines.append("exec:     disabled")\r\n'
-145: '            if "mcp" in enabled:\r\n'
-146: '                if ctx.get("native_tools_enabled"):\r\n'
-147: '                    allow = ctx.get("native_tools_allow") or []\r\n'
-148: '                    allow_s = ", ".join(allow) if allow else "(no allowlist -> all)"\r\n'
-149: '                    lines.append(f"native:   enabled  ({allow_s})")\r\n'
-150: '                else:\r\n'
-151: '                    lines.append("native:   disabled")\r\n'
-152: '            return "\\n".join(lines)\r\n'
-153: '\r\n'
-154: '    # --- indexes ----------------------------------------------------------\r\n'
-155: '\r\n'
-156: '    def _render_indexes(self, backend: Backend) -> str:\r\n'
-157: '        ctx = self._context\r\n'
-158: '        paths = ctx.get("index_paths") or {}\r\n'
-159: '        enabled = ctx.get("backends_enabled") or {"filesystem"}\r\n'
-160: '\r\n'
-[timing] user (7 actions): 0.01s
+[g4] ✓ read_file: toolkit/code/toolkit/runner/cli.py L220–L260
+220: '        print("[error] project not set: pass --project or set project_dir in config",\n'
+221: '              file=sys.stderr)\n'
+222: '        return 2\n'
+223: '    if not project_dir.is_dir():\n'
+224: '        print(f"[error] project is not a directory: {project_dir}", file=sys.stderr)\n'
+225: '        return 2\n'
+226: '    cfg = cfg_loader.load(cfg_path, project_dir=project_dir)\n'
+227: '\n'
+228: '    backend_name = args.backend or cfg.get("backend", "composite")\n'
+229: '    preset = args.format_preset or cfg.get("format_preset", "default")\n'
+230: '    fmt = Format.load(preset, cfg.get("format") or None)\n'
+231: '\n'
+232: '    from toolkit.tools.shell import RunPythonTool\n'
+233: '    RunPythonTool.set_config(cfg.get("exec"), project_dir)\n'
+234: '\n'
+235: '    from toolkit.tools.index import install_index_paths\n'
+236: '    install_index_paths(cfg)\n'
+237: '\n'
+238: '    patches: list[dict] = []\n'
+239: '    only_patches: list[dict] = []\n'
+240: '    parsed = None\n'
+241: '    if args.rebuild_only:\n'
+242: '        only_patches.append(_rebuild_patch(args, cfg))\n'
+243: '    if args.rebuild_code_only:\n'
+244: '        only_patches.append(_rebuild_code_patch(args, cfg))\n'
+245: '    if args.rebuild_lua_only:\n'
+246: '        only_patches.append(_rebuild_lua_patch(args, cfg))\n'
+247: '\n'
+248: '    if only_patches:\n'
+249: '        patches = only_patches\n'
+250: '    elif args.patch_file:\n'
+251: '        patch_path = Path(args.patch_file)\n'
+252: '        if not patch_path.is_file():\n'
+253: '            print(f"[error] patch file not found: {patch_path}", file=sys.stderr)\n'
+254: '            return 2\n'
+255: '        try:\n'
+256: '            parsed = _load_patches(patch_path)\n'
+257: '            patches = parsed.actions\n'
+258: '        except Exception as e:\n'
+259: '            print(f"[error] failed to parse patch: {e}", file=sys.stderr)\n'
+260: '            return 1\n'
+[timing] user (4 actions): 0.02s
 
-##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.01s
+##RESULT:{"ok": 4, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.02s

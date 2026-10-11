@@ -1,12 +1,16 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v394] [~5, ⇅32, +1, -1] ⚠
-  ~ toolkit/docs/LLM_START.en.md §7. Available actions (L202–L359, 15.2 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.en.md §Writing (text tools, escape hatch) (L221–L253, 3.0 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L204–L361, 20.3 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.ru.md §Запись (текстовые тулы, escape hatch) (L223–L255, 3.9 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L308–L343, 2.5 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P2 (закрыто): `replace_in_file` — tier-2 tolerance + tier-3 диагностика (L320–L323, 0.5 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §P2: `replace_in_file` — при провале показать похожие строки (L320–L323, 0.4 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v395] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 168, символов: 1157) [v440] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v441] [~2, +1, ⇅12]
+  ~ toolkit/code/toolkit/tools/fileops.py  (+41 стр., +1.5 KB)
+  ~ toolkit/code/toolkit/tools/status.py  (+5 стр., +0.2 KB)
+      + toolkit/code/toolkit/tools/fileops.py :: _check_content_syntax  [function]  L14–L36
+      ~ toolkit/code/toolkit/tools/fileops.py :: CreateFileTool  [class]  L14–L61 → L39–L94
+      ~ toolkit/code/toolkit/tools/fileops.py :: CreateFileTool.execute  [method]  L20–L61 → L45–L94
+      ~ toolkit/code/toolkit/tools/fileops.py :: OverwriteFileTool  [class]  L64–L99 → L97–L140
+      ~ ... и ещё 1
+      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool  [class]  L40–L273 → L40–L278
+      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool.set_context  [method]  L50–L80 → L50–L82
+      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool._render_session  [method]  L132–L152 → L134–L157
+  + toolkit/code/toolkit/tests/test_strictness.py  (190 стр., 7.0 KB)
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v269] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v270] [без изменений]
