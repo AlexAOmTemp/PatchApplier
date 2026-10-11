@@ -37,8 +37,7 @@ LLM_START описывает тулы **принципиально** (что у�
 | Тул | Почему |
 |---|---|
 | `replace_range` | Не возникло задачи, где он лучше остальных |
-| `replace_block` | Замену метода делал через `replace_between` / `overwrite` — следовало использовать этот |
-| `delete_block` | Удаление метода делал через `replace_between` — следовало использовать этот |
+| `replace_unit(block=)` | Замену метода/statement делал через `replace_between` / `overwrite` — следовало использовать этот |
 | `insert_block` | Новый statement в функцию вставлял через `replace_in_file` |
 | `copy_unit` | Не копировал unit'ы между файлами |
 | `move_file` / `copy_file` | Не перемещал/копировал файлы (git делает это) |
@@ -49,7 +48,7 @@ LLM_START описывает тулы **принципиально** (что у�
 | `grep_mcp` / `grep_replace_mcp` / `list_symbols_lua` / `read_symbol_lua` / `replace_function_lua` | Roblox-сторона не правила в этой сессии |
 | Native MCP tools (кроме `list_roblox_studios`, `search_game_tree` в recon) | Не было задач с DataModel |
 
-**Главный вывод по неиспользованным:** unit-write тулы (`replace_block` / `delete_block` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка.
+**Главный вывод по неиспользованным:** unit-write тулы (`replace_unit(block=)` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка. (С тех пор `replace_block` / `delete_block` вообще убраны из `TOOL_MAP` — поглощены `replace_unit(block=...)`.)
 
 ## 3. Рецепты: задача → тул
 
@@ -68,12 +67,12 @@ read_unit(qualname, part="body")  →  replace_unit(qualname, part="body", new_t
 ### Удалить метод из класса
 
 ```
-read_unit(qualname="Class.method")  →  list_units(file)  →  delete_block(address=Class, block=N)
+read_unit(qualname="Class.method")  →  list_units(file)  →  replace_unit(address=Class, block=N, new_text="")
 ```
 
-**Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `delete_block` был бы одним вызовом.
+**Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `replace_unit(block=N, new_text="")` был бы одним вызовом.
 
-**Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `delete_block` его сохранит (block исключает комментарий сверху).
+**Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `replace_unit(block=)` его сохранит (block исключает комментарий сверху).
 
 ### Заменить сигнатуру функции
 
@@ -267,13 +266,13 @@ run_python(script="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
 
 **Инцидент:** `replace_unit(qualname="Class.method", new_text="")` → `result_missing_symbol`, файл не тронут.
 
-**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `delete_block` (метод как блок в классе) или `replace_between`.
+**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text="")` (метод как блок в классе) или `replace_between`.
 
 ## 7. Что не использовалось и почему
 
-### Unit-write тулы (`replace_block`, `delete_block`, `insert_block`)
+### Unit-write тулы (`replace_unit(block=)`, `insert_block`)
 
-Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `delete_block(Class, block=N)` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.
+Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `replace_unit(Class, block=N, new_text="")` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.
 
 **Вывод:** не пробел тулсета, а моя нерешительность. В следующей сессии — сознательно попробовать.
 
@@ -358,7 +357,7 @@ Roblox-сторона не правила в этой сессии. Native — �
 
 Тулсет **работает**. Большинство операций — без трения. Проблемы — не в тулах, а в:
 
-1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `delete_block`.
+1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `replace_unit(block=)`.
 2. **Мелких footgun'ах** (`insert_at_anchor` без `\n`, `replace_between` с EOL). Каждый — 5-15 минут сессии.
 3. **Отсутствии cheat-sheet.** Выбор тула под задачу — думал, а не знал.
 

@@ -1,22 +1,73 @@
-[{"id": "l355", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-    "search": "        status_var.set(\"⏹ Этот патч уже применён. Используй «Повторить последний».\")\n        error_var.set(\"\")\n        return",
-    "replace": "        status_var.set(\"⏹ Этот патч уже применён. Используй «Повторить последний».\")\n        return",
+[{"id": "dec-sum", "action": "set_annotation",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+                "address": {"section_number": "2.1"},
+                "text": "Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block / set_annotation) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы."}}]
+
+[{"id": "dec-unit", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "search": "- **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес: `{qualname}`, `{section_number}`, `{section_title}`, `{qualname: \"<module>\"}`.",
+    "replace": "- **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес — ключ `{qualname}` (для секций: номер или заголовок; для модуля: `<module>`). Legacy-алиасы `section_number` → `qualname`, `section_title` → `title_match` принимаются, но в новых патчах не используются.",
     "search_repr": false}}]
 
-[{"id": "l388", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-    "search": "        pyperclip.copy(patch_text)\n        status_var.set(f\"✓ Последний патч в буфере ({len(patch_text)} симв.)\")\n        error_var.set(\"\")\n    except Exception as e:",
-    "replace": "        pyperclip.copy(patch_text)\n        status_var.set(f\"✓ Последний патч в буфере ({len(patch_text)} симв.)\")\n    except Exception as e:",
+[{"id": "dec-block", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "search": "- `replace_block` — замена блоков в body (`block=3`, `block=\"1-4\"`). Заменяет `replace_statement` (только Python) и структурные случаи `replace_between`. Кросс-форматно.\n- `insert_block` — вставка блока: `position=start|end|before|after` + `anchor` (индекс блока или qualname соседа). Заменяет `insert_symbol` и структурные случаи `insert_at_anchor`.\n- `delete_block` — удаление блоков по индексу или диапазону. Заменяет `delete_symbol`.",
+    "replace": "- `replace_unit(block=N)` — замена блоков в body (`block=3`, `block=\"1-4\"`). Заменяет `replace_statement` (только Python), `replace_block`, `delete_block` (пустой `new_text` = удалить) и структурные случаи `replace_between`. Кросс-форматно. `part` и `block` взаимоисключающие и обязательные (`scope_required` / `scope_conflict`).\n- `insert_block` — вставка блока: `position=start|end|before|after` + `anchor` (индекс блока или qualname соседа). Заменяет `insert_symbol` и структурные случаи `insert_at_anchor`.",
     "search_repr": false}}]
 
-[{"id": "grep-check", "action": "grep",
-  "arguments": {"pattern": "error_var",
-                "paths": ["toolkit/code/toolkit/runner/gui/app.py"]}}]
+[{"id": "dec-move", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "search": "**Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `delete_block` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.",
+    "replace": "**Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `replace_unit(block=N, new_text=\"\")` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.",
+    "search_repr": false}}]
 
-[{"id": "smoke-gui", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
+[{"id": "tp-table", "action": "replace_in_file",
+    "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "| `replace_block` | Замену метода делал через `replace_between` / `overwrite` — следовало использовать этот |\n| `delete_block` | Удаление метода делал через `replace_between` — следовало использовать этот |",
+    "replace": "| `replace_unit(block=)` | Замену метода/statement делал через `replace_between` / `overwrite` — следовало использовать этот |",
+    "search_repr": false}}]
+
+[{"id": "tp-concl", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "**Главный вывод по неиспользованным:** unit-write тулы (`replace_block` / `delete_block` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка.",
+    "replace": "**Главный вывод по неиспользованным:** unit-write тулы (`replace_unit(block=)` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка. (С тех пор `replace_block` / `delete_block` вообще убраны из `TOOL_MAP` — поглощены `replace_unit(block=...)`.)",
+    "search_repr": false}}]
+
+[{"id": "tp-recipe", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "read_unit(qualname=\"Class.method\")  →  list_units(file)  →  delete_block(address=Class, block=N)\n```\n\n**Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `delete_block` был бы одним вызовом.\n\n**Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `delete_block` его сохранит (block исключает комментарий сверху).",
+    "replace": "read_unit(qualname=\"Class.method\")  →  list_units(file)  →  replace_unit(address=Class, block=N, new_text=\"\")\n```\n\n**Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `replace_unit(block=N, new_text=\"\")` был бы одним вызовом.\n\n**Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `replace_unit(block=)` его сохранит (block исключает комментарий сверху).",
+    "search_repr": false}}]
+
+[{"id": "tp-moral", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `delete_block` (метод как блок в классе) или `replace_between`.",
+    "replace": "**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text=\"\")` (метод как блок в классе) или `replace_between`.",
+    "search_repr": false}}]
+
+[{"id": "tp-unused", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "### Unit-write тулы (`replace_block`, `delete_block`, `insert_block`)\n\nИспользовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `delete_block(Class, block=N)` или `insert_block(qualname, position=\"start\")` были бы одним вызовом без угадывания.",
+    "replace": "### Unit-write тулы (`replace_unit(block=)`, `insert_block`)\n\nИспользовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `replace_unit(Class, block=N, new_text=\"\")` или `insert_block(qualname, position=\"start\")` были бы одним вызовом без угадывания.",
+    "search_repr": false}}]
+
+[{"id": "tp-final", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+    "search": "1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `delete_block`.",
+    "replace": "1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `replace_unit(block=)`.",
+    "search_repr": false}}]
+
+[{"id": "ss-add", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/SESSION_STATE.md",
+    "anchor": "**Работа с моделью:**\n- `Unit.title` — новое поле, `section_title` матчит человеческий текст заголовка (не номер). `not_found` в unit-тулах возвращает `Did you mean: ...` top-5 + хинт `list_units`.\n- `replace_in_file` tier 2 (trailing whitespace) и tier 3 (`Similar lines:` с маркерами `␣`) подтверждены вживую.\n- `⚠` в diff-header сработал в реале при удалении двух файлов через `delete_file`.",
+    "position": "after",
+    "new_content": "\n\n**Унификация unit-API (после P-фиксов):**\n- `replace_unit` теперь принимает `part` XOR `block`. Оба обязательны — нет дефолта, `scope_required` без одного, `scope_conflict` с обоими. Убирает класс ошибок «думал, что меняю блок, заменил body».\n- `replace_block` / `delete_block` поглощены `replace_unit(block=...)` — сняты из `TOOL_MAP`. `list-tools` — 33 тула.\n- Canonical address keys: `qualname` (единый для всех форматов) + `title_match` (матчер по подстроке в заголовке). Legacy-алиасы `section_number` / `section_title` принимаются, но не в новых патчах.\n- `not_found` в unit-тулах возвращает top-5 `Did you mean: ...` (без полного перечисления файла — `list_units` для карты).\n- `MODEL.md §3-4`, `LLM_START §7` (ru+en) — переписаны под эту модель."}}]
+
+[{"id": "ss-sum", "action": "set_annotation",
+  "arguments": {"file_path": "toolkit/docs/SESSION_STATE.md",
+                "address": {"section_number": "1"},
+                "text": "Зачем этот документ. SESSION_STATE — где проект сейчас: что закрыто в последних сессиях, что открыто, что проверить в начале следующей."}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["gui: remove leftover error_var.set calls"]}}]
+                "args": ["docs: fold replace_block/delete_block into replace_unit, update practice notes"]}}]

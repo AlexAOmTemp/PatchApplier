@@ -50,6 +50,13 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 - `replace_in_file` tier 2 (trailing whitespace) и tier 3 (`Similar lines:` с маркерами `␣`) подтверждены вживую.
 - `⚠` в diff-header сработал в реале при удалении двух файлов через `delete_file`.
 
+**Унификация unit-API (после P-фиксов):**
+- `replace_unit` теперь принимает `part` XOR `block`. Оба обязательны — нет дефолта, `scope_required` без одного, `scope_conflict` с обоими. Убирает класс ошибок «думал, что меняю блок, заменил body».
+- `replace_block` / `delete_block` поглощены `replace_unit(block=...)` — сняты из `TOOL_MAP`. `list-tools` — 33 тула.
+- Canonical address keys: `qualname` (единый для всех форматов) + `title_match` (матчер по подстроке в заголовке). Legacy-алиасы `section_number` / `section_title` принимаются, но не в новых патчах.
+- `not_found` в unit-тулах возвращает top-5 `Did you mean: ...` (без полного перечисления файла — `list_units` для карты).
+- `MODEL.md §3-4`, `LLM_START §7` (ru+en) — переписаны под эту модель.
+
 ### Что открыто
 
 - **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена. Не критично, работать можно.

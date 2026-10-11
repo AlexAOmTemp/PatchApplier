@@ -103,7 +103,7 @@
 
 ### 2.1 Унификация тулов
 
-<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7. -->
+<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block / set_annotation) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы. -->
 
 **Стратегия: расширение тулсета без миграции.** Старый план (объединить `replace_section` / `replace_symbol*` / `insert_symbol` в единый `replace_unit` / `insert_unit`) отменён. Причины:
 
@@ -115,7 +115,7 @@
 
 **Модель.** Зафиксирована в §1 п.25 и подробно расписана в `manual/unit_proto/MODEL.md` (прототип). Ключевые понятия:
 
-- **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес: `{qualname}`, `{section_number}`, `{section_title}`, `{qualname: "<module>"}`.
+- **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес — ключ `{qualname}` (для секций: номер или заголовок; для модуля: `<module>`). Legacy-алиасы `section_number` → `qualname`, `section_title` → `title_match` принимаются, но в новых патчах не используются.
 - **Parts** — `head` (сигнатура / заголовок), `annotation` (docstring / summary / `--[[ ]]`), `body`.
 - **Blocks** — нумерованные элементы внутри body. `block=3`, `block="1-10"`, `block=[1, 3, 7]`. В head и annotation блоков нет.
 - **Module head** — до первого def/class. Глобал между классами — блок в body, не head.
@@ -131,15 +131,14 @@
 **Волна 2 (минимальный write).**
 
 - `replace_unit` — замена unit'а целиком или по частям (`part=head|annotation|body`). Заменяет `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_section`.
-- `replace_block` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python) и структурные случаи `replace_between`. Кросс-форматно.
+- `replace_unit(block=N)` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python), `replace_block`, `delete_block` (пустой `new_text` = удалить) и структурные случаи `replace_between`. Кросс-форматно. `part` и `block` взаимоисключающие и обязательные (`scope_required` / `scope_conflict`).
 - `insert_block` — вставка блока: `position=start|end|before|after` + `anchor` (индекс блока или qualname соседа). Заменяет `insert_symbol` и структурные случаи `insert_at_anchor`.
-- `delete_block` — удаление блоков по индексу или диапазону. Заменяет `delete_symbol`.
 - `set_annotation` — установить docstring / summary / `--[[ ]]` одной операцией. Заменяет `set_summary` и установку docstring через `replace_symbol`.
 - `verify_annotation` — подтвердить annotation без правки файла. Заменяет `verify_section`.
 
 **Правило: новый тул даёт то, чего в старых НЕТ.** Не «то же самое, но иначе». `replace_unit` параллельно с `replace_symbol` для одного формата — не делаем. `set_annotation` — да, потому что кросс-форматный annotation в старых отсутствует.
 
-**Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `delete_block` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.
+**Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `replace_unit(block=N, new_text="")` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.
 
 **Статистика.** `Patcher.apply` бампает счётчики в `metrics.json` (toolkit runtime state dir) после каждого действия: `counts[action][status] += 1` плюс `errors[action][error_code] += 1`. Не журнал, а агрегат — размер ограничен набором `action × status × error_code`, не растёт линейно со временем. `since` / `updated` показывают окно. Анализ — `manual/metrics_report.py` (печатает топ действий, доли по группам, ошибки), reset — удалить файл или `metrics_report.py --reset`. Через 1–2 месяца смотреть:
 

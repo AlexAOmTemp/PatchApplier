@@ -1,53 +1,81 @@
-[r1] ✓ read_file: toolkit/code/toolkit/runner/gui/app.py L348–L395
-348: '        status_var.set("✗ Буфер пуст")\r\n'
-349: '        return\r\n'
-350: '    normalized = normalize_patch(clipboard_text)\r\n'
-351: '    is_dup = (last_applied_patch_norm is not None\r\n'
-352: '              and normalized == last_applied_patch_norm)\r\n'
-353: '    if is_dup:\r\n'
-354: '        status_var.set("⏹ Этот патч уже применён. Используй «Повторить последний».")\r\n'
-355: '        error_var.set("")\r\n'
-356: '        return\r\n'
-357: '    _run_patch(clipboard_text)\r\n'
-358: '\r\n'
-359: '\r\n'
-360: 'def on_repeat_click():\r\n'
-361: '    if is_executing:\r\n'
-362: '        return\r\n'
-363: '    if not _validate_project():\r\n'
-364: '        status_var.set("⚠ укажите путь к проекту")\r\n'
-365: '        return\r\n'
-366: '    if not LAST_PATCH.exists():\r\n'
-367: '        status_var.set("✗ Нет last_patch.json")\r\n'
-368: '        return\r\n'
-369: '    try:\r\n'
-370: '        patch_text = LAST_PATCH.read_text(encoding="utf-8")\r\n'
-371: '    except Exception as e:\r\n'
-372: '        status_var.set(f"✗ Не могу прочитать last_patch.json: {e}")\r\n'
-373: '        return\r\n'
-374: '    if not patch_text.strip():\r\n'
-375: '        status_var.set("✗ last_patch.json пуст")\r\n'
-376: '        return\r\n'
-377: '    _run_patch(patch_text)\r\n'
-378: '\r\n'
-379: '\r\n'
-380: 'def on_get_last_patch():\r\n'
-381: '    if not LAST_PATCH.exists():\r\n'
-382: '        status_var.set("✗ Нет last_patch.json")\r\n'
-383: '        return\r\n'
-384: '    try:\r\n'
-385: '        patch_text = LAST_PATCH.read_text(encoding="utf-8")\r\n'
-386: '        pyperclip.copy(patch_text)\r\n'
-387: '        status_var.set(f"✓ Последний патч в буфере ({len(patch_text)} симв.)")\r\n'
-388: '        error_var.set("")\r\n'
-389: '    except Exception as e:\r\n'
-390: '        status_var.set(f"✗ {e}")\r\n'
-391: '\r\n'
-392: '\r\n'
-393: '\r\n'
-394: '\r\n'
-395: 'def on_get_last_output():\r\n'
-[timing] user (1 actions): 0.00s
+[g1] ✓ grep: Найдено 6 совпадений:
+toolkit/docs/DECISIONS.md:31: 20. **Копирование — отдельные тулы.** `copy_file` (байтовая копия) и `copy_unit` (структурная единица: секция `.md` или символ `.py`/`.lua`). Оба **не трогают source** — в этом их отличие от `move_file`/`move_symbol`. `copy_unit` — первый опыт унификации: тип единицы определяется ключом в `selector` (`section_number` / `section_title` / `qualname`), а не отдельным тулом. Если схема приживётся — кандидат на объединение `replace_section` / `replace_symbol` под общим `replace_unit`. `copy_file` работает на любых файлах (бинарники тоже); `copy_unit` — только на текстовых (markdown / Python / Lua), потому что ему нужен структурный парсер.
+toolkit/docs/DECISIONS.md:106: <!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7. -->
+toolkit/docs/DECISIONS.md:118: - **Unit** — `module` / `function` / `method` / `class` / `section`. Единый адрес: `{qualname}`, `{section_number}`, `{section_title}`, `{qualname: "<module>"}`.
+toolkit/docs/DECISIONS.md:134: - `replace_block` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python) и структурные случаи `replace_between`. Кросс-форматно.
+toolkit/docs/DECISIONS.md:136: - `delete_block` — удаление блоков по индексу или диапазону. Заменяет `delete_symbol`.
+toolkit/docs/DECISIONS.md:142: **Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `delete_block` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.
 
-##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+[g2] ✓ read_unit: ### 2.1 Унификация тулов
+<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7. -->
+
+[g3] ✓ grep: Найдено 11 совпадений:
+toolkit/docs/TOOL_PRACTICE.md:40: | `replace_block` | Замену метода делал через `replace_between` / `overwrite` — следовало использовать этот |
+toolkit/docs/TOOL_PRACTICE.md:41: | `delete_block` | Удаление метода делал через `replace_between` — следовало использовать этот |
+toolkit/docs/TOOL_PRACTICE.md:52: **Главный вывод по неиспользованным:** unit-write тулы (`replace_block` / `delete_block` / `insert_block`) — **есть, работают, но я их не применил** потому что думал старыми категориями. Метод удалить → `replace_between`, statement вставить → `replace_in_file`. Хотя semantic-wise правильнее unit-тул. Это не пробел тулсета, а привычка.
+toolkit/docs/TOOL_PRACTICE.md:71: read_unit(qualname="Class.method")  →  list_units(file)  →  delete_block(address=Class, block=N)
+toolkit/docs/TOOL_PRACTICE.md:74: **Не делал так** — использовал `replace_between` от метода до следующего метода. Сработало, но: нужны два anchor'а, оба должны быть уникальны. `delete_block` был бы одним вызовом.
+toolkit/docs/TOOL_PRACTICE.md:76: **Когда всё же `replace_between`:** если между методами есть комментарий, который тоже надо съесть, а `delete_block` его сохранит (block исключает комментарий сверху).
+toolkit/docs/TOOL_PRACTICE.md:270: **Мораль:** это **фича** (защита), но неочевидная. Для удаления — `delete_block` (метод как блок в классе) или `replace_between`.
+toolkit/docs/TOOL_PRACTICE.md:274: ### Unit-write тулы (`replace_block`, `delete_block`, `insert_block`)
+toolkit/docs/TOOL_PRACTICE.md:276: Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `delete_block(Class, block=N)` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.
+toolkit/docs/TOOL_PRACTICE.md:347: Реализовано: `empty_input_use_delete_block` в `writer.replace_unit` для `part=all` + пустой текст. Сообщение: «replace_unit does not delete a unit».
+toolkit/docs/TOOL_PRACTICE.md:361: 1. **Моих привычках.** Текстовые тулы вместо unit-write. `replace_between` вместо `delete_block`.
+
+[g4] ✓ grep: Совпадений не найдено: 'section_number|section_title'
+
+[g5] ✓ read_unit: 
+**Тема:** после Workspace refactor — довести GUI-окно управления проектом и закрыть накопившийся долг по инструментам из `TOOL_PRACTICE.md §8`.
+
+### Что сделано
+
+**GUI — Project settings (шаг 7.3, заменяет старую «дерево файлов» идею):**
+- `runner/gui/tree.py` — чистая логика дерева каталогов. 26/26.
+- `runner/gui/tree_view.py` — Tk-виджет `PolicyTree`: соед. глифы, пять колонок, реактивный `set_active_flags`, hidden = hard deny. 19/19.
+- `runner/gui/settings_window.py` — модал: имя проекта, Sources сверху (docs / py + exec / MCP / luau-on-disk / Luau source radio), Roots снизу (ноутбук табов + `Add root` / `Remove root` / `Show hidden` / легенда), ignore-редакторы inline в Sources, реактивные правила (exec требует python, luau radio зависит от источников, колонки дерева зависят от источников). `Ctrl+C / Ctrl+A` в Entry работают в любой раскладке (по keycode).
+- `app.py` — `_menu_project_settings` теперь тонкий шим; старая заглушка `open_settings_dialog` и кнопка ⚙ удалены; `roots=[...]` прокинуто в `set_status`.
+- `cli.py` — то же прокидывание roots.
+- Доки: `GUI_PROJECT_SETTINGS.md` — дизайн + статус; `GUI_TREE.md` — удалён, поглощён.
+
+**Тулы (P1/P2/P3 из TOOL_PRACTICE):**
+- ✅ P1: `insert_at_anchor` добавляет `\n` у границы; `replace_between` нормализует EOL anchor'ов.
+- ✅ P2: `replace_in_file` — три tier (byte-exact / trailing-whitespace / no-match + похожие строки); `regex: true`.
+- ✅ P2: `create_file` / `overwrite_file` — syntax check `.py` / `.json` (`content_syntax_error`).
+- ✅ P2: `replace_unit` для md — `part="own_body"`.
+- ✅ P3: `replace_unit` с пустым `new_text` → `empty_input_use_delete_block`.
+- ✅ P3: `get_status` показывает `roots:    a, b` для workspace.
+- ✅ `⚠` в diff-header при любых удалениях (маркер аномалии).
+
+**Модель:**
+- `own_body` задокументирован в `MODEL.md §4` как «ярлык к body-with-own-scope», с заделом на переделку в честный параметр.
+- `_check_parses` уже стоит как страховка от off-by-one в unit-модели (из прошлой сессии).
+
+**Статистика и депрекейт (итог):**
+- `metrics.json` за 21 час — 1030 действий. Escape hatch 14.2% (цель <15% — достигнута). Unit-модель 10.8%. Старая символьная модель 1.6% с 37.5% err.
+- Удалены из `TOOL_MAP` **17 записей**: `list_symbols`, `read_symbol`, `replace_symbol*`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`, `replace_function*`, `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`, `replace_section`, `set_summary`, `verify_section`. Файлы в дереве, регистрация снята. `list-tools` — 35 тулов. Запись в `DECISIONS §2.1`.
+
+**Docs:**
+- `LLM_START §11` — cheat-sheet «задача → тул» (первая подсекция, таблица со ссылками на сценарии).
+- `LLM_START §5` — блок «патч — ручная операция»: объединяй механически связанные действия, разделяй зависимые; проверяй `-N` + `⚠` в diff.
+- `LLM_START §12` — короткая отсылка к §5.
+
+**Работа с моделью:**
+- `Unit.title` — новое поле, `section_title` матчит человеческий текст заголовка (не номер). `not_found` в unit-тулах возвращает `Did you mean: ...` top-5 + хинт `list_units`.
+- `replace_in_file` tier 2 (trailing whitespace) и tier 3 (`Similar lines:` с маркерами `␣`) подтверждены вживую.
+- `⚠` в diff-header сработал в реале при удалении двух файлов через `delete_file`.
+
+### Что открыто
+
+- **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена. Не критично, работать можно.
+- **Tabs↔spaces auto в `replace_in_file`** — принципиально не делаем (indent значима).
+- **`replace_range`** — оставлен как escape hatch для module-level top region и файлов без парсера; в этой сессии не использовался.
+- **`grep_replace` на FS-стороне** — аналог `grep_replace_mcp` для файловой системы. В `TOOL_PRACTICE §8` числится как открытая идея, не делали.
+- **Символьный reverse для Lua / Symbol Graph depth>1** — только Python, задокументировано.
+- **`Roots-line влияет на конфиг`** — не влияет: `set_context` чисто для `get_status`.
+- **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс.
+
+**Git log этой сессии:** от `ed6e2e2 pre-model` до `fb2dcd8 deprecate old symbol tools, cheat-sheet, big-patches advice` (~20 коммитов).
+[timing] user (5 actions): 0.01s
+
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.01s
