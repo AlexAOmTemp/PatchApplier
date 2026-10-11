@@ -352,7 +352,6 @@ def on_button_click():
               and normalized == last_applied_patch_norm)
     if is_dup:
         status_var.set("⏹ Этот патч уже применён. Используй «Повторить последний».")
-        error_var.set("")
         return
     _run_patch(clipboard_text)
 
@@ -385,7 +384,6 @@ def on_get_last_patch():
         patch_text = LAST_PATCH.read_text(encoding="utf-8")
         pyperclip.copy(patch_text)
         status_var.set(f"✓ Последний патч в буфере ({len(patch_text)} симв.)")
-        error_var.set("")
     except Exception as e:
         status_var.set(f"✗ {e}")
 

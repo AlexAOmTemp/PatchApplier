@@ -1,162 +1,22 @@
-[{"id": "ru-pr", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "unit-модель (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`);",
-    "replace": "unit-модель (`list_units`, `read_unit`, `replace_unit`, `insert_block`, `set_annotation`);",
+[{"id": "l355", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+    "search": "        status_var.set(\"⏹ Этот патч уже применён. Используй «Повторить последний».\")\n        error_var.set(\"\")\n        return",
+    "replace": "        status_var.set(\"⏹ Этот патч уже применён. Используй «Повторить последний».\")\n        return",
     "search_repr": false}}]
 
-[{"id": "ru-ex", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "Унифицированные `replace_unit` / `replace_block` делают то же самое внутри себя — тебе не нужно писать gsub вручную. Приоритет у утилиты: используй `replace_unit` / `replace_block`; `execute_luau`+gsub только если правишь произвольный фрагмент `.Source`, для которого нет структурного тула.",
-    "replace": "Унифицированный `replace_unit` делает то же самое внутри себя — тебе не нужно писать gsub вручную. Приоритет у утилиты: используй `replace_unit`; `execute_luau`+gsub только если правишь произвольный фрагмент `.Source`, для которого нет структурного тула.",
+[{"id": "l388", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+    "search": "        pyperclip.copy(patch_text)\n        status_var.set(f\"✓ Последний патч в буфере ({len(patch_text)} симв.)\")\n        error_var.set(\"\")\n    except Exception as e:",
+    "replace": "        pyperclip.copy(patch_text)\n        status_var.set(f\"✓ Последний патч в буфере ({len(patch_text)} симв.)\")\n    except Exception as e:",
     "search_repr": false}}]
 
-[{"id": "ru-para", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "Для **всех поддерживаемых форматов** (`.py`, `.lua`, `.luau`, `.md`) используй unit-модель: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Адрес — по qualname (Python/Lua) или `section_number` / `section_title` (md); части `head` / `annotation` / `body`; блоки внутри body. Эти тулы сами пересчитывают позиции от AST или структуры документа и не зависят от предыдущих правок.",
-    "replace": "Для **всех поддерживаемых форматов** (`.py`, `.lua`, `.luau`, `.md`) используй unit-модель: `read_unit` / `replace_unit` / `insert_block` / `set_annotation`. Адрес — `qualname` (единый ключ для всех форматов: `Foo.bar`, `3`, `Format`, `<module>`) или `title_match` (матчер по подстроке в заголовке секции). Части `head` / `annotation` / `body`; блоки внутри body — через `block`. Эти тулы сами пересчитывают позиции от AST или структуры документа и не зависят от предыдущих правок.",
-    "search_repr": false}}]
+[{"id": "grep-check", "action": "grep",
+  "arguments": {"pattern": "error_var",
+                "paths": ["toolkit/code/toolkit/runner/gui/app.py"]}}]
 
-[{"id": "ru-addr", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "- **адрес** (JSON): `{\"qualname\": \"Foo.bar\"}` — Python/Lua; `{\"section_number\": \"3.1\"}` или `{\"section_title\": \"Format\"}` — markdown; `{\"qualname\": \"<module>\"}` — модуль.",
-    "replace": "- **адрес** (JSON): один ключ — `qualname`. Python/Lua: `{\"qualname\": \"Foo.bar\"}`. Markdown: `{\"qualname\": \"3\"}` для нумерованной секции, `{\"qualname\": \"Format\"}` для безномерной (qualname = весь заголовок). Модуль: `{\"qualname\": \"<module>\"}`. Плюс матчер `{\"title_match\": \"Format\"}` — подстрока в заголовке секции (не адрес, а поиск). Legacy-алиасы `section_number` → `qualname`, `section_title` → `title_match` принимаются, но в новых патчах не использовать.",
-    "search_repr": false}}]
-
-[{"id": "ru-table", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "| `replace_unit` | `file_path`, `address`, `new_text`; опц. `part` (`all` дефолт — заменить целиком; `\"body\"` — только тело, head и annotation сохраняются) |\n| `replace_block` | `file_path`, `address`, `block` (число / `\"1-4\"` / список), `new_text`. Непрерывный диапазон; разрыв → `bad_block_range`. Пустой `new_text` = удалить. Комментарий над блоком сохраняется |\n| `delete_block` | то же, что `replace_block` с пустым `new_text` |",
-    "replace": "| `replace_unit` | `file_path`, `address`, `new_text`, **ровно одно из `part` / `block`** (нет дефолта — иначе `scope_required`). `part=\"all\"` — заменить целиком; `part=\"body\"` — только тело, head и annotation сохраняются; `part=\"own_body\"` — тело без подсекций. `block` (число / `\"1-4\"` / список) — блоки в body; пустой `new_text` с `block` удаляет их; пустой `new_text` с `part` → `empty_input_use_delete_block` |",
-    "search_repr": false}}]
-
-[{"id": "ru-lua", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "**Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_block` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part=\"body\"`. `insert_block position=\"end\"` вставит перед `return M`, если он есть.",
-    "replace": "**Lua.** Blocks внутри функций **пока не нумеруются** (`blocks=0`, `replace_unit(block=...)` → `not_applicable`) — token-парсер не даёт statement-границ. Для правки тела — `replace_unit part=\"body\"`. `insert_block position=\"end\"` вставит перед `return M`, если он есть.",
-    "search_repr": false}}]
-
-[{"id": "ru-cheat", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "| Удалить метод из класса | `delete_block` |",
-    "replace": "| Удалить метод из класса | `replace_unit(block=N, new_text=\"\")` |",
-    "search_repr": false}}]
-
-[{"id": "ru-edit", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "3. `replace_block` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить (или `delete_block`).",
-    "replace": "3. `replace_unit(block=N)` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить.",
-    "search_repr": false}}]
-
-[{"id": "ru-err", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "- `bad_block_range` — `replace_block` / `delete_block` получили несоседние блоки (`\"1,3\"`); допустим только непрерывный диапазон.",
-    "replace": "- `bad_block_range` — `replace_unit(block=...)` получил несоседние блоки (`\"1,3\"`); допустим только непрерывный диапазон.\n- `scope_required` — `replace_unit` без `part` и без `block`. Передай одно из двух.\n- `scope_conflict` — `replace_unit` с `part` и `block` одновременно. Ровно одно.",
-    "search_repr": false}}]
-
-[{"id": "ru-notdo", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "- **Не использовать `replace_range` для правок в поддерживаемых форматах.** Для `.py` / `.lua` / `.md` всегда есть unit-тулы (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) и `replace_between`. `replace_range` уместен только для module-level top region и файлов без парсера. Если всё же нужен — передавай `expected_first_line`.",
-    "replace": "- **Не использовать `replace_range` для правок в поддерживаемых форматах.** Для `.py` / `.lua` / `.md` всегда есть unit-тулы (`replace_unit`, `insert_block`, `set_annotation`) и `replace_between`. `replace_range` уместен только для module-level top region и файлов без парсера. Если всё же нужен — передавай `expected_first_line`.",
-    "search_repr": false}}]
-
-[{"id": "ru-notdo2", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
-    "search": "- **Не использовать `replace_block` для разрывного диапазона.** `\"1,3\"` → `bad_block_range`. Только непрерывный (`\"1-3\"`). Разрывные — несколькими вызовами.",
-    "replace": "- **Не использовать `replace_unit(block=...)` для разрывного диапазона.** `\"1,3\"` → `bad_block_range`. Только непрерывный (`\"1-3\"`). Разрывные — несколькими вызовами.",
-    "search_repr": false}}]
-
-[{"id": "en-pr", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "the unit model (`list_units`, `read_unit`, `replace_unit`, `replace_block`, `delete_block`, `insert_block`, `set_annotation`);",
-    "replace": "the unit model (`list_units`, `read_unit`, `replace_unit`, `insert_block`, `set_annotation`);",
-    "search_repr": false}}]
-
-[{"id": "en-ex", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "Unified `replace_unit` / `replace_block` do exactly that internally — you do not write gsub by hand. The toolkit wins: use `replace_unit` / `replace_block`; `execute_luau`+gsub only for a chunk of `.Source` with no structural tool of its own.",
-    "replace": "Unified `replace_unit` does exactly that internally — you do not write gsub by hand. The toolkit wins: use `replace_unit`; `execute_luau`+gsub only for a chunk of `.Source` with no structural tool of its own.",
-    "search_repr": false}}]
-
-[{"id": "en-para", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `replace_block` / `delete_block` / `insert_block` / `set_annotation`. Address by qualname (Python/Lua) or `section_number` / `section_title` (md); parts `head` / `annotation` / `body`; blocks inside body. These tools recompute positions from the AST or the document structure and are independent of prior edits.",
-    "replace": "For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `insert_block` / `set_annotation`. Address by `qualname` (single key across formats: `Foo.bar`, `3`, `Format`, `<module>`) or `title_match` (substring matcher on a section's title). Parts `head` / `annotation` / `body`; blocks inside body via `block`. These tools recompute positions from the AST or the document structure and are independent of prior edits.",
-    "search_repr": false}}]
-
-[{"id": "en-addr", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "- **address** (JSON): `{\"qualname\": \"Foo.bar\"}` — Python/Lua; `{\"section_number\": \"3.1\"}` or `{\"section_title\": \"Format\"}` — markdown; `{\"qualname\": \"<module>\"}` — module.",
-    "replace": "- **address** (JSON): one key — `qualname`. Python/Lua: `{\"qualname\": \"Foo.bar\"}`. Markdown: `{\"qualname\": \"3\"}` for a numbered section, `{\"qualname\": \"Format\"}` for a bare one (qualname = full title). Module: `{\"qualname\": \"<module>\"}`. Plus a matcher `{\"title_match\": \"Format\"}` — substring in a section's title (search, not address). Legacy aliases `section_number` → `qualname`, `section_title` → `title_match` are accepted but not to be used in new patches.",
-    "search_repr": false}}]
-
-[{"id": "en-table", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "| `replace_block` | `file_path`, `address`, `block` (int / `\"1-4\"` / list), `new_text`. Contiguous range; a gap → `bad_block_range`. Empty `new_text` = delete. Comment above the block is preserved |\n| `delete_block` | same as `replace_block` with empty `new_text` |",
-    "replace": "_(replaced by `replace_unit` with `block=` — see above)_",
-    "search_repr": false}}]
-
-[{"id": "en-lua", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "**Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_block` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part=\"body\"`. `insert_block position=\"end\"` inserts before `return M` when present.",
-    "replace": "**Lua.** Blocks inside functions are **not numbered yet** (`blocks=0`, `replace_unit(block=...)` → `not_applicable`) — the token parser does not surface statement boundaries. To edit a body — `replace_unit part=\"body\"`. `insert_block position=\"end\"` inserts before `return M` when present.",
-    "search_repr": false}}]
-
-[{"id": "en-cheat", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "| Delete a method from a class | `delete_block` |",
-    "replace": "| Delete a method from a class | `replace_unit(block=N, new_text=\"\")` |",
-    "search_repr": false}}]
-
-[{"id": "en-edit", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "3. `replace_block` — replace a block or a range in body. Empty `new_text` deletes (or use `delete_block`).",
-    "replace": "3. `replace_unit(block=N)` — replace a block or a range in body. Empty `new_text` deletes.",
-    "search_repr": false}}]
-
-[{"id": "en-err", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "- `bad_block_range` — `replace_block` / `delete_block` received non-adjacent blocks (`\"1,3\"`); only a contiguous range is allowed.",
-    "replace": "- `bad_block_range` — `replace_unit(block=...)` received non-adjacent blocks (`\"1,3\"`); only a contiguous range is allowed.\n- `scope_required` — `replace_unit` without `part` or `block`. Pass exactly one.\n- `scope_conflict` — `replace_unit` with both `part` and `block`. Pass exactly one.",
-    "search_repr": false}}]
-
-[{"id": "en-notdo", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "- **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `replace_block`, `delete_block`, `insert_block`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.",
-    "replace": "- **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `insert_block`, `set_annotation`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.",
-    "search_repr": false}}]
-
-[{"id": "en-notdo2", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
-    "search": "- **Do not use `replace_block` for a non-contiguous range.** `\"1,3\"` → `bad_block_range`. Only contiguous (`\"1-3\"`). For gaps — several calls.",
-    "replace": "- **Do not use `replace_unit(block=...)` for a non-contiguous range.** `\"1,3\"` → `bad_block_range`. Only contiguous (`\"1-3\"`). For gaps — several calls.",
-    "search_repr": false}}]
-
-[{"id": "model-3", "action": "replace_unit",
-  "arguments": {"file_path": "toolkit/code/manual/unit_proto/MODEL.md",
-    "address": {"section_number": "3"},
-    "part": "body",
-    "new_text": "Адрес — JSON-объект. **Один ключ-адрес — `qualname`:**\n\n- `{\"qualname\": \"Foo.bar\"}` — Python или Luau. Для вложенных — через точку (`Foo.Inner.method`).\n- `{\"qualname\": \"3\"}` — markdown-секция с нумерованным заголовком (`## 3. Format` → qualname `\"3\"`).\n- `{\"qualname\": \"Format\"}` — markdown-секция с безномерным заголовком (qualname = весь заголовок).\n- `{\"qualname\": \"<module>\"}` — модуль.\n\n**Плюс матчер — `title_match`** (не адрес, а поиск по подстроке в заголовке секции): `{\"title_match\": \"Format\"}` найдёт любую секцию, у которой в заголовке есть `Format`.\n\n**Legacy-алиасы** (принимаются, но в новых патчах не использовать): `section_number` → `qualname`, `section_title` → `title_match`. Введены до 2026-10-11, когда адрес markdown-секции шёл отдельной осью; с унификацией на `qualname` стали избыточны.\n\n**Позиция** — через `block` в родителе. `qualname=\"<module>\", block=3` — третья top-level секция в markdown-модуле, или третий top-level statement в Python-модуле. Отдельного `section_position` нет — позиция покрыта единой моделью `block`.\n\nПри неоднозначности (несколько одноимённых unit'ов — например, `def f()` в разных местах) добавляется `occurrence`: `{\"qualname\": \"f\", \"occurrence\": 2}` — второй сверху вниз. Без `occurrence` в неоднозначном случае возвращается ошибка `ambiguous`."}}]
-
-[{"id": "model-4-part", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/unit_proto/MODEL.md",
-    "search": "Принимает строку или список строк. Одно из:\n\n- `all` (по умолчанию) — весь unit.\n- `head` — только объявление.\n- `annotation` — только описание.\n- `body` — только тело.",
-    "replace": "Принимает строку или список строк. Одно из:\n\n- `all` — весь unit (обязательно явно; дефолта нет).\n- `head` — только объявление.\n- `annotation` — только описание.\n- `body` — только тело.\n\n**`part` и `block` взаимоисключающие и обязательные** в write-тулах. `replace_unit` без одного из них → `scope_required`. С обоими → `scope_conflict`. Дефолта нет — caller всегда говорит, что заменяет. Это убирает класс ошибок «думал, что меняю блок, заменил всё тело».",
-    "search_repr": false}}]
-
-[{"id": "model-4-block", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/unit_proto/MODEL.md",
-    "search": "`block` **применяется к каждому блоку независимо**, если задан `part`. Пример: `block=\"1-5\", part=\"head\"` вернёт сигнатуры первых пяти блоков.",
-    "replace": "`block` — **только сам по себе** в write-тулах (в `read_unit` можно комбинировать с `part` для чтения срезов: `block=\"1-5\", part=\"head\"` вернёт сигнатуры первых пяти блоков). В `replace_unit` / `insert_block` `part` и `block` не совмещаются.",
-    "search_repr": false}}]
-
-[{"id": "model-hist", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/unit_proto/MODEL.md",
-    "search": "AST видит только `foo(x)`, а `# ...` — вне unit'а. `replace_block(..., block=1)` заменит `foo(x)` и **комментарий потеряет**.",
-    "replace": "AST видит только `foo(x)`, а `# ...` — вне unit'а. `replace_unit(..., block=1)` заменит `foo(x)` и **комментарий потеряет**.",
-    "search_repr": false}}]
-
-[{"id": "smoke", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
+[{"id": "smoke-gui", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["docs: LLM_START and MODEL use qualname/title_match and replace_unit(block=)"]}}]
+                "args": ["gui: remove leftover error_var.set calls"]}}]
