@@ -317,9 +317,9 @@ Roblox-сторона не правила в этой сессии. Native — �
 
 Матчить `\r\n` и `\n` одинаково. Реализация: перед матчингом `text.replace("\r\n", "\n")` для сравнения, но позиции — по оригиналу. Уберёт 90% промахов.
 
-### P2: `replace_in_file` — при провале показать похожие строки
+### ✅ P2 (закрыто): `replace_in_file` — tier-2 tolerance + tier-3 диагностика
 
-Сейчас `no_match`, без подсказки. Полезно: топ-3 строки файла с наивысшим сходством к `search` (SequenceMatcher). Сразу видно, где ошибка — пробел, регистр, отступ.
+Реализовано в следующей сессии. Итог: три tier'а — byte-exact (как Ctrl+F), trailing-whitespace tolerance (indent не трогается), no-match с top-3 похожих строк и маркерами `␣ ⇥ ⏎`. Плюс `regex: true` для паттернов с `\1`-backrefs. Тесты `test_replace_in_file.py` — 25/25.
 
 ### P2: `create_file` / `overwrite_file` — syntax check
 

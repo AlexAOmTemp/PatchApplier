@@ -226,12 +226,22 @@
 
 | Действие | Аргументы |
 |---|---|
-| `replace_in_file` | `file_path`, `search`, `replace`, опц. `occurrence` (число или `"all"`), `search_repr` (дефолт `true`) |
+| `replace_in_file` | `file_path`, `search`, `replace`, опц. `occurrence` (число или `"all"`), `search_repr` (дефолт `true`), `regex` (дефолт `false`) |
 | `replace_range` | `file_path`, `start_line`, `end_line`, `new_content`, **настоятельно рекомендуется** `expected_first_line` |
 | `replace_between` | `file_path`, `start_anchor`, `end_anchor`, `new_content`, опц. `include_start` (`true`), `include_end` (`true`), `occurrence` (`1`) |
 | `insert_at_anchor` | `file_path`, `anchor`, `position` (`"before"` / `"after"`), `new_content`, опц. `occurrence` (`1`) |
 
-**`occurrence`.** У `replace_in_file` — целое ≥1 (N-е вхождение) или `"all"`. У `replace_between` / `insert_at_anchor` — целое ≥1.
+**`occurrence`.** У `replace_in_file` — целое ≥1 (N-е вхождение) или `"all"`.
+
+**`replace_in_file` — три tier'а матчинга.**
+
+- **Tier 1 — byte-exact.** Как Ctrl+F: `search` содержит ровно те байты, что в файле. `foo()` — подстрока `foo()  `, найдётся; trailing сохранятся. Если матч есть — применяем молча.
+- **Tier 2 — trailing-whitespace tolerance.** Если exact не нашёл — нормализуем trailing whitespace построчно в `search` и в файле, ищем. **Leading (indent) не трогаем** — она значима. Уникальный матч — применяем, message содержит пометку `(matched with trailing-whitespace normalisation; verify the line above)`. Несколько матчей — `bad_occurrence`, тот же механизм что и в Tier 1.
+- **Tier 3 — no match.** Возвращаем `no_match` с `Searched: <repr>` и top-3 похожих строк из файла с маркерами невидимых: `␣` (trailing space), `⇥` (tab). По маркеру сразу видно, почему строка не нашлась.
+
+**Regex-режим.** `regex: true` — `search` это Python-regex, `replace` поддерживает `\1`-backrefs. `occurrence` работает как в literal: `"all"` — все совпадения, число — N-е. Плохой паттерн → `bad_regex`. Полезно для «любой `def <name>():`» без ручной работы с якорями.
+
+ У `replace_between` / `insert_at_anchor` — целое ≥1.
 
 **`replace_between`** — замена блока между двумя короткими уникальными якорями. `include_start` / `include_end` определяют, съедаются ли сами якоря. Основной текстовый тул для многострочных замен. Якоря — короткие фразы без эмодзи.
 

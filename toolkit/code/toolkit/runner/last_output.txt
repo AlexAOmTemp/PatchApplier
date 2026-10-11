@@ -1,175 +1,74 @@
-[r1] ✓ read_unit:     def execute(
-            self,
-            backend: Backend,
-            fmt: Any,
-            file_path: str,
-            search: str,
-            replace: str,
-            occurrence: int | str = 1,
-            search_repr: bool = True,
-            **_: Any,
-        ) -> Result:
-            before_raw = backend.read(file_path)
-            # CRLF normalization: match in LF-space, restore on write.
-            had_crlf = "\r\n" in before_raw
-            before = before_raw.replace("\r\n", "\n") if had_crlf else before_raw
+[test] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/tests/test_replace_in_file.py (+30 стр., +1411 Б)
 
-            # search_repr=True (default): if `search` looks like a Python string
-            # literal (starts and ends with matching quote), unwrap it via
-            # ast.literal_eval. This is how `read_file raw=repr` output is
-            # meant to be used. If it is not a valid literal — fall through to
-            # byte-exact matching (backward compat with raw text callers).
-            needle = search
-            if search_repr:
-                stripped = search.strip()
-                if (len(stripped) >= 2
-                        and stripped[0] in ("'", '"')
-                        and stripped[-1] == stripped[0]):
-                    try:
-                        needle = ast.literal_eval(stripped)
-                    except (ValueError, SyntaxError):
-                        needle = search
-            if "\r\n" in needle:
-                needle = needle.replace("\r\n", "\n")
+[run] ✓ run_python: exit=0  duration=101ms
+--- stdout ---
+[1] ✓ replace_in_file: a.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
 
-            repl = replace
-            if "\r\n" in repl:
-                repl = repl.replace("\r\n", "\n")
+[OK]   tier1 ok
+[OK]   tier1 applied
+[OK]   tier1 no marker
+[1] ✓ replace_in_file: b.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
 
-            total = before.count(needle)
-            if total == 0:
-                return Result(
-                    status="error",
-                    message=f"Строка не найдена в {file_path}",
-                    action="replace_in_file",
-                    error_code="no_match",
-                )
+[OK]   tier1 substring ok
+[OK]   substring keeps trailing ws
+[OK]   substring no normalisation marker
+[1] ✓ replace_in_file: c.py: заменено 1 вхожд. (последнее) — +0 стр., -2 Б  (matched with trailing-whitespace normalisation; verify the line above)
 
-            if occurrence == "all" or occurrence == -1:
-                after = before.replace(needle, repl)
-                n_occurrences = total
-            else:
-                try:
-                    occ_num = int(occurrence)
-                except (ValueError, TypeError):
-                    return Result(
-                        status="error",
-                        message=f"Некорректное occurrence: {occurrence!r}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
-                if occ_num < 1:
-                    return Result(
-                        status="error",
-                        message=f"occurrence должен быть >= 1, получено {occ_num}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
-                if occ_num > total:
-                    return Result(
-                        status="error",
-                        message=f"Найдено {total} вхождений, нельзя заменить #{occ_num}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
-                pos = -1
-                for _ in range(occ_num):
-                    pos = before.find(needle, pos + 1)
-                after = before[:pos] + repl + before[pos + len(needle):]
-                n_occurrences = 1
+[OK]   tier2 ok
+[OK]   tier2 replaced
+[OK]   tier2 marked in message
+[1] ✗ replace_in_file: Строка не найдена в d.py
+  Searched: 'def x():\n    pass'
+  Similar lines (invisible chars shown):
+    L1: 'def a():␣␣'
+    L4: 'def b():␣␣'
 
-            after_out = after.replace("\n", "\r\n") if had_crlf else after
-            backend.write(file_path, after_out)
-            delta = _delta(before_raw, after_out, n_occurrences)
-            msg = _delta_msg(file_path, delta, n_occurrences, total)
-            return Result(
-                status="ok",
-                message=msg,
-                delta=delta,
-                verified=True,
-                action="replace_in_file",
-            )
+[OK]   no match for unrelated needle
+[1] ✓ replace_in_file: e.py: заменено 1 вхожд. (последнее) — +0 стр., -2 Б  (matched with trailing-whitespace normalisation; verify the line above)
 
-[r2] ✓ grep: Найдено 10 совпадений:
-toolkit/code/toolkit/tools/write.py:186:             msg = (f"L{start_line}–L{end_line} → L{start_line}–L{start_line + _count_lines(new) - 1} "
-toolkit/code/toolkit/tools/write.py:234:         starts = _find_all(before, start_anchor)
-toolkit/code/toolkit/tools/write.py:235:         ends = _find_all(before, end_anchor)
-toolkit/code/toolkit/tools/write.py:257:         new_lines = _count_lines(new_content)
-toolkit/code/toolkit/tools/write.py:293:         anchors = _find_all(before, anchor)
-toolkit/code/toolkit/tools/write.py:397:         new_end = _count_lines(before[:sec.heading_start]) + _count_lines(replacement)
-toolkit/code/toolkit/tools/write.py:398:         start_line = _count_lines(before[:sec.heading_start]) + 1
-toolkit/code/toolkit/tools/write.py:639: def _find_all(text: str, needle: str) -> list[int]:
-toolkit/code/toolkit/tools/write.py:653: def _count_lines(text: str) -> int:
-toolkit/code/toolkit/tools/write.py:664:         lines=_count_lines(after_text) - _count_lines(before_text),
+[OK]   tier2 unique ok
+[OK]   tier2 unique applied
+[OK]   tier2 second function untouched
+[1] ✗ replace_in_file: Строка не найдена в f.py
+  Searched: 'from .core import Something'
+  Similar lines (invisible chars shown):
+    L1: 'from .model import Block, Part, Unit, UnitKind␣␣'
 
-[r3] ✓ read_file: toolkit/code/toolkit/tools/write.py L595–L660
-595: '    return f"{fmt.ann_open} {keyword}: {value} {fmt.ann_close}"\r\n'
-596: '\r\n'
-597: '\r\n'
-598: 'def _rewrite_top(\r\n'
-599: '    top: str,\r\n'
-600: '    fmt: Format,\r\n'
-601: '    summary: str,\r\n'
-602: '    tags: list[str] | None,\r\n'
-603: ') -> str:\r\n'
-604: '    new_top = top\r\n'
-605: '    if tags is not None:\r\n'
-606: '        tags_line = _fmt_annotation(fmt, fmt.ann_tags, ", ".join(tags))\r\n'
-607: '        new_top = _replace_or_insert(new_top, fmt, fmt.ann_tags, tags_line)\r\n'
-608: '    summary_line = _fmt_annotation(fmt, fmt.ann_summary, summary)\r\n'
-609: '    new_top = _replace_or_insert(new_top, fmt, fmt.ann_summary, summary_line)\r\n'
-610: '    return new_top\r\n'
-611: '\r\n'
-612: '\r\n'
-613: 'def _replace_or_insert(top: str, fmt: Format, keyword: str, new_line: str) -> str:\r\n'
-614: '    flags = 0 if fmt.case_sensitive else re.IGNORECASE\r\n'
-615: '    pat = re.compile(\r\n'
-616: '        rf"{re.escape(fmt.ann_open)}\\s*{re.escape(keyword)}\\s*:\\s*.+?\\s*{re.escape(fmt.ann_close)}",\r\n'
-617: '        flags,\r\n'
-618: '    )\r\n'
-619: '    if pat.search(top):\r\n'
-620: '        return pat.sub(lambda m: new_line, top, count=1)\r\n'
-621: '    return _insert_annotation(top, new_line)\r\n'
-622: '\r\n'
-623: '\r\n'
-624: 'def _insert_annotation(top: str, new_line: str) -> str:\r\n'
-625: '    stripped = top.lstrip("\\n")\r\n'
-626: '    if not stripped:\r\n'
-627: '        # only blanks (or empty) — insert at very start\r\n'
-628: '        return new_line + "\\n" + top\r\n'
-629: '    # insert right before first annotation (after leading blanks, if any)\r\n'
-630: '    i = 0\r\n'
-631: '    while i < len(top) and top[i] == "\\n":\r\n'
-632: '        i += 1\r\n'
-633: '    return top[:i] + new_line + "\\n" + top[i:]\r\n'
-634: '\r\n'
-635: '\r\n'
-636: '# --- shared helpers --------------------------------------------------------\r\n'
-637: '\r\n'
-638: '\r\n'
-639: 'def _find_all(text: str, needle: str) -> list[int]:\r\n'
-640: '    """All start offsets of non-overlapping occurrences of `needle`."""\r\n'
-641: '    if not needle:\r\n'
-642: '        return []\r\n'
-643: '    out: list[int] = []\r\n'
-644: '    pos = 0\r\n'
-645: '    while True:\r\n'
-646: '        i = text.find(needle, pos)\r\n'
-647: '        if i < 0:\r\n'
-648: '            return out\r\n'
-649: '        out.append(i)\r\n'
-650: '        pos = i + len(needle)\r\n'
-651: '\r\n'
-652: '\r\n'
-653: 'def _count_lines(text: str) -> int:\r\n'
-654: '    if not text:\r\n'
-655: '        return 0\r\n'
-656: '    n = text.count("\\n")\r\n'
-657: '    if not text.endswith("\\n"):\r\n'
-658: '        n += 1\r\n'
-659: '    return n\r\n'
-660: '\r\n'
-[timing] user (3 actions): 0.01s
+[OK]   tier3 no_match
+[OK]   tier3 mentions searched
+[OK]   tier3 shows similar lines
+[OK]   tier3 marks trailing space
+[1] ✓ replace_in_file: r.py: заменено 1 вхожд. (осталось 2) — +0 стр., -1 Б
 
-##RESULT:{"ok": 3, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.01s
+[OK]   regex ok
+[OK]   regex replaced first only
+[1] ✓ replace_in_file: s.py: заменено 2 вхожд. (все) — +0 стр., -2 Б
+
+[OK]   regex all ok
+[OK]   regex all replaced
+[1] ✓ replace_in_file: t.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+
+[OK]   regex backref ok
+[OK]   regex backref swapped
+[1] ✗ replace_in_file: Regex не нашёл совпадений в u.py
+  Pattern: 'qq\\d+'
+
+[OK]   regex no match
+[1] ✗ replace_in_file: Плохой regex: missing ), unterminated subpattern at position 0
+
+[OK]   regex bad pattern
+
+=== 25 ok, 0 failed ===
+[timing] user (2 actions): 0.10s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 174) [v393] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 168, символов: 1157) [v439] [~1, ⇅5]
+  ~ toolkit/code/toolkit/tests/test_replace_in_file.py  (+30 стр., +1.4 KB)
+      ~ toolkit/code/toolkit/tests/test_replace_in_file.py :: main  [function]  L57–L191 → L64–L221
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v268] [без изменений]
+[timing] auto-rebuild (3 actions): 0.77s
+
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.88s

@@ -224,12 +224,22 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 
 | Action | Arguments |
 |---|---|
-| `replace_in_file` | `file_path`, `search`, `replace`, optional `occurrence` (number or `"all"`), `search_repr` (default `true`) |
+| `replace_in_file` | `file_path`, `search`, `replace`, optional `occurrence` (number or `"all"`), `search_repr` (default `true`), `regex` (default `false`) |
 | `replace_range` | `file_path`, `start_line`, `end_line`, `new_content`, **strongly recommended** `expected_first_line` |
 | `replace_between` | `file_path`, `start_anchor`, `end_anchor`, `new_content`, optional `include_start` (`true`), `include_end` (`true`), `occurrence` (`1`) |
 | `insert_at_anchor` | `file_path`, `anchor`, `position` (`"before"` / `"after"`), `new_content`, optional `occurrence` (`1`) |
 
-**`occurrence`.** For `replace_in_file` — an integer ≥1 or `"all"`. For `replace_between` / `insert_at_anchor` — an integer ≥1.
+**`occurrence`.** For `replace_in_file` — an integer ≥1 or `"all"`.
+
+**`replace_in_file` — three matching tiers.**
+
+- **Tier 1 — byte-exact.** Like Ctrl+F: `search` contains exactly the bytes that are in the file. `foo()` is a substring of `foo()  `, so it matches; the trailing spaces stay. On a match we apply silently.
+- **Tier 2 — trailing-whitespace tolerance.** If exact does not match, we normalise trailing whitespace per line in both `search` and the file, then search again. **Leading (indent) is not normalised** — it is meaningful. Unique match — apply, message carries the note `(matched with trailing-whitespace normalisation; verify the line above)`. Multiple matches — `bad_occurrence`, same mechanism as in Tier 1.
+- **Tier 3 — no match.** Return `no_match` with `Searched: <repr>` and the top-3 similar lines from the file, with invisible characters marked: `␣` (trailing space), `⇥` (tab). The marker tells you at a glance why the line did not match.
+
+**Regex mode.** `regex: true` — `search` is a Python regex, `replace` supports `\1` backrefs. `occurrence` behaves as in literal mode: `"all"` for every match, a number for the N-th. A bad pattern returns `bad_regex`. Useful for "any `def <name>():`" without hand-managing anchors.
+
+ For `replace_between` / `insert_at_anchor` — an integer ≥1.
 
 **`replace_between`** — replaces a block between two short unique anchors. `include_start` / `include_end` control whether the anchors themselves are consumed. The primary text tool for multi-line replacements. Anchors should be short phrases, no emoji.
 
