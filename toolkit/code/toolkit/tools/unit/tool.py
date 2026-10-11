@@ -266,7 +266,8 @@ def _write_call(backend, file_path, action, address, apply_fn) -> Result:
     except ValueError as e:
         msg = str(e)
         code = "bad_argument"
-        for p in ("empty_input_use_delete_block", "empty_input",
+        for p in ("scope_required", "scope_conflict",
+                  "empty_input_use_delete_block", "empty_input",
                   "bad_block_range", "bad_block", "bad_position",
                   "anchor_required", "bad_anchor", "bad_text",
                   "result_syntax_error", "result_missing_symbol",

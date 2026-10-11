@@ -1,4 +1,16 @@
-[t-unit-now] ✗ run_python: exit=1  duration=103ms
+[rename-call] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 5 вхожд. (все) — +0 стр., -5 Б
+
+[rename-del] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., +0 Б
+
+[delete-call] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., +13 Б
+
+[head-comment] ✓ replace_in_file: toolkit/code/toolkit/tests/test_unit_model.py: заменено 1 вхожд. (последнее) — +0 стр., -9 Б
+
+[strict-empty] ✓ replace_in_file: toolkit/code/toolkit/tests/test_strictness.py: заменено 1 вхожд. (последнее) — +1 стр., +27 Б
+
+[strict-new-tests] ✓ replace_in_file: toolkit/code/toolkit/tests/test_strictness.py: заменено 1 вхожд. (последнее) — +50 стр., +2058 Б
+
+[run-unit] ✓ run_python: exit=0  duration=109ms
 --- stdout ---
 == read_unit: Python head ===
 [1] ✓ read_unit: def helper(x: int) -> int:
@@ -69,27 +81,27 @@ Widget.fetch                             [method  ] L18-21  blocks=3
 [OK]   ok
 [OK]   new summary
 == replace_block: single ===
-[1] – replace_block: неизвестное действие
+[1] ✓ replace_unit: a.py: replace_unit применён
 
-[FAIL] ok -- неизвестное действие
-[FAIL] new return
+[OK]   ok
+[OK]   new return
 == replace_block: range deletes ===
-[1] – replace_block: неизвестное действие
+[1] ✓ replace_unit: a.py: replace_unit применён
 
-[FAIL] ok -- неизвестное действие
-[FAIL] a=1 gone
-[FAIL] b=2 gone
-[FAIL] return 42 kept
+[OK]   ok
+[OK]   a=1 gone
+[OK]   b=2 gone
+[OK]   return 42 kept
 == replace_block: bad range ===
-[1] – replace_block: неизвестное действие
+[1] ✗ replace_unit: bad_block_range: blocks 1 and 3 are not adjacent
 
-[FAIL] error
-[FAIL] bad_block_range
+[OK]   error
+[OK]   bad_block_range
 == delete_block ===
-[1] – delete_block: неизвестное действие
+[1] ✓ replace_unit: b.py: replace_unit применён
 
-[FAIL] ok -- неизвестное действие
-[FAIL] a=1 gone
+[OK]   ok
+[OK]   a=1 gone
 [OK]   b=2 kept
 == insert_block: before anchor ===
 [1] ✓ insert_block: c.py: insert_block применён
@@ -115,20 +127,20 @@ Widget.fetch                             [method  ] L18-21  blocks=3
 [OK]   old gone
 [OK]   docstring kept
 == Luau: replace_block not_applicable ===
-[1] – replace_block: неизвестное действие
+[1] ✗ replace_unit: not_applicable: this unit has no blocks
 
-[FAIL] error
-[FAIL] not_applicable
+[OK]   error
+[OK]   not_applicable
 == replace_block: result_syntax_error ===
-[1] – replace_block: неизвестное действие
+[1] ✗ replace_unit: result_syntax_error: invalid syntax (<unknown>, line 2)
 
-[FAIL] error
-[FAIL] result_syntax_error
+[OK]   error
+[OK]   result_syntax_error
 [OK]   file unchanged
 
-=== 41 ok, 14 failed ===
+=== 55 ok, 0 failed ===
 
-[t-strict-now] ✗ run_python: exit=1  duration=105ms
+[run-strict] ✗ run_python: exit=1  duration=100ms
 --- stdout ---
 [1] ✗ create_file: Не создаю bad.py: content_syntax_error: invalid syntax (<unknown>, line 1)
 
@@ -147,81 +159,67 @@ Widget.fetch                             [method  ] L18-21  blocks=3
 
 [OK]   overwrite .py syntax error rejected
 [OK]   original preserved
-[1] ✓ read_unit: <!-- summary: a -->
-
-[OK]   section_title by human text works
-[1] ✓ read_unit: <!-- summary: b -->
-
-[OK]   section_title finds second by title
-[1] ✗ read_unit: not_found: title_match='gamma'
-  (or list_units for the full map of the file)
-
-[OK]   unknown section_title -> not_found
-[OK]   hint mentions list_units
-[1] ✗ read_unit: not_found: qualname='nosuch'
-  (or list_units for the full map of the file)
-
-[OK]   unknown qualname -> not_found
-[OK]   qualname hint mentions list_units
-[1] ✓ read_unit: <!-- summary: b -->
-
-[OK]   section_number still works
 [1] ✗ replace_unit: scope_required: pass part= or block= (part=all replaces the whole unit; block=N replaces N-th block)
 
-[FAIL] empty part=all rejected with dedicated code -- error/bad_argument
-[1] ✓ read_unit: 
-Prose part one.
-More prose.
+[FAIL] scope_required when no part/block -- error/bad_argument
+[1] ✗ replace_unit: scope_conflict: use part= or block=, not both
 
+[FAIL] scope_conflict when both part and block -- error/bad_argument
+[1] ✓ replace_unit: a.py: replace_unit применён
 
-[OK]   read own_body ok
-[OK]   own_body has prose
-[OK]   own_body has second prose line
-[OK]   own_body excludes subsection
-[OK]   own_body excludes subsection header
-[1] ✓ replace_unit: doc.md: replace_unit применён
+[OK]   replace_unit(block=1) works
+[OK]   block replaced
+[1] ✗ replace_unit: result_syntax_error: expected an indented block after function definition on line 1 (<unknown>, line 1)
 
-[OK]   replace own_body ok
-[OK]   new prose written
-[OK]   old prose gone
-[OK]   subsection preserved
-[OK]   subsection body preserved
-[1] ✓ get_status: ## Session
-project:  proj
-roots:    toolkit, docs
-backend:  filesystem
-luau:     mcp
-format:   default
-exec:     disabled
+[FAIL] replace_unit(block=, empty) deletes -- error/result_syntax_error
+--- stderr ---
+Traceback (most recent call last):
+  File "D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_strictness.py", line 301, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_strictness.py", line 153, in main
+    t.expect('block gone', 'return 42' not in body)
+                           ^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: argument of type 'bool' is not a container or iterable
 
-[OK]   get_status ok
-[OK]   roots line present
+[smoke] ✓ run_python: exit=0  duration=73ms
+--- stdout ---
+[OK]   toolkit.core
+[OK]   toolkit.core.models
+[OK]   toolkit.core.patcher
+[OK]   toolkit.core.session
+[OK]   toolkit.config
+[OK]   toolkit.config.workspace
+[OK]   toolkit.backends
+[OK]   toolkit.backends.filesystem
+[OK]   toolkit.backends.workspace
+[OK]   toolkit.backends.composite
+[OK]   toolkit.backends.mcp
+[OK]   toolkit.indexers
+[OK]   toolkit.indexers.doc
+[OK]   toolkit.indexers.code
+[OK]   toolkit.tools
+[OK]   toolkit.tools.index
+[OK]   toolkit.tools.status
+[OK]   toolkit.runner.projects
 
-=== 26 ok, 1 failed ===
+=== all imports OK ===
 
-[grep-rb] ✓ grep: Найдено 17 совпадений:
-toolkit/code/toolkit/tests/test_strictness.py:5:   - replace_unit: empty_input_use_delete_block for part=all + empty text
-toolkit/code/toolkit/tests/test_strictness.py:176:                  and r.error_code == 'empty_input_use_delete_block',
-toolkit/code/toolkit/tests/test_unit_model.py:2: replace_unit, replace_block, delete_block, insert_block.
-toolkit/code/toolkit/tests/test_unit_model.py:196:             # --- replace_block ---
-toolkit/code/toolkit/tests/test_unit_model.py:197:             print("== replace_block: single ===")
-toolkit/code/toolkit/tests/test_unit_model.py:198:             r = run("replace_block", file_path="a.py",
-toolkit/code/toolkit/tests/test_unit_model.py:205:             print("== replace_block: range deletes ===")
-toolkit/code/toolkit/tests/test_unit_model.py:206:             r = run("replace_block", file_path="a.py",
-toolkit/code/toolkit/tests/test_unit_model.py:215:             print("== replace_block: bad range ===")
-toolkit/code/toolkit/tests/test_unit_model.py:216:             r = run("replace_block", file_path="a.py",
-toolkit/code/toolkit/tests/test_unit_model.py:222:             # --- delete_block ---
-toolkit/code/toolkit/tests/test_unit_model.py:223:             print("== delete_block ===")
-toolkit/code/toolkit/tests/test_unit_model.py:227:             r = run("delete_block", file_path="b.py",
-toolkit/code/toolkit/tests/test_unit_model.py:277:             print("== Luau: replace_block not_applicable ===")
-toolkit/code/toolkit/tests/test_unit_model.py:278:             r = run("replace_block", file_path="m.lua",
-toolkit/code/toolkit/tests/test_unit_model.py:284:             print("== replace_block: result_syntax_error ===")
-toolkit/code/toolkit/tests/test_unit_model.py:285:             r = run("replace_block", file_path="c.py",
+[commit] ✓ run_python: exit=0  duration=156ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master ffccce7] tests: migrate to replace_unit(block=...), add scope tests
+ 6 files changed, 160 insertions(+), 75 deletions(-)
+[timing] user (10 actions): 0.45s
 
-[grep-ru-nopart] ✓ grep: Найдено 2 совпадений:
-toolkit/code/toolkit/tests/test_strictness.py:6:   - replace_unit: part=own_body on markdown with subsections
-toolkit/code/toolkit/tests/test_unit_bounds.py:4:   - md: replace_unit part=body must not eat the next section heading
-[timing] user (4 actions): 0.24s
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v407] [без изменений]
 
-##RESULT:{"ok": 2, "errors": 2, "skipped": 0, "failed": [1, 2], "blocked": []}
-[timing] total: 0.24s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v456] [~1]
+  ~ toolkit/code/toolkit/tests/test_unit_model.py  (+0 стр., +0.0 KB)
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v282] [без изменений]
+[timing] auto-rebuild (3 actions): 0.78s
+
+##RESULT:{"ok": 12, "errors": 1, "skipped": 0, "failed": [8], "blocked": []}
+[timing] total: 1.23s

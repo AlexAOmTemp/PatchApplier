@@ -140,17 +140,22 @@ def main():
         body = (root / 'a.py').read_text(encoding='utf-8')
         t.expect('block replaced', 'return 42' in body and 'return 1' not in body)
 
-        # block= with empty new_text = delete that block
+        # block= with empty new_text = delete that block. Function must
+        # have more than one block, or we end up with `def f():` and no body.
+        (root / 'b.py').write_text(
+            'def f():\n    a = 1\n    b = 2\n', encoding='utf-8')
         r = _run(root, [{'action': 'replace_unit', 'arguments': {
-            'file_path': 'a.py',
-            'address': {'qualname': 'foo'},
+            'file_path': 'b.py',
+            'address': {'qualname': 'f'},
             'block': 1,
             'new_text': '',
         }}])[0]
         t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',
                  f'{r.status}/{r.error_code}')
-        body = (r.status == 'ok') and (root / 'a.py').read_text(encoding='utf-8')
-        t.expect('block gone', 'return 42' not in body)
+        if r.status == 'ok':
+            body = (root / 'b.py').read_text(encoding='utf-8')
+            t.expect('first block gone', 'a = 1' not in body, repr(body))
+            t.expect('second block kept', 'b = 2' in body, repr(body))
 
     # --- section_title resolution ---
     with tempfile.TemporaryDirectory() as td:

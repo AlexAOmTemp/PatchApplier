@@ -1,50 +1,24 @@
-[{"id": "rename-call", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_unit_model.py",
-    "search": "\"replace_block\"",
-    "replace": "\"replace_unit\"",
-    "occurrence": "all",
+[{"id": "tool-prefix", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/tool.py",
+    "search": "        for p in (\"empty_input_use_delete_block\", \"empty_input\",\n                  \"bad_block_range\", \"bad_block\", \"bad_position\",\n                  \"anchor_required\", \"bad_anchor\", \"bad_text\",\n                  \"result_syntax_error\", \"result_missing_symbol\",\n                  \"result_parse_error\", \"result_missing_section\"):",
+    "replace": "        for p in (\"scope_required\", \"scope_conflict\",\n                  \"empty_input_use_delete_block\", \"empty_input\",\n                  \"bad_block_range\", \"bad_block\", \"bad_position\",\n                  \"anchor_required\", \"bad_anchor\", \"bad_text\",\n                  \"result_syntax_error\", \"result_missing_symbol\",\n                  \"result_parse_error\", \"result_missing_section\"):",
     "search_repr": false}}]
 
-[{"id": "rename-del", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_unit_model.py",
-    "search": "\"delete_block\"",
-    "replace": "\"replace_unit\"",
-    "occurrence": "all",
-    "search_repr": false}}]
-
-[{"id": "delete-call", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_unit_model.py",
-    "search": "r = run(\"replace_unit\", file_path=\"b.py\",\n                    address={\"qualname\": \"f\"}, block=1)",
-    "replace": "r = run(\"replace_unit\", file_path=\"b.py\",\n                    address={\"qualname\": \"f\"}, block=1, new_text=\"\")",
-    "search_repr": false}}]
-
-[{"id": "head-comment", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_unit_model.py",
-    "search": "\"\"\"Tests for the unit model tools: read_unit, list_units, set_annotation,\nreplace_unit, replace_block, delete_block, insert_block.",
-    "replace": "\"\"\"Tests for the unit model tools: read_unit, list_units, set_annotation,\nreplace_unit (with part / block), insert_block.",
-    "search_repr": false}}]
-
-[{"id": "strict-empty", "action": "replace_in_file",
+[{"id": "test-fix", "action": "replace_in_file",
   "arguments": {"file_path": "toolkit/code/toolkit/tests/test_strictness.py",
-    "search": "        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'new_text': '',\n        }}])[0]\n        t.expect('empty part=all rejected with dedicated code',",
-    "replace": "        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'part': 'all',\n            'new_text': '',\n        }}])[0]\n        t.expect('empty part=all rejected with dedicated code',",
+    "search": "        # block= with empty new_text = delete that block\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'block': 1,\n            'new_text': '',\n        }}])[0]\n        t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',\n                 f'{r.status}/{r.error_code}')\n        body = (r.status == 'ok') and (root / 'a.py').read_text(encoding='utf-8')\n        t.expect('block gone', 'return 42' not in body)",
+    "replace": "        # block= with empty new_text = delete that block. Function must\n        # have more than one block, or we end up with `def f():` and no body.\n        (root / 'b.py').write_text(\n            'def f():\\n    a = 1\\n    b = 2\\n', encoding='utf-8')\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'b.py',\n            'address': {'qualname': 'f'},\n            'block': 1,\n            'new_text': '',\n        }}])[0]\n        t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',\n                 f'{r.status}/{r.error_code}')\n        if r.status == 'ok':\n            body = (root / 'b.py').read_text(encoding='utf-8')\n            t.expect('first block gone', 'a = 1' not in body, repr(body))\n            t.expect('second block kept', 'b = 2' in body, repr(body))",
     "search_repr": false}}]
-
-[{"id": "strict-new-tests", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_strictness.py",
-    "search": "    # --- section_title resolution ---",
-    "replace": "    # --- scope: required / conflict ---\n    with tempfile.TemporaryDirectory() as td:\n        root = Path(td)\n        (root / 'a.py').write_text('def foo():\\n    return 1\\n', encoding='utf-8')\n\n        # Neither part nor block\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'new_text': 'x',\n        }}])[0]\n        t.expect('scope_required when no part/block',\n                 r.status == 'error' and r.error_code == 'scope_required',\n                 f'{r.status}/{r.error_code}')\n\n        # Both part and block\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'part': 'body',\n            'block': 1,\n            'new_text': 'x',\n        }}])[0]\n        t.expect('scope_conflict when both part and block',\n                 r.status == 'error' and r.error_code == 'scope_conflict',\n                 f'{r.status}/{r.error_code}')\n\n        # block= works through replace_unit\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'block': 1,\n            'new_text': 'return 42',\n        }}])[0]\n        t.expect('replace_unit(block=1) works', r.status == 'ok', r.message)\n        body = (root / 'a.py').read_text(encoding='utf-8')\n        t.expect('block replaced', 'return 42' in body and 'return 1' not in body)\n\n        # block= with empty new_text = delete that block\n        r = _run(root, [{'action': 'replace_unit', 'arguments': {\n            'file_path': 'a.py',\n            'address': {'qualname': 'foo'},\n            'block': 1,\n            'new_text': '',\n        }}])[0]\n        t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',\n                 f'{r.status}/{r.error_code}')\n        body = (r.status == 'ok') and (root / 'a.py').read_text(encoding='utf-8')\n        t.expect('block gone', 'return 42' not in body)\n\n    # --- section_title resolution ---",
-    "search_repr": false}}]
-
-[{"id": "run-unit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_unit_model.py"}}]
 
 [{"id": "run-strict", "action": "run_python",
   "arguments": {"script": "toolkit/code/toolkit/tests/test_strictness.py"}}]
+
+[{"id": "run-unit", "action": "run_python",
+  "arguments": {"script": "toolkit/code/toolkit/tests/test_unit_model.py"}}]
 
 [{"id": "smoke", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["tests: migrate to replace_unit(block=...), add scope tests"]}}]
+                "args": ["unit: scope_required/scope_conflict in error whitelist, fix test"]}}]
