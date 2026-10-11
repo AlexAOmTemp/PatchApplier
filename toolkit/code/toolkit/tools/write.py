@@ -25,96 +25,139 @@ class ReplaceInFileTool:
     path_list_args: list[str] = []
 
     def execute(
-            self,
-            backend: Backend,
-            fmt: Any,
-            file_path: str,
-            search: str,
-            replace: str,
-            occurrence: int | str = 1,
-            search_repr: bool = True,
-            **_: Any,
-        ) -> Result:
-            before_raw = backend.read(file_path)
-            # CRLF normalization: match in LF-space, restore on write.
-            had_crlf = "\r\n" in before_raw
-            before = before_raw.replace("\r\n", "\n") if had_crlf else before_raw
+        self,
+        backend: Backend,
+        fmt: Any,
+        file_path: str,
+        search: str,
+        replace: str,
+        occurrence: int | str = 1,
+        search_repr: bool = True,
+        regex: bool = False,
+        **_: Any,
+    ) -> Result:
+        before_raw = backend.read(file_path)
+        # CRLF normalization: match in LF-space, restore on write.
+        had_crlf = "\r\n" in before_raw
+        before = before_raw.replace("\r\n", "\n") if had_crlf else before_raw
 
-            # search_repr=True (default): if `search` looks like a Python string
-            # literal (starts and ends with matching quote), unwrap it via
-            # ast.literal_eval. This is how `read_file raw=repr` output is
-            # meant to be used. If it is not a valid literal — fall through to
-            # byte-exact matching (backward compat with raw text callers).
-            needle = search
-            if search_repr:
-                stripped = search.strip()
-                if (len(stripped) >= 2
-                        and stripped[0] in ("'", '"')
-                        and stripped[-1] == stripped[0]):
-                    try:
-                        needle = ast.literal_eval(stripped)
-                    except (ValueError, SyntaxError):
-                        needle = search
-            if "\r\n" in needle:
-                needle = needle.replace("\r\n", "\n")
+        # --- regex mode ---------------------------------------------------
+        if regex:
+            return _replace_regex(
+                backend, file_path, before, before_raw, had_crlf,
+                search, replace, occurrence,
+            )
 
-            repl = replace
-            if "\r\n" in repl:
-                repl = repl.replace("\r\n", "\n")
+        # --- literal mode: unwrap repr-quoted search if asked ----------------
+        needle = search
+        if search_repr:
+            stripped = search.strip()
+            if (len(stripped) >= 2
+                    and stripped[0] in ("'", '"')
+                    and stripped[-1] == stripped[0]):
+                try:
+                    needle = ast.literal_eval(stripped)
+                except (ValueError, SyntaxError):
+                    needle = search
+        if "\r\n" in needle:
+            needle = needle.replace("\r\n", "\n")
+        repl = replace
+        if "\r\n" in repl:
+            repl = repl.replace("\r\n", "\n")
 
-            total = before.count(needle)
-            if total == 0:
-                return Result(
-                    status="error",
-                    message=f"Строка не найдена в {file_path}",
-                    action="replace_in_file",
-                    error_code="no_match",
+        # --- Tier 1: byte-exact ------------------------------------------
+        tier = 1
+        total = before.count(needle)
+        ranges: list[tuple[int, int]] | None = None
+        if total == 0:
+            # --- Tier 2: trailing-whitespace-normalised -------------------
+            norm = _find_normalised(before, needle)
+            if norm:
+                tier = 2
+                ranges = norm
+                total = len(norm)
+
+        if total == 0:
+            # --- Tier 3: no match, show similar --------------------------
+            similar = _similar_lines(before, needle, n=3)
+            extra = ""
+            if similar:
+                extra = "\n  Similar lines (invisible chars shown):\n" + "\n".join(
+                    f"    L{ln}: {txt!r}" for ln, txt, _ in similar
                 )
+            return Result(
+                status="error",
+                message=(f"Строка не найдена в {file_path}"
+                         f"\n  Searched: {needle!r}"
+                         f"{extra}"),
+                action="replace_in_file",
+                error_code="no_match",
+            )
 
-            if occurrence == "all" or occurrence == -1:
+        # --- apply by occurrence ------------------------------------------
+        n_occurrences = 0
+        if occurrence == "all" or occurrence == -1:
+            if tier == 1:
                 after = before.replace(needle, repl)
                 n_occurrences = total
             else:
-                try:
-                    occ_num = int(occurrence)
-                except (ValueError, TypeError):
-                    return Result(
-                        status="error",
-                        message=f"Некорректное occurrence: {occurrence!r}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
-                if occ_num < 1:
-                    return Result(
-                        status="error",
-                        message=f"occurrence должен быть >= 1, получено {occ_num}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
-                if occ_num > total:
-                    return Result(
-                        status="error",
-                        message=f"Найдено {total} вхождений, нельзя заменить #{occ_num}",
-                        action="replace_in_file",
-                        error_code="bad_occurrence",
-                    )
+                # Tier 2 all: replace every matched range.
+                chunks = []
+                prev = 0
+                for s, e in ranges or []:
+                    chunks.append(before[prev:s])
+                    chunks.append(repl)
+                    prev = e
+                chunks.append(before[prev:])
+                after = "".join(chunks)
+                n_occurrences = len(ranges or [])
+        else:
+            try:
+                occ_num = int(occurrence)
+            except (ValueError, TypeError):
+                return Result(
+                    status="error",
+                    message=f"Некорректное occurrence: {occurrence!r}",
+                    action="replace_in_file",
+                    error_code="bad_occurrence",
+                )
+            if occ_num < 1:
+                return Result(
+                    status="error",
+                    message=f"occurrence должен быть >= 1, получено {occ_num}",
+                    action="replace_in_file",
+                    error_code="bad_occurrence",
+                )
+            if occ_num > total:
+                return Result(
+                    status="error",
+                    message=f"Найдено {total} вхождений, нельзя заменить #{occ_num}",
+                    action="replace_in_file",
+                    error_code="bad_occurrence",
+                )
+            if tier == 1:
                 pos = -1
                 for _ in range(occ_num):
                     pos = before.find(needle, pos + 1)
                 after = before[:pos] + repl + before[pos + len(needle):]
-                n_occurrences = 1
+            else:
+                s, e = (ranges or [])[occ_num - 1]
+                after = before[:s] + repl + before[e:]
+            n_occurrences = 1
 
-            after_out = after.replace("\n", "\r\n") if had_crlf else after
-            backend.write(file_path, after_out)
-            delta = _delta(before_raw, after_out, n_occurrences)
-            msg = _delta_msg(file_path, delta, n_occurrences, total)
-            return Result(
-                status="ok",
-                message=msg,
-                delta=delta,
-                verified=True,
-                action="replace_in_file",
-            )
+        after_out = after.replace("\n", "\r\n") if had_crlf else after
+        backend.write(file_path, after_out)
+        delta = _delta(before_raw, after_out, n_occurrences)
+        msg = _delta_msg(file_path, delta, n_occurrences, total)
+        if tier == 2:
+            msg += "  (matched with trailing-whitespace normalisation; verify the line above)"
+        return Result(
+            status="ok",
+            message=msg,
+            delta=delta,
+            verified=True,
+            action="replace_in_file",
+        )
 
 
 # --- replace_range ---------------------------------------------------------
@@ -636,6 +679,88 @@ def _insert_annotation(top: str, new_line: str) -> str:
 # --- shared helpers --------------------------------------------------------
 
 
+def _replace_regex(backend: Backend, file_path: str,
+                   before: str, before_raw: str, had_crlf: bool,
+                   pattern: str, replacement: str,
+                   occurrence) -> Result:
+    """Regex branch of ReplaceInFileTool.
+
+    `pattern` is a Python regex. `replacement` supports \\1 backrefs
+    via `re.Match.expand`. `occurrence` selects which match (1-based);
+    "all" / -1 replaces every match.
+    """
+    try:
+        rx = re.compile(pattern)
+    except re.error as e:
+        return Result(
+            status="error",
+            message=f"Плохой regex: {e}",
+            action="replace_in_file",
+            error_code="bad_regex",
+        )
+    matches = list(rx.finditer(before))
+    total = len(matches)
+    if total == 0:
+        similar = _similar_lines(before, pattern, n=3)
+        extra = ""
+        if similar:
+            extra = "\n  Similar lines:\n" + "\n".join(
+                f"    L{ln}: {txt!r}" for ln, txt, _ in similar
+            )
+        return Result(
+            status="error",
+            message=(f"Regex не нашёл совпадений в {file_path}"
+                     f"\n  Pattern: {pattern!r}"
+                     f"{extra}"),
+            action="replace_in_file",
+            error_code="no_match",
+        )
+
+    if occurrence == "all" or occurrence == -1:
+        try:
+            after = rx.sub(replacement, before)
+        except re.error as e:
+            return Result(
+                status="error",
+                message=f"Плохой replacement: {e}",
+                action="replace_in_file",
+                error_code="bad_regex",
+            )
+        n_occurrences = total
+    else:
+        try:
+            occ_num = int(occurrence)
+        except (ValueError, TypeError):
+            return Result(
+                status="error",
+                message=f"Некорректное occurrence: {occurrence!r}",
+                action="replace_in_file",
+                error_code="bad_occurrence",
+            )
+        if occ_num < 1 or occ_num > total:
+            return Result(
+                status="error",
+                message=f"Найдено {total} совпадений, нельзя взять #{occ_num}",
+                action="replace_in_file",
+                error_code="bad_occurrence",
+            )
+        m = matches[occ_num - 1]
+        after = before[:m.start()] + m.expand(replacement) + before[m.end():]
+        n_occurrences = 1
+
+    after_out = after.replace("\n", "\r\n") if had_crlf else after
+    backend.write(file_path, after_out)
+    delta = _delta(before_raw, after_out, n_occurrences)
+    msg = _delta_msg(file_path, delta, n_occurrences, total)
+    return Result(
+        status="ok",
+        message=msg,
+        delta=delta,
+        verified=True,
+        action="replace_in_file",
+    )
+
+
 def _find_all(text: str, needle: str) -> list[int]:
     """All start offsets of non-overlapping occurrences of `needle`."""
     if not needle:
@@ -657,6 +782,82 @@ def _count_lines(text: str) -> int:
     if not text.endswith("\n"):
         n += 1
     return n
+
+
+def _rstrip_lines(s: str) -> str:
+    """Drop trailing whitespace on every line, keep EOL and leading as-is."""
+    return "\n".join(line.rstrip() for line in s.split("\n"))
+
+
+def _find_normalised(before: str, needle: str) -> list[tuple[int, int]]:
+    """Ranges [start, end) in `before` matching `needle` after stripping
+    trailing whitespace on every line of both. Leading whitespace is kept
+    (indent is meaningful); only trailing is treated as file noise.
+
+    Both inputs must already be LF-normalised (see caller). Returns
+    non-overlapping ranges in source order.
+    """
+    if not needle:
+        return []
+    needle_lines = needle.split("\n")
+    file_lines = before.split("\n")
+    k = len(needle_lines)
+    if k > len(file_lines):
+        return []
+    needle_norm = [ln.rstrip() for ln in needle_lines]
+    # Precompute start offsets of every file line.
+    line_starts: list[int] = [0]
+    off = 0
+    for ln in file_lines[:-1]:
+        off += len(ln) + 1
+        line_starts.append(off)
+
+    matches: list[tuple[int, int]] = []
+    for j in range(len(file_lines) - k + 1):
+        ok = True
+        for i in range(k):
+            if file_lines[j + i].rstrip() != needle_norm[i]:
+                ok = False
+                break
+        if not ok:
+            continue
+        start_off = line_starts[j]
+        end_off = line_starts[j + k - 1] + len(file_lines[j + k - 1])
+        if matches and start_off < matches[-1][1]:
+            continue
+        matches.append((start_off, end_off))
+    return matches
+
+
+def _mark_invisible(s: str) -> str:
+    """Render a line with invisible characters made visible.
+
+    Trailing whitespace becomes \u2423 (space) / \u21e5 (tab). Tabs
+    anywhere else also become \u21e5. Internal spaces stay as spaces.
+    """
+    stripped = s.rstrip()
+    tail = s[len(stripped):]
+    out = stripped.replace("\t", "\u21e5")
+    if tail:
+        out += tail.replace(" ", "\u2423").replace("\t", "\u21e5")
+    return out
+
+
+def _similar_lines(before: str, needle: str, n: int = 3) -> list[tuple[int, str, float]]:
+    """Top-n file lines (1-based) most similar to the first needle line.
+
+    Returns [(line_no, marked_text, ratio), ...], sorted by ratio desc.
+    Used when both exact and normalised matching fail.
+    """
+    import difflib
+    needle_first = needle.split("\n", 1)[0]
+    out: list[tuple[int, str, float]] = []
+    for i, line in enumerate(before.split("\n"), start=1):
+        r = difflib.SequenceMatcher(None, line, needle_first).ratio()
+        if r > 0.5:
+            out.append((i, _mark_invisible(line), r))
+    out.sort(key=lambda x: -x[2])
+    return out[:n]
 
 
 def _delta(before_text: str, after_text: str, occurrences: int) -> Delta:
