@@ -1,6 +1,14 @@
 """Reader — resolve an address against a Unit tree and return text.
 
-Implements `read_unit`, `list_units`, `dump_tree` per MODEL.md.
+Addressing (MODEL.md section 3): one key — `qualname`. Sections with a
+numbered heading have `qualname = "3"`; bare sections have
+`qualname = "Format"` (the whole title). `title_match` is a *matcher*,
+not an address — it looks up by substring in a section's title.
+
+`section_number` and `section_title` are accepted as aliases for
+backward compatibility (they map to `qualname` and `title_match`
+respectively); new patches should use the canonical names.
+
 Text output for blocks: `=== block N ===` markers when more than one
 block is returned, none when exactly one.
 """
@@ -62,23 +70,28 @@ def _parse_blocks(spec) -> list[int]:
 
 def _resolve(root: Unit, address: dict) -> Unit:
     occ = int(address.get("occurrence", 0)) or None
+    # Canonical keys: `qualname` (address) and `title_match` (matcher).
+    # `section_number` / `section_title` are legacy aliases.
     if "qualname" in address:
-        qn = address["qualname"]
+        key, val = "qualname", address["qualname"]
+    elif "section_number" in address:
+        key, val = "qualname", str(address["section_number"]).strip()
+    elif "title_match" in address:
+        key, val = "title_match", str(address["title_match"])
+    elif "section_title" in address:
+        key, val = "title_match", str(address["section_title"])
+    else:
+        raise KeyError(
+            "address must have qualname or title_match "
+            "(section_number / section_title are legacy aliases)"
+        )
+
+    if key == "qualname":
+        qn = str(val)
         matches = [u for u in _iter_units(root) if u.qualname == qn]
         label = f"qualname={qn!r}"
-        kind_hint = "qualnames"
-    elif "section_number" in address:
-        n = str(address["section_number"]).strip()
-        matches = [u for u in _iter_units(root) if u.qualname == n]
-        label = f"section_number={n!r}"
-        kind_hint = "numbers"
-    elif "section_title" in address:
-        t = str(address["section_title"]).lower()
-        # Match against `title` (the human text) first; fall back to
-        # `name` for sections whose heading is bare (no number). Sections
-        # coming from a numbered heading have `name = "3"` and
-        # `title = "Format"`, so a plain substring against `name` would
-        # never match. See MODEL.md section 3.
+    else:  # title_match
+        t = str(val).lower()
         matches = []
         for u in _iter_units(root):
             if u.kind != UnitKind.SECTION:
@@ -86,12 +99,10 @@ def _resolve(root: Unit, address: dict) -> Unit:
             hay = (u.title or u.name or "").lower()
             if t in hay:
                 matches.append(u)
-        label = f"section_title={t!r}"
-        kind_hint = "titles"
-    else:
-        raise KeyError("address must have qualname / section_number / section_title")
+        label = f"title_match={t!r}"
+
     if not matches:
-        raise KeyError(_not_found_message(root, label, address, kind_hint))
+        raise KeyError(_not_found_message(root, label, val, key))
     if len(matches) == 1:
         return matches[0]
     if occ is None:
@@ -102,35 +113,27 @@ def _resolve(root: Unit, address: dict) -> Unit:
     return matches[occ - 1]
 
 
-def _not_found_message(root: Unit, label: str, address: dict,
-                       kind_hint: str) -> str:
-    """Not-found message with similar names + a next-step hint.
+def _not_found_message(root: Unit, label: str, query, key: str) -> str:
+    """Not-found message with up to 5 closest candidates.
 
-    For qualname / section_title we show the top-5 closest names via
-    difflib; for section_number — the list of numbers that do exist.
-    Always a hint to call list_units for the full map.
+    Candidates come from `difflib.get_close_matches`. No full enumeration
+    of the file: the point is to give the next guess, not a map (that is
+    what `list_units` is for).
     """
     import difflib
     units = list(_iter_units(root))
-    similar: list[str] = []
-    if kind_hint == "qualnames":
-        qn = address.get("qualname", "")
+    if key == "qualname":
         pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]
-        similar = difflib.get_close_matches(qn, pool, n=5, cutoff=0.5)
-    elif kind_hint == "titles":
-        t = str(address.get("section_title", ""))
+        q = str(query)
+    else:  # title_match
         pool = [u.title or u.name for u in units
                 if u.kind == UnitKind.SECTION]
-        similar = difflib.get_close_matches(t, pool, n=5, cutoff=0.5)
-    elif kind_hint == "numbers":
-        nums = sorted({u.qualname for u in units
-                       if u.kind == UnitKind.SECTION
-                       and u.qualname and u.qualname[0].isdigit()})
-        similar = nums[:20]
+        q = str(query)
+    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)
     parts = [f"not_found: {label}"]
     if similar:
-        parts.append("  Did you mean: " + ", ".join(repr(s) for s in similar))
-    parts.append("  (call list_units for the full map of the file)")
+        parts.append("  Did you mean: " + ", ".join(similar))
+    parts.append("  (or list_units for the full map of the file)")
     return "\n".join(parts)
 
 
@@ -146,24 +149,6 @@ def _slice(source: str, part: Part) -> str:
 def _slice_lines(source: str, a: int, b: int) -> str:
     lines = source.splitlines()
     return "\n".join(lines[max(0, a - 1):min(len(lines), b)])
-
-
-def _render_unit(source: str, unit: Unit, parts: list[str], blocks: list[int]) -> str:
-    if blocks:
-        return _render_blocks(source, unit, parts, blocks)
-    if not parts or parts == ["all"]:
-        return _slice_lines(source, unit.line_start, unit.line_end)
-    chunks: list[str] = []
-    for p in ("head", "annotation", "body", "own_body"):
-        if p not in parts:
-            continue
-        if p == "own_body":
-            text = _slice(source, _own_body_part(unit))
-        else:
-            text = _slice(source, getattr(unit, p))
-        if text:
-            chunks.append(text)
-    return "\n".join(chunks)
 
 
 def _own_body_part(unit: Unit):
@@ -188,6 +173,24 @@ def _own_body_part(unit: Unit):
     if end < unit.body.start:
         return _P()
     return _P(unit.body.start, end)
+
+
+def _render_unit(source: str, unit: Unit, parts: list[str], blocks: list[int]) -> str:
+    if blocks:
+        return _render_blocks(source, unit, parts, blocks)
+    if not parts or parts == ["all"]:
+        return _slice_lines(source, unit.line_start, unit.line_end)
+    chunks: list[str] = []
+    for p in ("head", "annotation", "body", "own_body"):
+        if p not in parts:
+            continue
+        if p == "own_body":
+            text = _slice(source, _own_body_part(unit))
+        else:
+            text = _slice(source, getattr(unit, p))
+        if text:
+            chunks.append(text)
+    return "\n".join(chunks)
 
 
 def _render_blocks(source: str, unit: Unit, parts: list[str], blocks: list[int]) -> str:
@@ -225,10 +228,6 @@ def _render_blocks(source: str, unit: Unit, parts: list[str], blocks: list[int])
 def _normalize_parts(part) -> list[str]:
     """Accept `head`, `head,annotation`, `[\"head\", \"annotation\"]`.
 
-    A bare string may hold a comma-separated list — same format the CLI
-    uses — so both `part="head,annotation"` and `part=["head", "annotation"]`
-    work identically.
-
     `own_body` is a section-only variant of `body`: the section's own
     text up to (not including) its first subsection. For non-section
     units it behaves like `body`.
@@ -256,9 +255,8 @@ def _normalize_parts(part) -> list[str]:
 def resolve(source: str, path: str, address: dict):
     """Resolve an address against the file's unit tree.
 
-    Public entry point for other tools (writer.py, etc.) that need the
-    resolved Unit rather than rendered text. Raises KeyError/ValueError
-    on the same conditions as `read_unit`.
+    Public entry point for other tools (writer.py, etc.). Raises
+    KeyError/ValueError on the same conditions as `read_unit`.
     """
     root = _build(source, path)
     return _resolve(root, address)
@@ -280,9 +278,17 @@ def read_unit(source: str, path: str, address: dict,
 def list_units(source: str, path: str) -> str:
     root = _build(source, path)
     rows: list[str] = []
+    top_level_counter = 0
     for u in _iter_units(root):
+        if u.kind != UnitKind.SECTION and u.kind != UnitKind.MODULE:
+            pos = ""
+        elif u.kind == UnitKind.MODULE:
+            pos = ""
+        else:
+            top_level_counter += 1
+            pos = f"[{top_level_counter}] "
         rows.append(
-            f"{u.qualname:<40} [{u.kind.value:<8}] "
+            f"{pos}{u.qualname:<40} [{u.kind.value:<8}] "
             f"L{u.line_start}-{u.line_end}  blocks={len(u.blocks)}"
         )
     return "\n".join(rows)

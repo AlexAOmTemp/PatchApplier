@@ -1,91 +1,13 @@
-[r1] ✓ read_unit: 
-### Unit-write тулы (`replace_block`, `delete_block`, `insert_block`)
+[reader] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/tools/unit/reader.py (+6 стр., -116 Б)
+[timing] user (1 actions): 0.00s
 
-Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor'а или точных строк. `delete_block(Class, block=N)` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.
-
-**Вывод:** не пробел тулсета, а моя нерешительность. В следующей сессии — сознательно попробовать.
-
-### `find_symbol`
-
-Не искал символ по имени — знал qualname из `read_file`. Если бы стартовая позиция была «найти функцию X», без индекса — использовал бы.
-
-**Когда использовать:** когда файл неизвестен, а имя символа известно. `find_symbol(query="parse_patches")` → путь + L-диапазон за один вызов.
-
-### `symbol_graph`
-
-Дважды: `Expectation.new` (Lua, пусто — модульный only) и `Patcher._apply_one` (Python, 2 callees + 1 caller + 4 unresolved). Тест на одном символе.
-
-**Когда использовать:** диагностика «кто ещё сломается, если я поменяю X». В этой сессии я просто делал grep по имени — работало, но без учёта графа.
-
-### `copy_unit`
-
-Не копировал целые функции между файлами. Если бы копировал `PathPolicy` из прототипа в боевой модуль — использовал бы.
-
-### `move_file` / `copy_file`
-
-Файлы перемещаю через git (переименования в коммите). `move_file` из тулсета — для runtime-задач, не для рефактора.
-
-### `replace_range`
-
-Не возникло. Замены по номерам строк — плохая практика (сам LLM_START это говорит), а `replace_in_file` / `replace_unit` / `overwrite_file` покрывают.
-
-### MCP-специфичные (`grep_mcp`, `grep_replace_mcp`, native tools)
-
-Roblox-сторона не правила в этой сессии. Native — только `list_roblox_studios`, `search_game_tree` в самом начале, для recon.
-
-
-[r2] ✓ read_file: toolkit/docs/SESSION_STATE.md L1–L50
-1: '# SESSION_STATE — состояние между сессиями\n'
-2: '\n'
-3: '<!-- summary: Snapshot of what was done in the last big session (Workspace refactor) and what to pick up next. Update on session close, read on session start. -->\n'
-4: '<!-- tags: session, state, bridge -->\n'
-5: '\n'
-6: '## Зачем этот документ\n'
-7: '\n'
-8: 'LLM_START — стабильная инструкция. DECISIONS — почему так решено. SESSION_STATE — **где мы прямо сейчас**: что закрыто в последней сессии, что открыто, что первым делом проверить при следующем старте.\n'
-9: '\n'
-10: 'Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.\n'
-11: '\n'
-12: '## Сессия: Settings window + tool polish (закрыта)\n'
-13: '\n'
-14: '**Тема:** после Workspace refactor — довести GUI-окно управления проектом и закрыть накопившийся долг по инструментам из `TOOL_PRACTICE.md §8`.\n'
-15: '\n'
-16: '### Что сделано\n'
-17: '\n'
-18: '**GUI — Project settings (шаг 7.3, заменяет старую «дерево файлов» идею):**\n'
-19: '- `runner/gui/tree.py` — чистая логика дерева каталогов. 26/26.\n'
-20: '- `runner/gui/tree_view.py` — Tk-виджет `PolicyTree`: соед. глифы, пять колонок, реактивный `set_active_flags`, hidden = hard deny. 19/19.\n'
-21: '- `runner/gui/settings_window.py` — модал: имя проекта, Sources сверху (docs / py + exec / MCP / luau-on-disk / Luau source radio), Roots снизу (ноутбук табов + `Add root` / `Remove root` / `Show hidden` / легенда), ignore-редакторы inline в Sources, реактивные правила (exec требует python, luau radio зависит от источников, колонки дерева зависят от источников). `Ctrl+C / Ctrl+A` в Entry работают в любой раскладке (по keycode).\n'
-22: '- `app.py` — `_menu_project_settings` теперь тонкий шим; старая заглушка `open_settings_dialog` и кнопка ⚙ удалены; `roots=[...]` прокинуто в `set_status`.\n'
-23: '- `cli.py` — то же прокидывание roots.\n'
-24: '- Доки: `GUI_PROJECT_SETTINGS.md` — дизайн + статус; `GUI_TREE.md` — удалён, поглощён.\n'
-25: '\n'
-26: '**Тулы (P1/P2/P3 из TOOL_PRACTICE):**\n'
-27: "- ✅ P1: `insert_at_anchor` добавляет `\\n` у границы; `replace_between` нормализует EOL anchor'ов.\n"
-28: '- ✅ P2: `replace_in_file` — три tier (byte-exact / trailing-whitespace / no-match + похожие строки); `regex: true`.\n'
-29: '- ✅ P2: `create_file` / `overwrite_file` — syntax check `.py` / `.json` (`content_syntax_error`).\n'
-30: '- ✅ P2: `replace_unit` для md — `part="own_body"`.\n'
-31: '- ✅ P3: `replace_unit` с пустым `new_text` → `empty_input_use_delete_block`.\n'
-32: '- ✅ P3: `get_status` показывает `roots:    a, b` для workspace.\n'
-33: '- ✅ `⚠` в diff-header при любых удалениях (маркер аномалии).\n'
-34: '\n'
-35: '**Модель:**\n'
-36: '- `own_body` задокументирован в `MODEL.md §4` как «ярлык к body-with-own-scope», с заделом на переделку в честный параметр.\n'
-37: '- `_check_parses` уже стоит как страховка от off-by-one в unit-модели (из прошлой сессии).\n'
-38: '\n'
-39: '### Что открыто\n'
-40: '\n'
-41: '- **LLM_START cheat-sheet «задача → тул»** — P3, не делали.\n'
-42: '- **`replace_in_file` auto-fix trailing/EOL** — обсудили, оставили «no — только диагностика + требование перечитать», кроме tier-2 trailing-whitespace (сделано). Tabs↔spaces — никогда не auto.\n'
-43: '- **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена.\n'
-44: '- **Roots-line влияет на конфиг** — не влияет: `set_context` чисто для `get_status`. Если из окна поменять roots — сессия перезапустится, `get_status` покажет новые.\n'
-45: '- **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс. Проверено косвенно через `test_multi_root_smoke`.\n'
-46: '\n'
-47: '**Git log этой сессии:** от `ed6e2e2 pre-model` до `aea3544 own_body in model docs, roots in status, prefix order fix` (~15 коммитов).\n'
-48: '\n'
-49: '\n'
-50: '## Сессия: Workspace refactor (закрыта)\n'
-[timing] user (2 actions): 0.00s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v453] [~1, ⇅9]
+  ~ toolkit/code/toolkit/tools/unit/reader.py  (+6 стр., -0.1 KB)
+      ~ toolkit/code/toolkit/tools/unit/reader.py :: _resolve  [function]  L63–L102 → L71–L113
+      ~ toolkit/code/toolkit/tools/unit/reader.py :: _not_found_message  [function]  L105–L134 → L116–L137
+      ~ toolkit/code/toolkit/tools/unit/reader.py :: _normalize_parts  [function]  L225–L253 → L228–L252
+      ~ ... и ещё 2
+[timing] auto-rebuild (1 actions): 0.66s
 
 ##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+[timing] total: 0.66s
