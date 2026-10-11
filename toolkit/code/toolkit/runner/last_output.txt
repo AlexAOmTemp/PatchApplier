@@ -1,13 +1,218 @@
-[reader] ✓ overwrite_file: Файл перезаписан: toolkit/code/toolkit/tools/unit/reader.py (+6 стр., -116 Б)
-[timing] user (1 actions): 0.00s
+[t-unit] ✓ run_python: exit=0  duration=106ms
+--- stdout ---
+== read_unit: Python head ===
+[1] ✓ read_unit: def helper(x: int) -> int:
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v453] [~1, ⇅9]
-  ~ toolkit/code/toolkit/tools/unit/reader.py  (+6 стр., -0.1 KB)
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _resolve  [function]  L63–L102 → L71–L113
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _not_found_message  [function]  L105–L134 → L116–L137
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _normalize_parts  [function]  L225–L253 → L228–L252
-      ~ ... и ещё 2
-[timing] auto-rebuild (1 actions): 0.66s
+[OK]   ok
+[OK]   has def helper
+[OK]   no body
+== read_unit: Python annotation ===
+[1] ✓ read_unit:     """A widget."""
 
-##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.66s
+[OK]   ok
+[OK]   docstring
+== read_unit: block range ===
+[1] ✓ read_unit: === block 1 ===
+        a = 1
+=== block 2 ===
+        b = 2
+
+[OK]   ok
+[OK]   block marker
+[OK]   has a=1
+[OK]   has b=2
+[OK]   no return
+== read_unit: markdown section ===
+[1] ✓ read_unit: <!-- summary: first section -->
+
+[OK]   ok
+[OK]   summary
+== read_unit: Luau annotation ===
+[1] ✓ read_unit: --- Adds.
+
+[OK]   ok
+[OK]   annotation
+== read_unit: bad part ===
+[1] ✗ read_unit: bad_part: 'nose'
+
+[OK]   error
+[OK]   bad_part
+== read_unit: block out of range ===
+[1] ✗ read_unit: block_out_of_range: 999 (max 1)
+
+[OK]   error
+[OK]   block_out_of_range
+== list_units: Python ===
+[1] ✓ list_units: <module>                                 [module  ] L1-21  blocks=2
+helper                                   [function] L7-9  blocks=1
+Widget                                   [class   ] L12-21  blocks=2
+Widget.render                            [method  ] L15-16  blocks=1
+Widget.fetch                             [method  ] L18-21  blocks=3
+
+[OK]   ok
+[OK]   has helper
+[OK]   has Widget.render
+== set_annotation: replace Python docstring ===
+[1] ✓ set_annotation: a.py: annotation обновлён
+
+[OK]   ok
+[OK]   new doc in file
+[OK]   old doc gone
+== set_annotation: no annotation fails ===
+[1] ✗ set_annotation: no_annotation: Widget.render
+
+[OK]   error
+[OK]   no_annotation
+== set_annotation: markdown summary ===
+[1] ✓ set_annotation: doc.md: annotation обновлён
+
+[OK]   ok
+[OK]   new summary
+== replace_block: single ===
+[1] ✓ replace_block: a.py: replace_block применён
+
+[OK]   ok
+[OK]   new return
+== replace_block: range deletes ===
+[1] ✓ replace_block: a.py: replace_block применён
+
+[OK]   ok
+[OK]   a=1 gone
+[OK]   b=2 gone
+[OK]   return 42 kept
+== replace_block: bad range ===
+[1] ✗ replace_block: bad_block_range: blocks 1 and 3 are not adjacent
+
+[OK]   error
+[OK]   bad_block_range
+== delete_block ===
+[1] ✓ delete_block: b.py: delete_block применён
+
+[OK]   ok
+[OK]   a=1 gone
+[OK]   b=2 kept
+== insert_block: before anchor ===
+[1] ✓ insert_block: c.py: insert_block применён
+
+[OK]   ok
+[OK]   inserted
+[OK]   order correct
+== insert_block: bad position ===
+[1] ✗ insert_block: bad_position: 'middle'
+
+[OK]   error
+[OK]   bad_position
+== insert_block: anchor_required ===
+[1] ✗ insert_block: anchor_required: before/after need an anchor
+
+[OK]   error
+[OK]   anchor_required
+== replace_unit: body only ===
+[1] ✓ replace_unit: d.py: replace_unit применён
+
+[OK]   ok
+[OK]   new body
+[OK]   old gone
+[OK]   docstring kept
+== Luau: replace_block not_applicable ===
+[1] ✗ replace_block: not_applicable: this unit has no blocks
+
+[OK]   error
+[OK]   not_applicable
+== replace_block: result_syntax_error ===
+[1] ✗ replace_block: result_syntax_error: invalid syntax (<unknown>, line 2)
+
+[OK]   error
+[OK]   result_syntax_error
+[OK]   file unchanged
+
+=== 55 ok, 0 failed ===
+
+[t-strict] ✓ run_python: exit=0  duration=104ms
+--- stdout ---
+[1] ✗ create_file: Не создаю bad.py: content_syntax_error: invalid syntax (<unknown>, line 1)
+
+[OK]   create .py syntax error rejected
+[OK]   file not created
+[1] ✓ create_file: Файл создан: good.py (1 стр., 6 Б)
+
+[OK]   create .py valid OK
+[1] ✗ create_file: Не создаю bad.json: content_syntax_error: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+
+[OK]   create .json syntax error rejected
+[1] ✓ create_file: Файл создан: x.md (1 стр., 16 Б)
+
+[OK]   create .md not checked
+[1] ✗ overwrite_file: Не перезаписываю a.py: content_syntax_error: invalid syntax (<unknown>, line 1)
+
+[OK]   overwrite .py syntax error rejected
+[OK]   original preserved
+[1] ✓ read_unit: <!-- summary: a -->
+
+[OK]   section_title by human text works
+[1] ✓ read_unit: <!-- summary: b -->
+
+[OK]   section_title finds second by title
+[1] ✗ read_unit: not_found: title_match='gamma'
+  (or list_units for the full map of the file)
+
+[OK]   unknown section_title -> not_found
+[OK]   hint mentions list_units
+[1] ✗ read_unit: not_found: qualname='nosuch'
+  (or list_units for the full map of the file)
+
+[OK]   unknown qualname -> not_found
+[OK]   qualname hint mentions list_units
+[1] ✓ read_unit: <!-- summary: b -->
+
+[OK]   section_number still works
+[1] ✗ replace_unit: empty_input_use_delete_block: replace_unit does not delete a unit
+
+[OK]   empty part=all rejected with dedicated code
+[1] ✓ read_unit: 
+Prose part one.
+More prose.
+
+
+[OK]   read own_body ok
+[OK]   own_body has prose
+[OK]   own_body has second prose line
+[OK]   own_body excludes subsection
+[OK]   own_body excludes subsection header
+[1] ✓ replace_unit: doc.md: replace_unit применён
+
+[OK]   replace own_body ok
+[OK]   new prose written
+[OK]   old prose gone
+[OK]   subsection preserved
+[OK]   subsection body preserved
+[1] ✓ get_status: ## Session
+project:  proj
+roots:    toolkit, docs
+backend:  filesystem
+luau:     mcp
+format:   default
+exec:     disabled
+
+[OK]   get_status ok
+[OK]   roots line present
+
+=== 27 ok, 0 failed ===
+
+[commit-1] ✓ run_python: exit=0  duration=158ms
+--- stdout ---
+[add rc=0]
+[commit rc=0]
+[master 7706d44] unit: canonical qualname/title_match, compact not_found
+ 5 files changed, 95 insertions(+), 185 deletions(-)
+[timing] user (3 actions): 0.37s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v405] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v454] [без изменений]
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v280] [без изменений]
+[timing] auto-rebuild (3 actions): 0.78s
+
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.15s

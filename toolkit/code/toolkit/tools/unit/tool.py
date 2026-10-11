@@ -159,11 +159,13 @@ class ReplaceUnitTool:
         address: dict | None = None,
         new_text: str = "",
         part=None,
+        block=None,
         **_: Any,
     ) -> Result:
         return _write_call(
             backend, file_path, "replace_unit", address,
-            lambda src: writer.replace_unit(src, file_path, address, new_text, part),
+            lambda src: writer.replace_unit(
+                src, file_path, address, new_text, part, block),
         )
 
 

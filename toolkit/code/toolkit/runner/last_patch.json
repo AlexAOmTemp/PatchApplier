@@ -1,9 +1,26 @@
-[{"id": "t-unit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_unit_model.py"}}]
+[{"id": "w-replace-unit", "action": "replace_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/writer.py",
+    "address": {"qualname": "replace_unit"},
+    "new_text": "def replace_unit(source: str, path: str, address: dict,\n                 new_text: str, part=None, block=None) -> str:\n    \"\"\"Replace a unit — wholly, a part of it, or a range of blocks.\n\n    Exactly one of `part` / `block` is required:\n\n      part=\"all\"        — the whole unit (head + annotation + body)\n      part=\"body\"       — body only, head and annotation kept\n      part=\"own_body\"   — body without subsections (section-only view)\n      part=\"head\"       — declaration only\n      part=\"annotation\" — docstring / summary only\n      part=[\"head\",\"annotation\"] — several parts\n      block=N | \"1-4\" | [1,3] — one or more blocks in body\n\n    No default: callers must say what they are replacing. This removes\n    the class of bugs where \"thought I was editing a block, replaced\n    the whole body\". `scope_required` if neither part nor block given;\n    `scope_conflict` if both.\n\n    Empty `new_text` with `block` = delete those blocks. Empty\n    `new_text` with `part` = error `empty_input_use_delete_block`.\n    \"\"\"\n    if new_text is None:\n        new_text = \"\"\n    if part is None and block is None:\n        raise ValueError(\n            \"scope_required: pass part= or block= \"\n            \"(part=all replaces the whole unit; block=N replaces N-th block)\"\n        )\n    if part is not None and block is not None:\n        raise ValueError(\"scope_conflict: use part= or block=, not both\")\n    if block is not None:\n        return replace_block(source, path, address, block, new_text)\n\n    ext = Path(path).suffix.lower()\n    unit = reader.resolve(source, path, address)\n    parts = reader._normalize_parts(part)\n    if parts == [\"all\"] and not (new_text or \"\").strip():\n        raise ValueError(\n            \"empty_input_use_delete_block: replace_unit does not delete a unit\"\n        )\n    if parts == [\"all\"]:\n        start, end = unit.line_start, unit.line_end\n    else:\n        start, end = None, None\n        for p in parts:\n            if p == \"own_body\":\n                ps = _own_body_part(unit)\n            else:\n                ps = getattr(unit, p)\n            if ps.is_present():\n                if start is None or ps.start < start:\n                    start = ps.start\n                if end is None or ps.end > end:\n                    end = ps.end\n        if start is None:\n            raise KeyError(\"no_parts: none of the requested parts are present\")\n\n    lines = source.splitlines()\n    first_line = lines[start - 1]\n    indent = _line_indent(first_line)\n    new_lines = _apply_indent(new_text, indent)\n    out_lines = lines[:start - 1] + new_lines + lines[end:]\n\n    eol = \"\\r\\n\" if \"\\r\\n\" in source else \"\\n\"\n    new_source = eol.join(out_lines)\n    if source.endswith((\"\\n\", \"\\r\")) and not new_source.endswith((\"\\n\", \"\\r\")):\n        new_source += eol\n\n    _check_parses(new_source, path, unit, ext, source)\n    return new_source"}}]
 
-[{"id": "t-strict", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_strictness.py"}}]
+[{"id": "t-ru-exec", "action": "replace_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/tool.py",
+    "address": {"qualname": "ReplaceUnitTool.execute"},
+    "new_text": "def execute(\n    self,\n    backend: Backend,\n    fmt: Any = None,\n    file_path: str = \"\",\n    address: dict | None = None,\n    new_text: str = \"\",\n    part=None,\n    block=None,\n    **_: Any,\n) -> Result:\n    return _write_call(\n        backend, file_path, \"replace_unit\", address,\n        lambda src: writer.replace_unit(\n            src, file_path, address, new_text, part, block),\n    )"}}]
 
-[{"id": "commit-1", "action": "run_python",
+[{"id": "tool-map", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/__init__.py",
+    "search": "    # Unit model — cross-format read/write (DECISIONS §2.1).\n    \"read_unit\": ReadUnitTool,\n    \"list_units\": ListUnitsTool,\n    \"set_annotation\": SetAnnotationTool,\n    \"replace_unit\": ReplaceUnitTool,\n    \"replace_block\": ReplaceBlockTool,\n    \"delete_block\": DeleteBlockTool,\n    \"insert_block\": InsertBlockTool,\n}",
+    "replace": "    # Unit model — cross-format read/write (DECISIONS §2.1).\n    # `replace_block` / `delete_block` removed 2026-10-11 — folded into\n    # `replace_unit(block=...)`. See DECISIONS §2.1.\n    \"read_unit\": ReadUnitTool,\n    \"list_units\": ListUnitsTool,\n    \"set_annotation\": SetAnnotationTool,\n    \"replace_unit\": ReplaceUnitTool,\n    \"insert_block\": InsertBlockTool,\n}",
+    "search_repr": false}}]
+
+[{"id": "smoke", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
+
+[{"id": "list-tools", "action": "run_python",
+  "arguments": {"script": "toolkit/code/toolkit/runner/cli.py",
+                "args": ["--list-tools"]}}]
+
+[{"id": "commit-2", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["unit: canonical qualname/title_match, compact not_found"]}}]
+                "args": ["unit: replace_unit takes block, scope required, drop replace_block/delete_block"]}}]

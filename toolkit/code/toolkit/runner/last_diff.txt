@@ -1,6 +1,5 @@
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v453] [~1, ⇅9]
-  ~ toolkit/code/toolkit/tools/unit/reader.py  (+6 стр., -0.1 KB)
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _resolve  [function]  L63–L102 → L71–L113
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _not_found_message  [function]  L105–L134 → L116–L137
-      ~ toolkit/code/toolkit/tools/unit/reader.py :: _normalize_parts  [function]  L225–L253 → L228–L252
-      ~ ... и ещё 2
+.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v405] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v454] [без изменений]
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v280] [без изменений]

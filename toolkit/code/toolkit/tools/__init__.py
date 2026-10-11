@@ -69,12 +69,12 @@ TOOL_MAP: dict[str, type] = {
     "symbol_graph": SymbolGraphTool,
     "run_python": RunPythonTool,
     # Unit model — cross-format read/write (DECISIONS §2.1).
+    # `replace_block` / `delete_block` removed 2026-10-11 — folded into
+    # `replace_unit(block=...)`. See DECISIONS §2.1.
     "read_unit": ReadUnitTool,
     "list_units": ListUnitsTool,
     "set_annotation": SetAnnotationTool,
     "replace_unit": ReplaceUnitTool,
-    "replace_block": ReplaceBlockTool,
-    "delete_block": DeleteBlockTool,
     "insert_block": InsertBlockTool,
 }
 

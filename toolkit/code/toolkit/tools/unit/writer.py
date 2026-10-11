@@ -98,26 +98,42 @@ def _render_md(text: str) -> list[str]:
 
 
 def replace_unit(source: str, path: str, address: dict,
-                 new_text: str, part=None) -> str:
-    """Replace a unit — wholly (part=all) or one/more of its parts.
+                 new_text: str, part=None, block=None) -> str:
+    """Replace a unit — wholly, a part of it, or a range of blocks.
 
-    `part` follows the same conventions as `read_unit`: bare string,
-    comma-separated string, or list. `part=all` (default) replaces the
-    entire unit (head+annotation+body); `part=["body"]` replaces only the
-    body, leaving head and annotation intact.
+    Exactly one of `part` / `block` is required:
 
-    The new text is inserted literally; indentation of the first line is
-    preserved (the replacement block is re-indented to match). Validated
-    after write — if the file no longer parses, the change is rejected.
+      part="all"        — the whole unit (head + annotation + body)
+      part="body"       — body only, head and annotation kept
+      part="own_body"   — body without subsections (section-only view)
+      part="head"       — declaration only
+      part="annotation" — docstring / summary only
+      part=["head","annotation"] — several parts
+      block=N | "1-4" | [1,3] — one or more blocks in body
+
+    No default: callers must say what they are replacing. This removes
+    the class of bugs where "thought I was editing a block, replaced
+    the whole body". `scope_required` if neither part nor block given;
+    `scope_conflict` if both.
+
+    Empty `new_text` with `block` = delete those blocks. Empty
+    `new_text` with `part` = error `empty_input_use_delete_block`.
     """
     if new_text is None:
-        raise ValueError("empty_input")
+        new_text = ""
+    if part is None and block is None:
+        raise ValueError(
+            "scope_required: pass part= or block= "
+            "(part=all replaces the whole unit; block=N replaces N-th block)"
+        )
+    if part is not None and block is not None:
+        raise ValueError("scope_conflict: use part= or block=, not both")
+    if block is not None:
+        return replace_block(source, path, address, block, new_text)
+
     ext = Path(path).suffix.lower()
     unit = reader.resolve(source, path, address)
     parts = reader._normalize_parts(part)
-    # Empty text with part=all would delete the unit. That is a
-    # different intent — delete_block is for that. Reject explicitly
-    # instead of failing later with result_missing_symbol.
     if parts == ["all"] and not (new_text or "").strip():
         raise ValueError(
             "empty_input_use_delete_block: replace_unit does not delete a unit"
