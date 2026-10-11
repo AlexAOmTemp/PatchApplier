@@ -1,41 +1,37 @@
-[{"id": "model-title", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/model.py",
-    "search": "    kind: UnitKind\n    name: str\n    qualname: str\n    line_start: int\n    line_end: int",
-    "replace": "    kind: UnitKind\n    name: str\n    qualname: str\n    title: str = \"\"\n    line_start: int = 1\n    line_end: int = 1",
-    "search_repr": false}}]
+[{"id": "t1", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
+                "search": "y = 2",
+                "replace": "y = 20"}}]
 
-[{"id": "md-title", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/adapter_md.py",
-    "search": "        name = s.number or s.title\n        return Unit(\n            kind=UnitKind.SECTION, name=name, qualname=name,\n            line_start=line_start, line_end=line_end,\n            head=Part(head_start, head_end), annotation=ann,\n            body=body_part, blocks=blocks,\n        )",
-    "replace": "        # For a numbered heading `name` is the number (it addresses the\n        # section in the index); `title` is the human text. For a bare\n        # heading both fall back to the same string. `reader` uses\n        # `title` for section_title lookup, `name` for section_number.\n        name = s.number or s.title\n        return Unit(\n            kind=UnitKind.SECTION, name=name, qualname=name,\n            title=s.title,\n            line_start=line_start, line_end=line_end,\n            head=Part(head_start, head_end), annotation=ann,\n            body=body_part, blocks=blocks,\n        )",
-    "search_repr": false}}]
+[{"id": "t2", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
+                "search": "x = 1\ny = 20",
+                "replace": "x = 100\ny = 200"}}]
 
-[{"id": "reader-resolve", "action": "replace_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/reader.py",
-    "address": {"qualname": "_resolve"},
-    "new_text": "def _resolve(root: Unit, address: dict) -> Unit:\n    occ = int(address.get(\"occurrence\", 0)) or None\n    if \"qualname\" in address:\n        qn = address[\"qualname\"]\n        matches = [u for u in _iter_units(root) if u.qualname == qn]\n        label = f\"qualname={qn!r}\"\n        kind_hint = \"qualnames\"\n    elif \"section_number\" in address:\n        n = str(address[\"section_number\"]).strip()\n        matches = [u for u in _iter_units(root) if u.qualname == n]\n        label = f\"section_number={n!r}\"\n        kind_hint = \"numbers\"\n    elif \"section_title\" in address:\n        t = str(address[\"section_title\"]).lower()\n        # Match against `title` (the human text) first; fall back to\n        # `name` for sections whose heading is bare (no number). Sections\n        # coming from a numbered heading have `name = \"3\"` and\n        # `title = \"Format\"`, so a plain substring against `name` would\n        # never match. See MODEL.md section 3.\n        matches = []\n        for u in _iter_units(root):\n            if u.kind != UnitKind.SECTION:\n                continue\n            hay = (u.title or u.name or \"\").lower()\n            if t in hay:\n                matches.append(u)\n        label = f\"section_title={t!r}\"\n        kind_hint = \"titles\"\n    else:\n        raise KeyError(\"address must have qualname / section_number / section_title\")\n    if not matches:\n        raise KeyError(_not_found_message(root, label, address, kind_hint))\n    if len(matches) == 1:\n        return matches[0]\n    if occ is None:\n        where = \", \".join(f\"L{u.line_start}\" for u in matches)\n        raise KeyError(f\"ambiguous: {label} — matches at {where}; pass occurrence\")\n    if occ < 1 or occ > len(matches):\n        raise KeyError(f\"occurrence_out_of_range: {occ} for {len(matches)} matches\")\n    return matches[occ - 1]\n\n\ndef _not_found_message(root: Unit, label: str, address: dict,\n                       kind_hint: str) -> str:\n    \"\"\"Not-found message with similar names + a next-step hint.\n\n    For qualname / section_title we show the top-5 closest names via\n    difflib; for section_number — the list of numbers that do exist.\n    Always a hint to call list_units for the full map.\n    \"\"\"\n    import difflib\n    units = list(_iter_units(root))\n    similar: list[str] = []\n    if kind_hint == \"qualnames\":\n        qn = address.get(\"qualname\", \"\")\n        pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]\n        similar = difflib.get_close_matches(qn, pool, n=5, cutoff=0.5)\n    elif kind_hint == \"titles\":\n        t = str(address.get(\"section_title\", \"\"))\n        pool = [u.title or u.name for u in units\n                if u.kind == UnitKind.SECTION]\n        similar = difflib.get_close_matches(t, pool, n=5, cutoff=0.5)\n    elif kind_hint == \"numbers\":\n        nums = sorted({u.qualname for u in units\n                       if u.kind == UnitKind.SECTION\n                       and u.qualname and u.qualname[0].isdigit()})\n        similar = nums[:20]\n    parts = [f\"not_found: {label}\"]\n    if similar:\n        parts.append(\"  Did you mean: \" + \", \".join(repr(s) for s in similar))\n    parts.append(\"  (call list_units for the full map of the file)\")\n    return \"\\n\".join(parts)"}}]
+[{"id": "t3", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
+                "search": "x = 999",
+                "replace": "x = 0"}}]
 
-[{"id": "test-add", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/tests/test_strictness.py",
-    "search": "    # --- replace_unit: empty + part=all ---",
-    "replace": "    # --- section_title resolution ---\n    with tempfile.TemporaryDirectory() as td:\n        root = Path(td)\n        md = (\n            '# Doc\\n\\n'\n            '## 1. Alpha section\\n'\n            '<!-- summary: a -->\\n\\n'\n            'Body a.\\n\\n'\n            '## 2. Beta section\\n'\n            '<!-- summary: b -->\\n\\n'\n            'Body b.\\n'\n        )\n        (root / 'doc.md').write_text(md, encoding='utf-8')\n        r = _run(root, [{'action': 'read_unit', 'arguments': {\n            'file_path': 'doc.md',\n            'address': {'section_title': 'Alpha'},\n            'part': 'annotation',\n        }}])[0]\n        t.expect('section_title by human text works',\n                 r.status == 'ok' and 'a' in r.message, r.message)\n\n        r = _run(root, [{'action': 'read_unit', 'arguments': {\n            'file_path': 'doc.md',\n            'address': {'section_title': 'Beta'},\n            'part': 'annotation',\n        }}])[0]\n        t.expect('section_title finds second by title',\n                 r.status == 'ok' and 'b' in r.message, r.message)\n\n        # not_found with hint\n        r = _run(root, [{'action': 'read_unit', 'arguments': {\n            'file_path': 'doc.md',\n            'address': {'section_title': 'Gamma'},\n            'part': 'annotation',\n        }}])[0]\n        t.expect('unknown section_title -> not_found',\n                 r.status == 'error' and r.error_code == 'not_found',\n                 f'{r.status}/{r.error_code}')\n        t.expect('hint mentions list_units',\n                 'list_units' in r.message, r.message)\n\n        # qualname not found -> hint\n        r = _run(root, [{'action': 'read_unit', 'arguments': {\n            'file_path': 'doc.md',\n            'address': {'qualname': 'nosuch'},\n        }}])[0]\n        t.expect('unknown qualname -> not_found',\n                 r.status == 'error' and r.error_code == 'not_found')\n        t.expect('qualname hint mentions list_units',\n                 'list_units' in r.message, r.message)\n\n        # section_number still works\n        r = _run(root, [{'action': 'read_unit', 'arguments': {\n            'file_path': 'doc.md',\n            'address': {'section_number': '2'},\n            'part': 'annotation',\n        }}])[0]\n        t.expect('section_number still works',\n                 r.status == 'ok' and 'b' in r.message, r.message)\n\n    # --- replace_unit: empty + part=all ---",
-    "search_repr": false}}]
+[{"id": "t4", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
+                "search": "= 200",
+                "replace": "= 222",
+                "regex": true}}]
 
-[{"id": "gps-2-fix", "action": "replace_unit",
-  "arguments": {"file_path": "toolkit/docs/GUI_PROJECT_SETTINGS.md",
-    "address": {"section_number": "2", "occurrence": 1},
-    "part": "body",
-    "new_text": "### 2.1. Имя проекта (top)\n\nОдна строка: `Entry` со значением `workspace.name`. Редактируется, сохраняется при `OK`. Правый клик → «Копировать»; Ctrl+C работает в любой раскладке.\n\n**Не путь.** Путь проекта — свойство сессии, не проекта. Виден в заголовке окна настроек серым.\n\n### 2.2. Порядок секций\n\nСверху вниз, по логике «выбрал с чем работаю → убрал шум → настроил политику»:\n\n1. **Sources** — что в проекте.\n2. **Roots** — какие каталоги и какая политика внутри.\n\nVisibility-редакторы живут внутри **Sources**, у соответствующих источников — не отдельным блоком. Roots **скрывается целиком**, если ни Documentation, ни Python не включены (нет FS-режимов — нечего настраивать).\n\n### 2.3. Sources\n\nПять строк, каждая — про свой источник:\n\n- **Documentation (.md)** — чекбокс. Справа — кнопка `Hide paths…` и счётчик правил `.patchignore`.\n- **Python (.py)** — чекбокс. Под ним, с отступом, **Allow Python scripts (run_python)** — серая и выключенная, если Python off. Hint `(requires Python)`.\n- **MCP (Roblox bridge: …)** — чекбокс. Label меняется по Luau source: `scene + code` при MCP-режиме, `scene only` при Rojo. Справа — кнопка `Hide modules…` и счётчик `.mcpignore`.\n- **Lua files on disk (.luau)** — чекбокс.\n- **Luau source:** radio `MCP` / `Rojo`. Правило: ни один источник — radio disabled; только MCP — forced `mcp`; только Rojo — forced `rojo`; оба — оба radio активны, дефолт **Rojo**.\n\nКнопки visibility **серые**, когда соответствующий источник закрыт:\n- `Hide paths…` — серая если нет ни Documentation, ни Python.\n- `Hide modules…` — серая если MCP off или Luau source = Rojo.\n\n### 2.4. Roots\n\n**Табы по root'ам.** Один root = один таб. Заголовок таба = basename.\n\n**Внутри таба:**\n\n- **Дерево каталогов** root'а. Только каталоги, без файлов (см. §3). Соединительные глифы `├── └── │` показывают иерархию.\n- **Виртуальная строка `[root]`** сверху — дефолт root'а (`overrides[\".\"]`). На неё можно задать политику на весь корень.\n- **Пять флагов** `R / W / Id / Ip / Il`. **Колонки реактивны к Sources:** `R`, `W` — всегда; `Id` — при Documentation; `Ip` — при Python; `Il` — при Lua-on-disk (Rojo). Отключённый источник — колонка исчезает, override не удаляется и вернётся при включении.\n- **Клик по флагу** — три состояния `·` / `+` / `−`. Из `·` → создать override (инверсия effective), из `+` ↔ `−` → флип одного флага. Возврат в `·` — не в этой итерации.\n- **Скрытые строки** (`.`-prefixed, `.patchignore`) — видимы только при галке «Show hidden», и у них **все пять флагов жёстко `−`** — `.patchignore` = hard deny, override не открывает.\n\n**Под табами:** `Add root…`, `Remove root`, `Show hidden`, короткая легенда про `R/W/Id/Ip/Il` и `· + −`.\n\nДобавление root'а — через `filedialog`, валидация `projects.add_root` (уникальность basename, недопустимость вложенности, запрет имён Roblox-сервисов).\n\n### 2.5. Ignore-редакторы\n\nОдин модал на два файла. Открывается из `Hide paths…` и `Hide modules…`. Внутри — listbox, add/remove, reset-to-default, open-all.\n\n- **Hide paths** правит `.patchignore` — правила видимости FS.\n- **Hide modules** правит `.mcpignore` — правила видимости Roblox-модулей.\n\nОба файла лежат в `state_dir` проекта. Счётчик правил обновляется после закрытия модала.\n\n### 2.6. Кнопки\n\n`OK` — сохранить всё: `workspace.json` (имя, roots, policy, overrides) + `CONFIG` (источники, MCP, exec), перезапустить сессию.\n`Cancel` — закрыть без изменений."}}]
+[{"id": "read", "action": "read_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
+                "numbered": true, "escape": "perline"}}]
 
-[{"id": "run-strict", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_strictness.py"}}]
+[{"id": "del", "action": "delete_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py"}}]
 
-[{"id": "run-unit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/toolkit/tests/test_unit_model.py"}}]
+[{"id": "rm-script", "action": "delete_file",
+  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py"}}]
 
-[{"id": "smoke", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
+[{"id": "rm-metrics", "action": "delete_file",
+  "arguments": {"file_path": "toolkit/code/manual/_show_metrics.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["unit: section_title matches human title, not_found hints with list_units"]}}]
+                "args": ["cleanup: remove probe helpers"]}}]
