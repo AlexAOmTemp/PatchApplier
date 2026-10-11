@@ -57,9 +57,14 @@ def build(source: str, path: str = "") -> Unit:
             cu = build_section(child)
             blocks.append(Block(index=i, start=cu.line_start, end=cu.line_end, unit=cu))
 
+        # For a numbered heading `name` is the number (it addresses the
+        # section in the index); `title` is the human text. For a bare
+        # heading both fall back to the same string. `reader` uses
+        # `title` for section_title lookup, `name` for section_number.
         name = s.number or s.title
         return Unit(
             kind=UnitKind.SECTION, name=name, qualname=name,
+            title=s.title,
             line_start=line_start, line_end=line_end,
             head=Part(head_start, head_end), annotation=ann,
             body=body_part, blocks=blocks,

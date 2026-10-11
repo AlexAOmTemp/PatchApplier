@@ -102,6 +102,66 @@ def main():
         t.expect('original preserved',
                  (root / 'a.py').read_text(encoding='utf-8') == 'x = 1\n')
 
+    # --- section_title resolution ---
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        md = (
+            '# Doc\n\n'
+            '## 1. Alpha section\n'
+            '<!-- summary: a -->\n\n'
+            'Body a.\n\n'
+            '## 2. Beta section\n'
+            '<!-- summary: b -->\n\n'
+            'Body b.\n'
+        )
+        (root / 'doc.md').write_text(md, encoding='utf-8')
+        r = _run(root, [{'action': 'read_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'section_title': 'Alpha'},
+            'part': 'annotation',
+        }}])[0]
+        t.expect('section_title by human text works',
+                 r.status == 'ok' and 'a' in r.message, r.message)
+
+        r = _run(root, [{'action': 'read_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'section_title': 'Beta'},
+            'part': 'annotation',
+        }}])[0]
+        t.expect('section_title finds second by title',
+                 r.status == 'ok' and 'b' in r.message, r.message)
+
+        # not_found with hint
+        r = _run(root, [{'action': 'read_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'section_title': 'Gamma'},
+            'part': 'annotation',
+        }}])[0]
+        t.expect('unknown section_title -> not_found',
+                 r.status == 'error' and r.error_code == 'not_found',
+                 f'{r.status}/{r.error_code}')
+        t.expect('hint mentions list_units',
+                 'list_units' in r.message, r.message)
+
+        # qualname not found -> hint
+        r = _run(root, [{'action': 'read_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'qualname': 'nosuch'},
+        }}])[0]
+        t.expect('unknown qualname -> not_found',
+                 r.status == 'error' and r.error_code == 'not_found')
+        t.expect('qualname hint mentions list_units',
+                 'list_units' in r.message, r.message)
+
+        # section_number still works
+        r = _run(root, [{'action': 'read_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'section_number': '2'},
+            'part': 'annotation',
+        }}])[0]
+        t.expect('section_number still works',
+                 r.status == 'ok' and 'b' in r.message, r.message)
+
     # --- replace_unit: empty + part=all ---
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)

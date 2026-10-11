@@ -55,8 +55,9 @@ class Unit:
     kind: UnitKind
     name: str
     qualname: str
-    line_start: int
-    line_end: int
+    title: str = ""
+    line_start: int = 1
+    line_end: int = 1
     head: Part = field(default_factory=Part)
     annotation: Part = field(default_factory=Part)
     body: Part = field(default_factory=Part)

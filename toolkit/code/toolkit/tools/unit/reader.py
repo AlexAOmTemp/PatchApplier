@@ -66,19 +66,32 @@ def _resolve(root: Unit, address: dict) -> Unit:
         qn = address["qualname"]
         matches = [u for u in _iter_units(root) if u.qualname == qn]
         label = f"qualname={qn!r}"
+        kind_hint = "qualnames"
     elif "section_number" in address:
         n = str(address["section_number"]).strip()
         matches = [u for u in _iter_units(root) if u.qualname == n]
         label = f"section_number={n!r}"
+        kind_hint = "numbers"
     elif "section_title" in address:
         t = str(address["section_title"]).lower()
-        matches = [u for u in _iter_units(root)
-                   if u.kind == UnitKind.SECTION and t in u.name.lower()]
+        # Match against `title` (the human text) first; fall back to
+        # `name` for sections whose heading is bare (no number). Sections
+        # coming from a numbered heading have `name = "3"` and
+        # `title = "Format"`, so a plain substring against `name` would
+        # never match. See MODEL.md section 3.
+        matches = []
+        for u in _iter_units(root):
+            if u.kind != UnitKind.SECTION:
+                continue
+            hay = (u.title or u.name or "").lower()
+            if t in hay:
+                matches.append(u)
         label = f"section_title={t!r}"
+        kind_hint = "titles"
     else:
         raise KeyError("address must have qualname / section_number / section_title")
     if not matches:
-        raise KeyError(f"not_found: {label}")
+        raise KeyError(_not_found_message(root, label, address, kind_hint))
     if len(matches) == 1:
         return matches[0]
     if occ is None:
@@ -87,6 +100,38 @@ def _resolve(root: Unit, address: dict) -> Unit:
     if occ < 1 or occ > len(matches):
         raise KeyError(f"occurrence_out_of_range: {occ} for {len(matches)} matches")
     return matches[occ - 1]
+
+
+def _not_found_message(root: Unit, label: str, address: dict,
+                       kind_hint: str) -> str:
+    """Not-found message with similar names + a next-step hint.
+
+    For qualname / section_title we show the top-5 closest names via
+    difflib; for section_number — the list of numbers that do exist.
+    Always a hint to call list_units for the full map.
+    """
+    import difflib
+    units = list(_iter_units(root))
+    similar: list[str] = []
+    if kind_hint == "qualnames":
+        qn = address.get("qualname", "")
+        pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]
+        similar = difflib.get_close_matches(qn, pool, n=5, cutoff=0.5)
+    elif kind_hint == "titles":
+        t = str(address.get("section_title", ""))
+        pool = [u.title or u.name for u in units
+                if u.kind == UnitKind.SECTION]
+        similar = difflib.get_close_matches(t, pool, n=5, cutoff=0.5)
+    elif kind_hint == "numbers":
+        nums = sorted({u.qualname for u in units
+                       if u.kind == UnitKind.SECTION
+                       and u.qualname and u.qualname[0].isdigit()})
+        similar = nums[:20]
+    parts = [f"not_found: {label}"]
+    if similar:
+        parts.append("  Did you mean: " + ", ".join(repr(s) for s in similar))
+    parts.append("  (call list_units for the full map of the file)")
+    return "\n".join(parts)
 
 
 def _slice(source: str, part: Part) -> str:
