@@ -1,11 +1,5 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v413] [~4, ⇅60, +1, -1] ⚠
-  ~ toolkit/docs/DECISIONS.md §2. Открыто (L99–L297, 33.0 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ toolkit/docs/DECISIONS.md §2.1 Унификация тулов (L104–L167, 9.9 KB) — Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block / set_annotation) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы.
-  ~ toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L72, 6.8 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §3. Рецепты: задача → тул (L53–L167, 6.0 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §Unit-write тулы (`replace_unit(block=)`, `insert_block`) (L273–L278, 0.6 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §Unit-write тулы (`replace_block`, `delete_block`, `insert_block`) (L274–L279, 0.6 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v414] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v462] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v463] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v286] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v287] [без изменений]

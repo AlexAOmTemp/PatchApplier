@@ -1,48 +1,19 @@
-[dec-sum] ✓ set_annotation: toolkit/docs/DECISIONS.md: annotation обновлён
+[ss-sum] ✗ set_annotation: no_annotation: <module>
 
-[dec-unit] ✓ replace_in_file: toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — +0 стр., +214 Б
-
-[dec-block] ✓ replace_in_file: toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — -1 стр., +71 Б
-
-[dec-move] ✓ replace_in_file: toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — +0 стр., +22 Б
-
-[tp-table] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — -1 стр., -131 Б
-
-[tp-concl] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +134 Б
-
-[tp-recipe] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +43 Б
-
-[tp-moral] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +22 Б
-
-[tp-unused] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +4 Б
-
-[tp-final] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +0 стр., +8 Б
-
-[ss-add] ✓ insert_at_anchor: после L51 в toolkit/docs/SESSION_STATE.md — +7 стр., +1061 Б
-
-[ss-sum] ✗ set_annotation: not_found: qualname='1'
-  (or list_units for the full map of the file)
-
-[commit] ✓ run_python: exit=0  duration=177ms
+[commit] ✓ run_python: exit=0  duration=143ms
 --- stdout ---
 [add rc=0]
 [commit rc=0]
-[master 43c8114] docs: fold replace_block/delete_block into replace_unit, update practice notes
- 7 files changed, 172 insertions(+), 85 deletions(-)
-[timing] user (13 actions): 0.20s
+[master cee9657] docs: session_state module annotation
+ 4 files changed, 63 insertions(+), 150 deletions(-)
+[timing] user (2 actions): 0.15s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v413] [~4, ⇅60, +1, -1] ⚠
-  ~ toolkit/docs/DECISIONS.md §2. Открыто (L99–L297, 33.0 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ toolkit/docs/DECISIONS.md §2.1 Унификация тулов (L104–L167, 9.9 KB) — Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block / set_annotation) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы.
-  ~ toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L72, 6.8 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §3. Рецепты: задача → тул (L53–L167, 6.0 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §Unit-write тулы (`replace_unit(block=)`, `insert_block`) (L273–L278, 0.6 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §Unit-write тулы (`replace_block`, `delete_block`, `insert_block`) (L274–L279, 0.6 KB, ⚠ no summary)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v414] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v462] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v463] [без изменений]
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v286] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v287] [без изменений]
 [timing] auto-rebuild (3 actions): 0.80s
 
-##RESULT:{"ok": 15, "errors": 1, "skipped": 0, "failed": [12], "blocked": []}
-[timing] total: 1.00s
+##RESULT:{"ok": 4, "errors": 1, "skipped": 0, "failed": [1], "blocked": []}
+[timing] total: 0.95s
