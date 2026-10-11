@@ -53,9 +53,6 @@ TOOL_MAP: dict[str, type] = {
     "replace_range": ReplaceRangeTool,
     "replace_between": ReplaceBetweenTool,
     "insert_at_anchor": InsertAtAnchorTool,
-    "replace_section": ReplaceSectionTool,
-    "set_summary": SetSummaryTool,
-    "verify_section": VerifySectionTool,
     "create_file": CreateFileTool,
     "overwrite_file": OverwriteFileTool,
     "delete_file": DeleteFileTool,
@@ -67,26 +64,11 @@ TOOL_MAP: dict[str, type] = {
     "rebuild_lua_code_index": RebuildLuaCodeIndexTool,
     "get_index": GetIndexTool,
     "get_status": GetStatusTool,
-    "list_symbols": ListSymbolsTool,
-    "read_symbol": ReadSymbolTool,
-    "replace_symbol": ReplaceSymbolTool,
-    "replace_symbol_body": ReplaceSymbolBodyTool,
-    "replace_symbol_signature": ReplaceSymbolSignatureTool,
-    "replace_statement": ReplaceStatementTool,
-    "delete_symbol": DeleteSymbolTool,
-    "insert_symbol": InsertSymbolTool,
-    "move_symbol": MoveSymbolTool,
-    # Backwards-compatible aliases (pre-rename patches).
-    "replace_function": ReplaceSymbolTool,
-    "replace_function_body": ReplaceSymbolBodyTool,
     "find_symbol": FindSymbolTool,
     "find_usages": FindUsagesTool,
     "symbol_graph": SymbolGraphTool,
-    "list_symbols_lua": ListSymbolsLuaTool,
-    "read_symbol_lua": ReadSymbolLuaTool,
-    "replace_function_lua": ReplaceFunctionLuaTool,
     "run_python": RunPythonTool,
-    # Unit model — cross-format read (DECISIONS §2.1).
+    # Unit model — cross-format read/write (DECISIONS §2.1).
     "read_unit": ReadUnitTool,
     "list_units": ListUnitsTool,
     "set_annotation": SetAnnotationTool,
@@ -95,6 +77,13 @@ TOOL_MAP: dict[str, type] = {
     "delete_block": DeleteBlockTool,
     "insert_block": InsertBlockTool,
 }
+
+# Deprecated 2026-10-11 (see DECISIONS §2.1). Removed from the map, files
+# remain in the tree for reference: replace_section / set_summary /
+# verify_section (superseded by unit model), list_symbols / read_symbol /
+# replace_symbol* / replace_statement / delete_symbol / insert_symbol /
+# move_symbol / replace_function* (Python symbol tools), list_symbols_lua /
+# read_symbol_lua / replace_function_lua (Lua symbol tools).
 
 __all__ = [
     "TOOL_MAP",

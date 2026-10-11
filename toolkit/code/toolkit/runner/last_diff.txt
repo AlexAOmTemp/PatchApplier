@@ -1,2 +1,7 @@
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 171, символов: 1166) [v449] [+1]
-  + toolkit/code/manual/_probe_tier.py  (4 стр., 0.1 KB)
+.patch_applier/INDEX.md (файлов: 23, без summary: 179) [v402] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v450] [-2] ⚠
+  - toolkit/code/manual/_probe_tier.py  (4 стр., 0.1 KB)
+  - toolkit/code/manual/_show_metrics.py  (12 стр., 0.4 KB)
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v277] [без изменений]

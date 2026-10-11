@@ -1,37 +1,70 @@
-[{"id": "t1", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
-                "search": "y = 2",
-                "replace": "y = 20"}}]
+[{"id": "tools-map", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/tools/__init__.py",
+    "search": "TOOL_MAP: dict[str, type] = {\n    \"read_file\": ReadFileTool,\n    \"file_exists\": FileExistsTool,\n    \"file_stat\": FileStatTool,\n    \"list_files\": ListFilesTool,\n    \"grep\": GrepTool,\n    \"grep_mcp\": GrepMcpTool,\n    \"grep_replace_mcp\": GrepReplaceMcpTool,\n    # Legacy alias — old name kept for pre-rename patches.\n    \"grep_lua\": GrepMcpTool,\n    \"replace_in_file\": ReplaceInFileTool,\n    \"replace_range\": ReplaceRangeTool,\n    \"replace_between\": ReplaceBetweenTool,\n    \"insert_at_anchor\": InsertAtAnchorTool,\n    \"replace_section\": ReplaceSectionTool,\n    \"set_summary\": SetSummaryTool,\n    \"verify_section\": VerifySectionTool,\n    \"create_file\": CreateFileTool,\n    \"overwrite_file\": OverwriteFileTool,\n    \"delete_file\": DeleteFileTool,\n    \"move_file\": MoveFileTool,\n    \"copy_file\": CopyFileTool,\n    \"copy_unit\": CopyUnitTool,\n    \"rebuild_index\": RebuildIndexTool,\n    \"rebuild_code_index\": RebuildCodeIndexTool,\n    \"rebuild_lua_code_index\": RebuildLuaCodeIndexTool,\n    \"get_index\": GetIndexTool,\n    \"get_status\": GetStatusTool,\n    \"list_symbols\": ListSymbolsTool,\n    \"read_symbol\": ReadSymbolTool,\n    \"replace_symbol\": ReplaceSymbolTool,\n    \"replace_symbol_body\": ReplaceSymbolBodyTool,\n    \"replace_symbol_signature\": ReplaceSymbolSignatureTool,\n    \"replace_statement\": ReplaceStatementTool,\n    \"delete_symbol\": DeleteSymbolTool,\n    \"insert_symbol\": InsertSymbolTool,\n    \"move_symbol\": MoveSymbolTool,\n    # Backwards-compatible aliases (pre-rename patches).\n    \"replace_function\": ReplaceSymbolTool,\n    \"replace_function_body\": ReplaceSymbolBodyTool,\n    \"find_symbol\": FindSymbolTool,\n    \"find_usages\": FindUsagesTool,\n    \"symbol_graph\": SymbolGraphTool,\n    \"list_symbols_lua\": ListSymbolsLuaTool,\n    \"read_symbol_lua\": ReadSymbolLuaTool,\n    \"replace_function_lua\": ReplaceFunctionLuaTool,\n    \"run_python\": RunPythonTool,\n    # Unit model — cross-format read (DECISIONS §2.1).\n    \"read_unit\": ReadUnitTool,\n    \"list_units\": ListUnitsTool,\n    \"set_annotation\": SetAnnotationTool,\n    \"replace_unit\": ReplaceUnitTool,\n    \"replace_block\": ReplaceBlockTool,\n    \"delete_block\": DeleteBlockTool,\n    \"insert_block\": InsertBlockTool,\n}",
+    "replace": "TOOL_MAP: dict[str, type] = {\n    \"read_file\": ReadFileTool,\n    \"file_exists\": FileExistsTool,\n    \"file_stat\": FileStatTool,\n    \"list_files\": ListFilesTool,\n    \"grep\": GrepTool,\n    \"grep_mcp\": GrepMcpTool,\n    \"grep_replace_mcp\": GrepReplaceMcpTool,\n    # Legacy alias — old name kept for pre-rename patches.\n    \"grep_lua\": GrepMcpTool,\n    \"replace_in_file\": ReplaceInFileTool,\n    \"replace_range\": ReplaceRangeTool,\n    \"replace_between\": ReplaceBetweenTool,\n    \"insert_at_anchor\": InsertAtAnchorTool,\n    \"create_file\": CreateFileTool,\n    \"overwrite_file\": OverwriteFileTool,\n    \"delete_file\": DeleteFileTool,\n    \"move_file\": MoveFileTool,\n    \"copy_file\": CopyFileTool,\n    \"copy_unit\": CopyUnitTool,\n    \"rebuild_index\": RebuildIndexTool,\n    \"rebuild_code_index\": RebuildCodeIndexTool,\n    \"rebuild_lua_code_index\": RebuildLuaCodeIndexTool,\n    \"get_index\": GetIndexTool,\n    \"get_status\": GetStatusTool,\n    \"find_symbol\": FindSymbolTool,\n    \"find_usages\": FindUsagesTool,\n    \"symbol_graph\": SymbolGraphTool,\n    \"run_python\": RunPythonTool,\n    # Unit model — cross-format read/write (DECISIONS §2.1).\n    \"read_unit\": ReadUnitTool,\n    \"list_units\": ListUnitsTool,\n    \"set_annotation\": SetAnnotationTool,\n    \"replace_unit\": ReplaceUnitTool,\n    \"replace_block\": ReplaceBlockTool,\n    \"delete_block\": DeleteBlockTool,\n    \"insert_block\": InsertBlockTool,\n}\n\n# Deprecated 2026-10-11 (see DECISIONS §2.1). Removed from the map, files\n# remain in the tree for reference: replace_section / set_summary /\n# verify_section (superseded by unit model), list_symbols / read_symbol /\n# replace_symbol* / replace_statement / delete_symbol / insert_symbol /\n# move_symbol / replace_function* (Python symbol tools), list_symbols_lua /\n# read_symbol_lua / replace_function_lua (Lua symbol tools).",
+    "search_repr": false}}]
 
-[{"id": "t2", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
-                "search": "x = 1\ny = 20",
-                "replace": "x = 100\ny = 200"}}]
+[{"id": "llm-ru-cheat", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
+    "anchor": "**Понять механику X:**",
+    "position": "before",
+    "new_content": "**Быстрый выбор тула.** От задачи к инструменту. Подробные сценарии — ниже.\n\n| Задача | Тул |\n|---|---|\n| Прочитать секцию / файл | `read_file` / `read_unit` |\n| Заменить тело функции | `replace_unit part=\"body\"` |\n| Заменить только «своё» тело секции | `replace_unit part=\"own_body\"` |\n| Удалить метод из класса | `delete_block` |\n| Вставить statement в функцию | `insert_block` |\n| Найти unit по имени | `find_symbol` |\n| Кто вызывает X | `symbol_graph qualname=\"X\"` |\n| Кто импортирует модуль | `find_usages query=\"path/to/mod\"` |\n| Заменить строку (точная / с trailing) | `replace_in_file` (tier 1 / tier 2) |\n| Regex-замена | `replace_in_file regex=true` |\n| Массовая замена в Roblox-коде | `grep_replace_mcp` |\n| Пересборка индекса после правки | `rebuild_*` (авто при write) |\n| Запустить тест / скрипт | `run_python` |\n\n**Понять механику X:**",
+    "search_repr": false}}]
 
-[{"id": "t3", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
-                "search": "x = 999",
-                "replace": "x = 0"}}]
+[{"id": "llm-ru-patch-note", "action": "insert_at_anchor",
+    "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
+    "anchor": "## 6. Парадигма: работа по структурным единицам",
+    "position": "before",
+    "new_content": "**Патч — ручная операция, объединяй действия.** Пользователь копирует текст патча, вставляет, нажимает «Выполнить». Пять мелких патчей = пять копипастов, один большой = один. Не смешивай **независимые** логические действия (чтение и запись без причины, разнородные правки), но объединяй **механически связанные**: несколько однотипных `replace_in_file` в одном файле, `rebuild_*` после write, чтение и правка одной сущности подряд. Если следующее действие **зависит от результата** предыдущего (read → нужно увидеть → write), разделяй на два патча.\n\n**Проверяй diff индекса после write-патчей.** `rebuild_*` возвращает `+` добавленные, `~` изменённые, `-` удалённые единицы. `-N` — единственный тип изменения, который не должен случаться без намерения (write-тул не теряет соседей). Если видишь `-` на файлах или секциях, которые ты **не** собирался удалять — останови работу и разберись. Рядом с `-N` стоит `⚠`.\n\n",
+    "search_repr": false}}]
 
-[{"id": "t4", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
-                "search": "= 200",
-                "replace": "= 222",
-                "regex": true}}]
+[{"id": "llm-ru-patch-line", "action": "replace_in_file",
+    "arguments": {"file_path": "toolkit/docs/LLM_START.ru.md",
+    "search": "- **Один патч = одно логическое действие.** Не смешивай чтение и запись без причины.\n- **Проверяй diff от `rebuild_*`.** Он показывает, что реально изменилось в индексе.",
+    "replace": "- **Патч — ручная операция.** Объединяй механически связанные действия (несколько правок в одном файле, `rebuild_*` после write). Разделяй, если следующее зависит от результата предыдущего (см. §5).\n- **Проверяй diff от `rebuild_*`.** `-N` + `⚠` — аномалия, разбирайся до продолжения.",
+    "search_repr": false}}]
 
-[{"id": "read", "action": "read_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py",
-                "numbered": true, "escape": "perline"}}]
+[{"id": "llm-en-cheat", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+    "anchor": "**Understand mechanic X:**",
+    "position": "before",
+    "new_content": "**Quick tool pick.** From task to tool. Detailed scenarios below.\n\n| Task | Tool |\n|---|---|\n| Read a section / file | `read_file` / `read_unit` |\n| Replace a function body | `replace_unit part=\"body\"` |\n| Replace only a section's own text | `replace_unit part=\"own_body\"` |\n| Delete a method from a class | `delete_block` |\n| Insert a statement into a function | `insert_block` |\n| Find a unit by name | `find_symbol` |\n| Who calls X | `symbol_graph qualname=\"X\"` |\n| Who imports a module | `find_usages query=\"path/to/mod\"` |\n| Replace a line (exact / with trailing) | `replace_in_file` (tier 1 / tier 2) |\n| Regex replace | `replace_in_file regex=true` |\n| Bulk replace in Roblox code | `grep_replace_mcp` |\n| Rebuild index after an edit | `rebuild_*` (auto on write) |\n| Run a test / script | `run_python` |\n\n**Understand mechanic X:**",
+    "search_repr": false}}]
 
-[{"id": "del", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py"}}]
+[{"id": "llm-en-patch-note", "action": "insert_at_anchor",
+    "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+    "anchor": "## 6. Paradigm: work through structural units",
+    "position": "before",
+    "new_content": "**A patch is a manual operation — bundle actions.** The user copies the patch text, pastes, presses Run. Five small patches = five copy-pastes; one big patch = one. Do not mix **independent** logical actions (read and write without reason, unrelated edits), but bundle **mechanically connected** ones: several same-kind `replace_in_file` calls in one file, `rebuild_*` after a write, reading and editing one entity in sequence. If the next action **depends on the result** of the previous (read → need to see → write), split into two patches.\n\n**Check the index diff after write patches.** `rebuild_*` returns `+` added, `~` changed, `-` removed units. `-N` is the only change type that should not occur without intent (a write tool must not drop neighbours). If you see `-` on files or sections you did **not** intend to remove — stop and investigate. A `⚠` is placed next to `-N`.\n\n",
+    "search_repr": false}}]
 
-[{"id": "rm-script", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_probe_tier.py"}}]
+[{"id": "llm-en-patch-line", "action": "replace_in_file",
+    "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+    "search": "- **One patch = one logical action.** Do not mix reading and writing without a reason.\n- **Check the diff from `rebuild_*`.** It shows what actually changed in the index.",
+    "replace": "- **A patch is a manual operation.** Bundle mechanically connected actions (several edits in one file, `rebuild_*` after a write). Split if the next depends on the previous result (see §5).\n- **Check the diff from `rebuild_*`.** `-N` + `⚠` is an anomaly; investigate before continuing.",
+    "search_repr": false}}]
 
-[{"id": "rm-metrics", "action": "delete_file",
-  "arguments": {"file_path": "toolkit/code/manual/_show_metrics.py"}}]
+[{"id": "dec-sum", "action": "set_annotation",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+                "address": {"section_number": "2.1"},
+                "text": "Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7."}}]
+
+[{"id": "dec-note", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
+    "anchor": "**Открыто** потому, что тулы волны 2 ещё не написаны, а решение о судьбе старых — по статистике после нескольких недель работы.",
+    "position": "before",
+    "new_content": "**Итог по статистике (2026-10-11).** Metrics за 21 час работы (1030 действий): old symbol model — 16 вызовов (1.6% от всех), 6 из них с ошибками (37.5%). Unit model — 111 вызовов (10.8%). Text escape hatch — 146 (14.2%). Целевой индикатор победы модели (<15% escape hatch) достигнут. **Решение: удалены из `TOOL_MAP` 17 записей** — `list_symbols`, `read_symbol`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`, `replace_function`, `replace_function_body` (алиасы), `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`, `replace_section`, `set_summary`, `verify_section`. Файлы остаются в дереве (`tools/symbols/`, `tools/code.py`, `tools/lua_code.py`, `tools/write.py`) — если понадобится вернуть, раскомментировать одну строку в `tools/__init__.py`.\n\n"}}]
+
+[{"id": "smoke", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
+
+[{"id": "smoke-gui", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/_smoke_gui.py"}}]
+
+[{"id": "list-tools", "action": "run_python",
+  "arguments": {"script": "toolkit/code/toolkit/runner/cli.py",
+                "args": ["--list-tools"]}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["cleanup: remove probe helpers"]}}]
+                "args": ["deprecate old symbol tools, cheat-sheet, big-patches advice"]}}]

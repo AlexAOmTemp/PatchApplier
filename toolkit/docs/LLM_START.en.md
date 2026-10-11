@@ -172,6 +172,10 @@ Example output:
 By construction `errors == len(failed)` — `errors` is a counter, `failed` is the list of the same indices. There is no separate `blocked_count`. The marker prefix is exactly `##RESULT:` (with a colon).
 
 
+**A patch is a manual operation — bundle actions.** The user copies the patch text, pastes, presses Run. Five small patches = five copy-pastes; one big patch = one. Do not mix **independent** logical actions (read and write without reason, unrelated edits), but bundle **mechanically connected** ones: several same-kind `replace_in_file` calls in one file, `rebuild_*` after a write, reading and editing one entity in sequence. If the next action **depends on the result** of the previous (read → need to see → write), split into two patches.
+
+**Check the index diff after write patches.** `rebuild_*` returns `+` added, `~` changed, `-` removed units. `-N` is the only change type that should not occur without intent (a write tool must not drop neighbours). If you see `-` on files or sections you did **not** intend to remove — stop and investigate. A `⚠` is placed next to `-N`.
+
 ## 6. Paradigm: work through structural units
 
 **The main rule: edit files through structural units, not through text and not by line numbers.**
@@ -435,6 +439,25 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 
 ## 11. Strategies
 
+**Quick tool pick.** From task to tool. Detailed scenarios below.
+
+| Task | Tool |
+|---|---|
+| Read a section / file | `read_file` / `read_unit` |
+| Replace a function body | `replace_unit part="body"` |
+| Replace only a section's own text | `replace_unit part="own_body"` |
+| Delete a method from a class | `delete_block` |
+| Insert a statement into a function | `insert_block` |
+| Find a unit by name | `find_symbol` |
+| Who calls X | `symbol_graph qualname="X"` |
+| Who imports a module | `find_usages query="path/to/mod"` |
+| Replace a line (exact / with trailing) | `replace_in_file` (tier 1 / tier 2) |
+| Regex replace | `replace_in_file regex=true` |
+| Bulk replace in Roblox code | `grep_replace_mcp` |
+| Rebuild index after an edit | `rebuild_*` (auto on write) |
+| Run a test / script | `run_python` |
+
+**Understand mechanic X:**
 **Understand mechanic X:**
 1. `grep pattern="X"` over the index — every section across all docs at once.
 2. `read_file section_number="N"` — precisely.
@@ -483,8 +506,8 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - **`blocked` ≠ `error`.** `blocked` is policy or sandbox; do not retry, tell the user.
 - **Files >100 KB** — read by sections or with `max_bytes`. `read_file` without limits reads the whole file — for a large one that floods context. Check the size in the index first (`⚠ large`, metrics in the header).
 - **Read the current state before editing.** `read_unit` / `read_file` → then `replace_*` / `insert_*` / `delete_*`. The index may be stale, the previous patch may not have applied, the file may have changed. Exception — idempotent operations like `create_file` for a file that certainly does not exist.
-- **One patch = one logical action.** Do not mix reading and writing without a reason.
-- **Check the diff from `rebuild_*`.** It shows what actually changed in the index.
+- **A patch is a manual operation.** Bundle mechanically connected actions (several edits in one file, `rebuild_*` after a write). Split if the next depends on the previous result (see §5).
+- **Check the diff from `rebuild_*`.** `-N` + `⚠` is an anomaly; investigate before continuing.
 - **Hidden = closed.** Paths in `.patchignore` at the project root (dotdirs, `__pycache__`, `node_modules`, `venv` by default) are closed for read / write / index. If access is needed, the user opens them via the GUI. Hidden in the tree means "not reachable", not "not important".
 
 ## 13. Error codes

@@ -103,7 +103,7 @@
 
 ### 2.1 Унификация тулов
 
-<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation / verify_annotation) добавляется рядом со старыми. Старые остаются в TOOL_MAP, но исчезают из LLM_START. Статистика по metrics.jsonl решает судьбу. -->
+<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / replace_block / insert_block / delete_block / set_annotation) добавлен рядом со старыми. По статистике metrics.json за 21 час старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11 (файлы остаются в дереве). См. TOOL_PRACTICE.md §7. -->
 
 **Стратегия: расширение тулсета без миграции.** Старый план (объединить `replace_section` / `replace_symbol*` / `insert_symbol` в единый `replace_unit` / `insert_unit`) отменён. Причины:
 
@@ -161,6 +161,8 @@
 - `copy_unit` — уже кросс-форматный, остаётся как есть.
 
 **Что скрывается из LLM_START §7.** `list_symbols`, `read_symbol`, `read_symbol_lua`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `replace_section`, `set_summary`, `verify_section`, `insert_symbol`, `delete_symbol`, `move_symbol`. Все они остаются в `TOOL_MAP` для совместимости.
+
+**Итог по статистике (2026-10-11).** Metrics за 21 час работы (1030 действий): old symbol model — 16 вызовов (1.6% от всех), 6 из них с ошибками (37.5%). Unit model — 111 вызовов (10.8%). Text escape hatch — 146 (14.2%). Целевой индикатор победы модели (<15% escape hatch) достигнут. **Решение: удалены из `TOOL_MAP` 17 записей** — `list_symbols`, `read_symbol`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`, `replace_function`, `replace_function_body` (алиасы), `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`, `replace_section`, `set_summary`, `verify_section`. Файлы остаются в дереве (`tools/symbols/`, `tools/code.py`, `tools/lua_code.py`, `tools/write.py`) — если понадобится вернуть, раскомментировать одну строку в `tools/__init__.py`.
 
 **Открыто** потому, что тулы волны 2 ещё не написаны, а решение о судьбе старых — по статистике после нескольких недель работы.
 
