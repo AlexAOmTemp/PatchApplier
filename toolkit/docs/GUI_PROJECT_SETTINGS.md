@@ -177,16 +177,18 @@ Workflow проекта: пользователь создаёт проект, �
 
 ### 5. Порядок записи в `workspace.json`
 
-Сейчас `projects.update_root_policy` пишет только дефолт (`["."]`). Для per-path — нужна новая функция `set_override(folder, root, rel_path, PathPolicy)`. Добавляется по ходу.
+**✅ Закрыто.** `save_workspace(project_dir, w, state_subdir)` пишет весь `Workspace` целиком, включая все per-path `overrides`. Отдельный `set_override` не нужен: `PolicyTree` мутирует `root.overrides` in-place, `OK` вызывает `save_workspace`. Реактивные колонки не удаляют overrides при скрытии — они перерисовывают представление, а данные остаются.
 
 ## 8. Порядок работы
+1. **Дизайн (этот документ).** ✅
+2. **`runner/gui/tree.py`** — чистая логика, юнит-тесты (26/26). ✅
+3. **`runner/gui/tree_view.py`** — Tk-виджет, тесты 19/19. ✅
+4. **`runner/gui/settings_window.py`** — окно целиком. ✅
+5. **`app.py`** — подключение, удаление старой заглушки и кнопки ⚙. ✅
+6. **`projects.set_override`** — не нужен, `save_workspace` сохраняет всё. ✅
+7. **`projects` + `app` — подключение roots в `get_status`.** ✅ (roots line в `_render_session`)
+8. **Проверка end-to-end** — визуально подтверждено пользователем.
 
-1. **Дизайн (этот документ).** Согласовать §7.
-2. **`runner/gui/tree.py`** — чистая логика, тест.
-3. **`runner/gui/tree_view.py`** — Tk-виджет с флагами.
-4. **`runner/gui/settings_window.py`** — окно целиком: имя, табы, кнопки, редакторы, toggles.
-5. **`app.py`** — подключение: File → Project settings → new window; удаление старой заглушки.
-6. **`projects.set_override`** — для per-path.
-7. **Проверка end-to-end:** открыть проект, добавить root, переключить флаг, OK, переоткрыть — состояние сохранилось.
-
-Каждый шаг самодостаточен, откатывается.
+**Осталось открытым:**
+- `.mcpignore` редактор существует, но реально не влияет на MCP-индекс (см. `WORKSPACE_BACKEND.md` / `lua_runner.py`) — фильтр работает, потому что `mcpignore.path_hidden` вызывается в `build_lua_index` через `project_dir`. Проверено косвенно.
+- Ctrl+клик / Shift+клик на поддерево — не в этой итерации.

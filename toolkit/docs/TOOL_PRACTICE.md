@@ -321,21 +321,21 @@ Roblox-сторона не правила в этой сессии. Native — �
 
 Реализовано в следующей сессии. Итог: три tier'а — byte-exact (как Ctrl+F), trailing-whitespace tolerance (indent не трогается), no-match с top-3 похожих строк и маркерами `␣ ⇥ ⏎`. Плюс `regex: true` для паттернов с `\1`-backrefs. Тесты `test_replace_in_file.py` — 25/25.
 
-### P2: `create_file` / `overwrite_file` — syntax check
+### ✅ P2 (закрыто): `create_file` / `overwrite_file` — syntax check
 
-Для `.py` — `ast.parse(content)`. Для `.json` — `json.loads(content)`. Ошибка с `error_code="syntax_error"`, файл не создан. Спасает от JSON-escape промахов.
+Реализовано: `_check_content_syntax` — `.py` → `ast.parse`, `.json` → `json.loads`. `error_code="content_syntax_error"`, файл не тронут. Тесты в `test_strictness.py`.
 
-### P2: `replace_unit` для md — `part="own_body"`
+### ✅ P2 (закрыто): `replace_unit` для md — `part="own_body"`
 
-Сейчас `part="body"` включает подсекции. Добавить `part="own_body"` — только текст секции до первой `###`-подсекции. Либо явное `part="body", with_children=false`.
+Реализовано. Ярлык к `body` без детей, прописан в `MODEL.md §4` (со статусом «синтаксический ярлык, не четвёртая часть»).
 
-### P3: `replace_unit` с пустым `new_text` — явный error_code
+### ✅ P3 (закрыто): `replace_unit` с пустым `new_text`
 
-Сейчас `result_missing_symbol` (сбивает). Лучше `empty_input_use_delete_block` с инструкцией. Или отдельный `delete_unit`.
+Реализовано: `empty_input_use_delete_block` в `writer.replace_unit` для `part=all` + пустой текст. Сообщение: «replace_unit does not delete a unit».
 
-### P3: `get_status` — показывать roots для WorkspaceBackend
+### ✅ P3 (закрыто): `get_status` — roots в сессии
 
-Сейчас `project: PatchApplier`. Можно `project: PatchApplier [toolkit]` — basename'ы корней. Помогает быстро понять «в каком workspace я».
+Реализовано: отдельная строка `roots:    toolkit, docs` под `project:` — basename'ы всех корней через запятую. `set_context(roots=[...])` заполняется из `app.py` и `cli.py` через `load_workspace`.
 
 ### P3: LLM_START cheat-sheet «задача → тул»
 

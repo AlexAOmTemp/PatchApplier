@@ -1,16 +1,11 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 174) [v395] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 175) [v396] [~5, ⇅6, +1]
+  ~ toolkit/code/manual/unit_proto/MODEL.md §4. Части (part) и блоки (block) (L77–L154, 5.6 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.en.md §7. Available actions (L202–L359, 15.5 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.en.md §Unit operations: a unified model for `.py` / `.lua` / `.md` (priority) (L286–L318, 4.0 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L204–L361, 20.6 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §Unit-операции: единая модель для `.py` / `.lua` / `.md` (приоритетно) (L288–L320, 5.3 KB, ⚠ no summary)
+  + toolkit/code/manual/unit_proto/MODEL.md §`own_body` — вид на `body` (L96–L115, 1.5 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v441] [~2, +1, ⇅12]
-  ~ toolkit/code/toolkit/tools/fileops.py  (+41 стр., +1.5 KB)
-  ~ toolkit/code/toolkit/tools/status.py  (+5 стр., +0.2 KB)
-      + toolkit/code/toolkit/tools/fileops.py :: _check_content_syntax  [function]  L14–L36
-      ~ toolkit/code/toolkit/tools/fileops.py :: CreateFileTool  [class]  L14–L61 → L39–L94
-      ~ toolkit/code/toolkit/tools/fileops.py :: CreateFileTool.execute  [method]  L20–L61 → L45–L94
-      ~ toolkit/code/toolkit/tools/fileops.py :: OverwriteFileTool  [class]  L64–L99 → L97–L140
-      ~ ... и ещё 1
-      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool  [class]  L40–L273 → L40–L278
-      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool.set_context  [method]  L50–L80 → L50–L82
-      ~ toolkit/code/toolkit/tools/status.py :: GetStatusTool._render_session  [method]  L132–L152 → L134–L157
-  + toolkit/code/toolkit/tests/test_strictness.py  (190 стр., 7.0 KB)
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1165) [v442] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v270] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v271] [без изменений]

@@ -9,6 +9,44 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 
 Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.
 
+## Сессия: Settings window + tool polish (закрыта)
+
+**Тема:** после Workspace refactor — довести GUI-окно управления проектом и закрыть накопившийся долг по инструментам из `TOOL_PRACTICE.md §8`.
+
+### Что сделано
+
+**GUI — Project settings (шаг 7.3, заменяет старую «дерево файлов» идею):**
+- `runner/gui/tree.py` — чистая логика дерева каталогов. 26/26.
+- `runner/gui/tree_view.py` — Tk-виджет `PolicyTree`: соед. глифы, пять колонок, реактивный `set_active_flags`, hidden = hard deny. 19/19.
+- `runner/gui/settings_window.py` — модал: имя проекта, Sources сверху (docs / py + exec / MCP / luau-on-disk / Luau source radio), Roots снизу (ноутбук табов + `Add root` / `Remove root` / `Show hidden` / легенда), ignore-редакторы inline в Sources, реактивные правила (exec требует python, luau radio зависит от источников, колонки дерева зависят от источников). `Ctrl+C / Ctrl+A` в Entry работают в любой раскладке (по keycode).
+- `app.py` — `_menu_project_settings` теперь тонкий шим; старая заглушка `open_settings_dialog` и кнопка ⚙ удалены; `roots=[...]` прокинуто в `set_status`.
+- `cli.py` — то же прокидывание roots.
+- Доки: `GUI_PROJECT_SETTINGS.md` — дизайн + статус; `GUI_TREE.md` — удалён, поглощён.
+
+**Тулы (P1/P2/P3 из TOOL_PRACTICE):**
+- ✅ P1: `insert_at_anchor` добавляет `\n` у границы; `replace_between` нормализует EOL anchor'ов.
+- ✅ P2: `replace_in_file` — три tier (byte-exact / trailing-whitespace / no-match + похожие строки); `regex: true`.
+- ✅ P2: `create_file` / `overwrite_file` — syntax check `.py` / `.json` (`content_syntax_error`).
+- ✅ P2: `replace_unit` для md — `part="own_body"`.
+- ✅ P3: `replace_unit` с пустым `new_text` → `empty_input_use_delete_block`.
+- ✅ P3: `get_status` показывает `roots:    a, b` для workspace.
+- ✅ `⚠` в diff-header при любых удалениях (маркер аномалии).
+
+**Модель:**
+- `own_body` задокументирован в `MODEL.md §4` как «ярлык к body-with-own-scope», с заделом на переделку в честный параметр.
+- `_check_parses` уже стоит как страховка от off-by-one в unit-модели (из прошлой сессии).
+
+### Что открыто
+
+- **LLM_START cheat-sheet «задача → тул»** — P3, не делали.
+- **`replace_in_file` auto-fix trailing/EOL** — обсудили, оставили «no — только диагностика + требование перечитать», кроме tier-2 trailing-whitespace (сделано). Tabs↔spaces — никогда не auto.
+- **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена.
+- **Roots-line влияет на конфиг** — не влияет: `set_context` чисто для `get_status`. Если из окна поменять roots — сессия перезапустится, `get_status` покажет новые.
+- **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс. Проверено косвенно через `test_multi_root_smoke`.
+
+**Git log этой сессии:** от `ed6e2e2 pre-model` до `aea3544 own_body in model docs, roots in status, prefix order fix` (~15 коммитов).
+
+
 ## Сессия: Workspace refactor (закрыта)
 
 **Длительность:** одна большая сессия, ~22 коммита, от `ab09954 before refactor` до `9683bc9 docs: session tool-practice notes`.
