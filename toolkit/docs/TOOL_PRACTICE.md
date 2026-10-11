@@ -301,6 +301,19 @@ run_python(script="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
 
 Не возникло. Замены по номерам строк — плохая практика (сам LLM_START это говорит), а `replace_in_file` / `replace_unit` / `overwrite_file` покрывают.
 
+### ✅ Удалены из `TOOL_MAP` по статистике (2026-10-11)
+
+После 21 часа работы и 1030 действий `metrics.json` показал: старая символьная модель дала **16 вызовов (1.6% всех)** с **37.5% error/block** — плохая отдача при плохих ошибках. Решение: убраны из `TOOL_MAP` **17 записей**. Файлы остаются в дереве; если понадобится вернуть — одна строка в `tools/__init__.py`.
+
+Удалено:
+
+- Python symbol tools: `list_symbols`, `read_symbol`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`.
+- Алиасы: `replace_function`, `replace_function_body`.
+- Lua symbol tools: `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`.
+- Старый section-API: `replace_section`, `set_summary`, `verify_section`.
+
+**Что теперь в `TOOL_MAP`:** 35 тулов — unit-модель, text escape hatch, file ops, индексы, граф, Roblox-мост, native passthrough. См. `list-tools` через CLI (`python -m toolkit.runner.cli --list-tools`).
+
 ### MCP-специфичные (`grep_mcp`, `grep_replace_mcp`, native tools)
 
 Roblox-сторона не правила в этой сессии. Native — только `list_roblox_studios`, `search_game_tree` в самом начале, для recon.

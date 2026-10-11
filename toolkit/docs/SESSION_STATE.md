@@ -36,15 +36,31 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 - `own_body` задокументирован в `MODEL.md §4` как «ярлык к body-with-own-scope», с заделом на переделку в честный параметр.
 - `_check_parses` уже стоит как страховка от off-by-one в unit-модели (из прошлой сессии).
 
+**Статистика и депрекейт (итог):**
+- `metrics.json` за 21 час — 1030 действий. Escape hatch 14.2% (цель <15% — достигнута). Unit-модель 10.8%. Старая символьная модель 1.6% с 37.5% err.
+- Удалены из `TOOL_MAP` **17 записей**: `list_symbols`, `read_symbol`, `replace_symbol*`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`, `replace_function*`, `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`, `replace_section`, `set_summary`, `verify_section`. Файлы в дереве, регистрация снята. `list-tools` — 35 тулов. Запись в `DECISIONS §2.1`.
+
+**Docs:**
+- `LLM_START §11` — cheat-sheet «задача → тул» (первая подсекция, таблица со ссылками на сценарии).
+- `LLM_START §5` — блок «патч — ручная операция»: объединяй механически связанные действия, разделяй зависимые; проверяй `-N` + `⚠` в diff.
+- `LLM_START §12` — короткая отсылка к §5.
+
+**Работа с моделью:**
+- `Unit.title` — новое поле, `section_title` матчит человеческий текст заголовка (не номер). `not_found` в unit-тулах возвращает `Did you mean: ...` top-5 + хинт `list_units`.
+- `replace_in_file` tier 2 (trailing whitespace) и tier 3 (`Similar lines:` с маркерами `␣`) подтверждены вживую.
+- `⚠` в diff-header сработал в реале при удалении двух файлов через `delete_file`.
+
 ### Что открыто
 
-- **LLM_START cheat-sheet «задача → тул»** — P3, не делали.
-- **`replace_in_file` auto-fix trailing/EOL** — обсудили, оставили «no — только диагностика + требование перечитать», кроме tier-2 trailing-whitespace (сделано). Tabs↔spaces — никогда не auto.
-- **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена.
-- **Roots-line влияет на конфиг** — не влияет: `set_context` чисто для `get_status`. Если из окна поменять roots — сессия перезапустится, `get_status` покажет новые.
-- **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс. Проверено косвенно через `test_multi_root_smoke`.
+- **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена. Не критично, работать можно.
+- **Tabs↔spaces auto в `replace_in_file`** — принципиально не делаем (indent значима).
+- **`replace_range`** — оставлен как escape hatch для module-level top region и файлов без парсера; в этой сессии не использовался.
+- **`grep_replace` на FS-стороне** — аналог `grep_replace_mcp` для файловой системы. В `TOOL_PRACTICE §8` числится как открытая идея, не делали.
+- **Символьный reverse для Lua / Symbol Graph depth>1** — только Python, задокументировано.
+- **`Roots-line влияет на конфиг`** — не влияет: `set_context` чисто для `get_status`.
+- **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс.
 
-**Git log этой сессии:** от `ed6e2e2 pre-model` до `aea3544 own_body in model docs, roots in status, prefix order fix` (~15 коммитов).
+**Git log этой сессии:** от `ed6e2e2 pre-model` до `fb2dcd8 deprecate old symbol tools, cheat-sheet, big-patches advice` (~20 коммитов).
 
 
 ## Сессия: Workspace refactor (закрыта)
