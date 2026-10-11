@@ -114,25 +114,32 @@ def _resolve(root: Unit, address: dict) -> Unit:
 
 
 def _not_found_message(root: Unit, label: str, query, key: str) -> str:
-    """Not-found message with up to 5 closest candidates.
+    """Not-found message with up to 5 closest candidates + kind hint.
 
-    Candidates come from `difflib.get_close_matches`. No full enumeration
-    of the file: the point is to give the next guess, not a map (that is
-    what `list_units` is for).
+    Candidates come from `difflib.get_close_matches`. The point is to
+    give the next guess, not a map — `list_units` is for that.
+
+    Special case: if the file has no sections at all — say so explicitly
+    instead of just listing empty candidates. That is a recurring source
+    of "why does section_number='2' not work here".
     """
     import difflib
     units = list(_iter_units(root))
     if key == "qualname":
         pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]
-        q = str(query)
     else:  # title_match
         pool = [u.title or u.name for u in units
                 if u.kind == UnitKind.SECTION]
-        q = str(query)
-    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)
+    q = str(query)
     parts = [f"not_found: {label}"]
+    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)
     if similar:
         parts.append("  Did you mean: " + ", ".join(similar))
+    # Extra hint: no sections in the file at all.
+    has_sections = any(u.kind == UnitKind.SECTION for u in units)
+    if not has_sections:
+        parts.append("  This file has no sections (markdown headings `## `); "
+                     "if it is a .py/.lua file, address by qualname only.")
     parts.append("  (or list_units for the full map of the file)")
     return "\n".join(parts)
 

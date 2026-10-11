@@ -1,19 +1,46 @@
-[ss-sum] ✗ set_annotation: no_annotation: <module>
+[model-md-mod] ✓ insert_at_anchor: после L43 в toolkit/code/manual/unit_proto/MODEL.md — +8 стр., +1242 Б
 
-[commit] ✓ run_python: exit=0  duration=143ms
+[not-found] ✗ replace_unit: scope_required: pass part= or block= (part=all replaces the whole unit; block=N replaces N-th block)
+
+[smoke] ✓ run_python: exit=0  duration=76ms
+--- stdout ---
+[OK]   toolkit.core
+[OK]   toolkit.core.models
+[OK]   toolkit.core.patcher
+[OK]   toolkit.core.session
+[OK]   toolkit.config
+[OK]   toolkit.config.workspace
+[OK]   toolkit.backends
+[OK]   toolkit.backends.filesystem
+[OK]   toolkit.backends.workspace
+[OK]   toolkit.backends.composite
+[OK]   toolkit.backends.mcp
+[OK]   toolkit.indexers
+[OK]   toolkit.indexers.doc
+[OK]   toolkit.indexers.code
+[OK]   toolkit.tools
+[OK]   toolkit.tools.index
+[OK]   toolkit.tools.status
+[OK]   toolkit.runner.projects
+
+=== all imports OK ===
+
+[commit] ✓ run_python: exit=0  duration=485ms
 --- stdout ---
 [add rc=0]
 [commit rc=0]
-[master cee9657] docs: session_state module annotation
- 4 files changed, 63 insertions(+), 150 deletions(-)
-[timing] user (2 actions): 0.15s
+[master 9d73e99] docs: md-module has no annotation; not_found hints about empty sections
+ 5 files changed, 36 insertions(+), 53 deletions(-)
+[timing] user (4 actions): 0.57s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v414] [без изменений]
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v415] [~2, ⇅10]
+  ~ toolkit/code/manual/unit_proto/MODEL.md §2. Модель (L12–L72, 5.5 KB, ⚠ no summary)
+  ~ toolkit/code/manual/unit_proto/MODEL.md §Module как unit (L43–L72, 2.4 KB, ⚠ no summary)
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v463] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v464] [без изменений]
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v287] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v288] [без изменений]
+[timing] auto-rebuild (3 actions): 0.79s
 
-##RESULT:{"ok": 4, "errors": 1, "skipped": 0, "failed": [1], "blocked": []}
-[timing] total: 0.95s
+##RESULT:{"ok": 6, "errors": 1, "skipped": 0, "failed": [2], "blocked": []}
+[timing] total: 1.36s

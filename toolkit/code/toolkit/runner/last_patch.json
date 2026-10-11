@@ -1,17 +1,15 @@
-[{"id": "model-md-mod", "action": "insert_at_anchor",
-  "arguments": {"file_path": "toolkit/code/manual/unit_proto/MODEL.md",
-    "anchor": "### Module как unit",
-    "position": "after",
-    "new_content": "\n\n**Markdown-модуль особенный.** В `.md` у файла нет ни `head`, ни `annotation` в смысле модели: head — пусто, annotation — пусто, body — всё содержимое файла (все top-level секции как блоки). `part=\"head\"` / `part=\"annotation\"` на `<module>` вернут пустую строку или `no_annotation` при попытке `set_annotation`.\n\nПричина: в `.md` «голова файла» — это H1-заголовок и свободный текст до первой `## `-секции, но это не аннотация файла и не head в обще-модельном смысле. Аннотация (summary) — свойство **секции**, а не файла. Если нужен «summary файла», в этой модели его нет; используй `part=\"body\"` модуля, чтобы увидеть файл целиком, или `read_file`.\n\nДля Python-модуля `part=\"annotation\"` работает (docstring), для Luau-модуля тоже (комментарий после shebang). У markdown — нет. Это осознанное упрощение, не пробел.\n\n"}}]
-
 [{"id": "not-found", "action": "replace_unit",
   "arguments": {"file_path": "toolkit/code/toolkit/tools/unit/reader.py",
     "address": {"qualname": "_not_found_message"},
-    "new_text": "def _not_found_message(root: Unit, label: str, query, key: str) -> str:\n    \"\"\"Not-found message with up to 5 closest candidates + kind hint.\n\n    Candidates come from `difflib.get_close_matches`. The point is to\n    give the next guess, not a map — `list_units` is for that.\n\n    Special case: if the doc has no sections at all (or no numbered\n    sections, when the caller asked by `qualname` with a digit) — say so\n    explicitly instead of just listing empty candidates. That is a\n    recurring source of \"why does section_number='2' not work here\".\n    \"\"\"\n    import difflib\n    units = list(_iter_units(root))\n    if key == \"qualname\":\n        pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]\n    else:  # title_match\n        pool = [u.title or u.name for u in units\n                if u.kind == UnitKind.SECTION]\n    q = str(query)\n    parts = [f\"not_found: {label}\"]\n    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)\n    if similar:\n        parts.append(\"  Did you mean: \" + \", \".join(similar))\n    # Extra hint: no sections in the file at all.\n    has_sections = any(u.kind == UnitKind.SECTION for u in units)\n    if not has_sections:\n        parts.append(\"  This file has no sections (markdown headings `## `); \"\n                     \"if it is a .py/.lua file, address by qualname only.\")\n    parts.append(\"  (or list_units for the full map of the file)\")\n    return \"\\n\".join(parts)"}}]
+    "part": "all",
+    "new_text": "def _not_found_message(root: Unit, label: str, query, key: str) -> str:\n    \"\"\"Not-found message with up to 5 closest candidates + kind hint.\n\n    Candidates come from `difflib.get_close_matches`. The point is to\n    give the next guess, not a map — `list_units` is for that.\n\n    Special case: if the file has no sections at all — say so explicitly\n    instead of just listing empty candidates. That is a recurring source\n    of \"why does section_number='2' not work here\".\n    \"\"\"\n    import difflib\n    units = list(_iter_units(root))\n    if key == \"qualname\":\n        pool = [u.qualname for u in units if u.kind != UnitKind.MODULE]\n    else:  # title_match\n        pool = [u.title or u.name for u in units\n                if u.kind == UnitKind.SECTION]\n    q = str(query)\n    parts = [f\"not_found: {label}\"]\n    similar = difflib.get_close_matches(q, pool, n=5, cutoff=0.4)\n    if similar:\n        parts.append(\"  Did you mean: \" + \", \".join(similar))\n    # Extra hint: no sections in the file at all.\n    has_sections = any(u.kind == UnitKind.SECTION for u in units)\n    if not has_sections:\n        parts.append(\"  This file has no sections (markdown headings `## `); \"\n                     \"if it is a .py/.lua file, address by qualname only.\")\n    parts.append(\"  (or list_units for the full map of the file)\")\n    return \"\\n\".join(parts)"}}]
+
+[{"id": "test", "action": "run_python",
+  "arguments": {"script": "toolkit/code/toolkit/tests/test_strictness.py"}}]
 
 [{"id": "smoke", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_smoke_imports.py"}}]
 
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["docs: md-module has no annotation; not_found hints about empty sections"]}}]
+                "args": ["unit: not_found hints about empty sections"]}}]
