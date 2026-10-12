@@ -1,7 +1,25 @@
+[{"id": "overwrite", "action": "overwrite_file",
+  "arguments": {"file_path": "toolkit/code/toolkit/core/metrics.py",
+                "file_content": "\"\"\"Best-effort action counters for the Patcher.\n\nEach Patcher.apply bumps per-action counters in `metrics.json` under the\ntoolkit runtime state dir (see config.loader). Purpose: after a few\nweeks, decide whether the unit-model tools win the \"honest competition\"\nagainst text tools -- see DECISIONS \u00a72.1.\n\nCounters, not a log. The file size is bounded by the set of\n`project x action x status x error_code` combos actually seen, and it\nnever grows linearly with time. `since` / `updated` mark the window.\n\nShape:\n    {\n      \"since\":   1728000000.123,\n      \"updated\": 1728100000.456,\n      \"projects\": {\n        \"PatchApplier\": {\n          \"replace_unit\": {\"ok\": 40, \"error\": 12, \"blocked\": 0}\n        },\n        \"AiTest\": {...},\n        \"unknown\": {...}\n      },\n      \"errors\": {\n        \"PatchApplier\": {\n          \"replace_unit\": {\"empty_input_use_delete_block\": 3}\n        }\n      }\n    }\n\nProject key comes from `set_context(project_name)` called once at\nsession start (GUI run(), CLI main()). Without it counters land under\n\"unknown\". The split matters: refactoring the toolkit and modding a\nRoblox game are different task profiles; a single aggregate hides the\ndifference.\n\nLegacy files (flat `{counts, errors}` from the pre-project era) are\ndiscarded on first bump: the file is rewritten in the new shape, old\ncounters lost. No migration -- the format change is intentional.\n\nReset: delete the file.\n\"\"\"\nfrom __future__ import annotations\n\nimport json\nimport os\nimport time\nfrom pathlib import Path\n\n\n_METRICS_PATH: Path | None = None\n_RESOLVED = False\n_PROJECT: str = \"unknown\"\n\n\ndef set_context(project_name: str | None) -> None:\n    \"\"\"Set the active project for subsequent bumps. Call once at session\n    start. Empty / None falls back to \"unknown\".\n\n    Best-effort: no validation, no error. Project is a namespace, not a\n    key that can fail.\n    \"\"\"\n    global _PROJECT\n    name = (project_name or \"\").strip()\n    _PROJECT = name if name else \"unknown\"\n\n\ndef _path() -> Path | None:\n    global _METRICS_PATH, _RESOLVED\n    if _RESOLVED:\n        return _METRICS_PATH\n    _RESOLVED = True\n    try:\n        from ..config.loader import toolkit_runtime_state_dir\n        _METRICS_PATH = toolkit_runtime_state_dir() / \"metrics.json\"\n    except Exception:\n        _METRICS_PATH = None\n    return _METRICS_PATH\n\n\ndef _load(p: Path) -> dict:\n    try:\n        data = json.loads(p.read_text(encoding=\"utf-8\"))\n    except Exception:\n        return {}\n    if not isinstance(data, dict):\n        return {}\n    # New-shape only. Legacy flat files (no \"projects\" key) are ignored\n    # -- they get overwritten on the next save.\n    if \"projects\" not in data:\n        return {}\n    return data\n\n\ndef _save(p: Path, data: dict) -> None:\n    tmp = p.with_suffix(p.suffix + \".tmp\")\n    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2),\n                   encoding=\"utf-8\")\n    os.replace(tmp, p)\n\n\ndef bump(action: str, status: str, error_code: str | None) -> None:\n    \"\"\"Increment one counter under the current project. Never raises.\"\"\"\n    p = _path()\n    if p is None:\n        return\n    try:\n        data = _load(p)\n        now = time.time()\n        data.setdefault(\"since\", now)\n        data[\"updated\"] = now\n        a = action or \"?\"\n        s = status or \"?\"\n        proj = _PROJECT\n        projects = data.setdefault(\"projects\", {})\n        bucket = projects.setdefault(proj, {}).setdefault(a, {})\n        bucket[s] = bucket.get(s, 0) + 1\n        if error_code:\n            errs = data.setdefault(\"errors\", {})\n            e = errs.setdefault(proj, {}).setdefault(a, {})\n            e[error_code] = e.get(error_code, 0) + 1\n        p.parent.mkdir(parents=True, exist_ok=True)\n        _save(p, data)\n    except Exception:\n        pass\n"}}]
+
+[{"id": "app", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+                "anchor": "    CONFIG.update(_cfg.load())",
+                "position": "after",
+                "new_content": "    try:\n        from ...core import metrics as _metrics\n        _proj = (CONFIG.get(\"project_dir\") or \"\").rstrip(\"/\\\\\")\n        _metrics.set_context(Path(_proj).name if _proj else None)\n    except Exception:\n        pass\r\n"}}]
+
+[{"id": "cli", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/cli.py",
+                "anchor": "    cfg = cfg_loader.load(cfg_path, project_dir=project_dir)",
+                "position": "after",
+                "new_content": "\n    try:\n        from toolkit.core import metrics as _metrics\n        _metrics.set_context(project_dir.name)\n    except Exception:\n        pass\n"}}]
+
+[{"id": "verify", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/verify_syntax.py",
+                "args": ["toolkit/code/toolkit/core/metrics.py",
+                         "toolkit/code/toolkit/runner/gui/app.py",
+                         "toolkit/code/toolkit/runner/cli.py"]}}]
+
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "replace_unit: empty part=all deletes the unit (was empty_input_use_delete_block)"]}}]
-
-[{"id": "grep-calls", "action": "grep",
-  "arguments": {"pattern": "metrics\\.bump|from .*metrics import|import metrics",
-                "directory": "toolkit/code/toolkit", "file_glob": "*.py"}}]
+                "args": ["commit", "metrics: per-project counters (new shape, no migration)"]}}]

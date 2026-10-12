@@ -229,6 +229,12 @@ def main(argv=None) -> int:
         print(f"[error] project is not a directory: {project_dir}", file=sys.stderr)
         return 2
     cfg = cfg_loader.load(cfg_path, project_dir=project_dir)
+    try:
+        from toolkit.core import metrics as _metrics
+        _metrics.set_context(project_dir.name)
+    except Exception:
+        pass
+
 
     backend_name = args.backend or cfg.get("backend", "composite")
     preset = args.format_preset or cfg.get("format_preset", "default")

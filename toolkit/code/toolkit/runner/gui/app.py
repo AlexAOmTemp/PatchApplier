@@ -770,6 +770,13 @@ def run():
     global _recent_menu
 
     CONFIG.update(_cfg.load())
+    try:
+        from ...core import metrics as _metrics
+        _proj = (CONFIG.get("project_dir") or "").rstrip("/\\")
+        _metrics.set_context(Path(_proj).name if _proj else None)
+    except Exception:
+        pass
+
     _load_last_state()
 
     from ..views.main_window import MainWindow

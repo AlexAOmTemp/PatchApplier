@@ -1,102 +1,21 @@
-[r263] ✓ replace_range: L263–L264 → L263–L264 в toolkit/code/toolkit/tools/unit/writer.py — +0 стр., -22 Б
-
-[r168] ✓ replace_range: L168–L168 → L168–L169 в toolkit/code/toolkit/tools/unit/writer.py — +1 стр., +44 Б
-
-[test-run] ✓ run_python: exit=0  duration=114ms
+[commit] ✓ run_python: exit=0  duration=184ms
 --- stdout ---
-[1] ✗ create_file: Не создаю bad.py: content_syntax_error: invalid syntax (<unknown>, line 1)
+[add rc=0]
+[commit rc=0]
+[master c97be27] replace_unit: empty part=all deletes the unit (was empty_input_use_delete_block)
+ 10 files changed, 161 insertions(+), 68 deletions(-)
 
-[OK]   create .py syntax error rejected
-[OK]   file not created
-[1] ✓ create_file: Файл создан: good.py (1 стр., 6 Б)
+[grep-calls] ✓ grep: Найдено 2 совпадений:
+toolkit/code/toolkit/core/patcher.py:15: from . import metrics
+toolkit/code/toolkit/core/patcher.py:86:             metrics.bump(
+[timing] user (2 actions): 0.22s
 
-[OK]   create .py valid OK
-[1] ✗ create_file: Не создаю bad.json: content_syntax_error: Expecting property name enclosed in double quotes: line 1 column 3 (char 2)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v467] [без изменений]
 
-[OK]   create .json syntax error rejected
-[1] ✓ create_file: Файл создан: x.md (1 стр., 16 Б)
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1201) [v520] [без изменений]
 
-[OK]   create .md not checked
-[1] ✗ overwrite_file: Не перезаписываю a.py: content_syntax_error: invalid syntax (<unknown>, line 1)
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v340] [без изменений]
+[timing] auto-rebuild (3 actions): 0.78s
 
-[OK]   overwrite .py syntax error rejected
-[OK]   original preserved
-[1] ✗ replace_unit: scope_required: pass part= or block= (part=all replaces the whole unit; block=N replaces N-th block)
-
-[OK]   scope_required when no part/block
-[1] ✗ replace_unit: scope_conflict: use part= or block=, not both
-
-[OK]   scope_conflict when both part and block
-[1] ✓ replace_unit: a.py: replace_unit применён
-
-[OK]   replace_unit(block=1) works
-[OK]   block replaced
-[1] ✓ replace_unit: b.py: replace_unit применён
-
-[OK]   replace_unit(block=, empty) deletes
-[OK]   first block gone
-[OK]   second block kept
-[1] ✓ read_unit: <!-- summary: a -->
-
-[OK]   section_title by human text works
-[1] ✓ read_unit: <!-- summary: b -->
-
-[OK]   section_title finds second by title
-[1] ✗ read_unit: not_found: title_match='gamma'
-  (or list_units for the full map of the file)
-
-[OK]   unknown section_title -> not_found
-[OK]   hint mentions list_units
-[1] ✗ read_unit: not_found: qualname='nosuch'
-  (or list_units for the full map of the file)
-
-[OK]   unknown qualname -> not_found
-[OK]   qualname hint mentions list_units
-[1] ✓ read_unit: <!-- summary: b -->
-
-[OK]   section_number still works
-[1] ✓ replace_unit: a.py: replace_unit применён
-
-[OK]   empty part=all deletes the unit
-[OK]   deleted unit is gone
-[OK]   sibling survives
-[1] ✓ read_unit: 
-Prose part one.
-More prose.
-
-
-[OK]   read own_body ok
-[OK]   own_body has prose
-[OK]   own_body has second prose line
-[OK]   own_body excludes subsection
-[OK]   own_body excludes subsection header
-[1] ✓ replace_unit: doc.md: replace_unit применён
-
-[OK]   replace own_body ok
-[OK]   new prose written
-[OK]   old prose gone
-[OK]   subsection preserved
-[OK]   subsection body preserved
-[1] ✓ get_status: ## Session
-project:  proj
-roots:    toolkit, docs
-backend:  filesystem
-luau:     mcp
-format:   default
-exec:     disabled
-
-[OK]   get_status ok
-[OK]   roots line present
-
-=== 36 ok, 0 failed ===
-[timing] user (3 actions): 0.12s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v466] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1201) [v519] [без изменений]
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v339] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
-
-##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.92s
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.00s
