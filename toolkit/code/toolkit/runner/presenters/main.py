@@ -214,3 +214,172 @@ def _build_extras(include_roblox: bool, docs_dir: Path, runtime_state_dir: Path)
         except Exception as e:
             extras.append(f"---\n\n(tools_schema.json: cannot read: {e})")
     return extras
+
+
+# -- 3c.4 session lifecycle ----------------------------------------------
+
+
+class BackendError(Exception):
+    """Backend could not be constructed (missing workspace, no bridge, ...)."""
+
+
+def load_workspace_or_none(project_dir, config: dict):
+    """Load workspace.json from project_dir; None if missing/unreadable."""
+    from ...config import loader as _l
+    from ...config.workspace import load as _ws_load
+    state_dir = Path(project_dir) / _l.resolve_state_dir(config)
+    try:
+        return _ws_load(state_dir)
+    except Exception:
+        return None
+
+
+def build_backend_for_config(config: dict):
+    """Construct a backend from config. Mirrors the original in app.py.
+
+    Returns (backend, name) on success. Raises BackendError with a short
+    human message on failure -- caller renders it.
+    """
+    from ...backends import FilesystemBackend, MCPBackend, CompositeBackend  # noqa: F401
+    backend_name = config.get("backend", "filesystem")
+    work_dir = config.get("project_dir", "").strip()
+    if not work_dir or not Path(work_dir).is_dir():
+        raise BackendError("project_dir not set or not a directory")
+
+    from ...config import loader as _l
+
+    if backend_name == "filesystem":
+        ws = load_workspace_or_none(work_dir, config)
+        if ws is None:
+            raise BackendError("workspace.json not found in project folder")
+        from ...backends.workspace import WorkspaceBackend
+        state_dir = Path(work_dir) / _l.resolve_state_dir(config)
+        return WorkspaceBackend(ws, state_dir), "filesystem"
+
+    from ...config.loader import default_bridge_script
+    mcp_cfg = dict(config.get("mcp") or {})
+    override = mcp_cfg.get("bridge_script")
+    if override:
+        bridge_path = Path(override)
+        if not bridge_path.is_absolute():
+            bridge_path = (Path(work_dir) / override).resolve()
+    else:
+        bridge_path = default_bridge_script()
+    if not bridge_path.is_file() and backend_name == "mcp":
+        raise BackendError(f"bridge not found: {bridge_path}")
+
+    native_cfg = mcp_cfg.get("native_tools") or {}
+    mcp_backend = MCPBackend(
+        bridge_script=str(bridge_path),
+        command=mcp_cfg.get("command", "python -u"),
+        mcp_command=mcp_cfg.get("mcp_command") or "cmd.exe",
+        mcp_args=mcp_cfg.get("mcp_args")
+                 or r"/c cd /d %LOCALAPPDATA%\Roblox && .\mcp.bat",
+        working_dir=work_dir,
+        state_subdir=_l.resolve_state_dir(config),
+        preflight=mcp_cfg.get("preflight", True),
+        auto_switch=mcp_cfg.get("auto_switch", True),
+        ready_timeout=float(mcp_cfg.get("ready_timeout", 120.0)),
+        call_timeout=float(mcp_cfg.get("call_timeout", 180.0)),
+        studio_timeout=float(mcp_cfg.get("studio_timeout", 60.0)),
+        max_retries=int(mcp_cfg.get("max_retries", 6)),
+        retry_delay=float(mcp_cfg.get("retry_delay", 1.0)),
+        native_tools_enabled=bool(native_cfg.get("enabled", True)),
+        native_tools_allow=native_cfg.get("allow") or None,
+        quiet_bridge=bool(mcp_cfg.get("quiet_bridge", True)),
+    )
+
+    if backend_name == "mcp":
+        return mcp_backend, "mcp"
+    if backend_name == "composite":
+        ws = load_workspace_or_none(work_dir, config)
+        if ws is None:
+            raise BackendError("workspace.json not found in project folder")
+        from ...backends.workspace import WorkspaceBackend
+        state_dir = Path(work_dir) / _l.resolve_state_dir(config)
+        return CompositeBackend([
+            ("fs", WorkspaceBackend(ws, state_dir)),
+            ("mcp", mcp_backend),
+        ]), "composite"
+    raise BackendError(f"unknown backend: {backend_name}")
+
+
+def build_session(backend, name: str, config: dict):
+    """Construct a Session for `backend` and register side-effect setup.
+
+    Registers RunPythonTool config, index paths, and GetStatusTool context.
+    Does NOT open the session -- caller decides (open_async, open, ...).
+    """
+    from ...core import Session
+    from ...formats import Format
+    from ...tools import TOOL_MAP
+    from ...tools.shell import RunPythonTool
+    from ...tools.index import install_index_paths
+    from ...tools.status import GetStatusTool
+    from ...config import loader as _l
+
+    preset = config.get("format_preset", "default")
+    fmt = Format.load(preset, config.get("format") or None)
+    RunPythonTool.set_config(
+        config.get("exec"),
+        config.get("project_dir", ""),
+    )
+    install_index_paths(config)
+
+    mcp_cfg = config.get("mcp") or {}
+    native_cfg = mcp_cfg.get("native_tools") or {}
+    if name == "composite":
+        backs = {"filesystem", "mcp"}
+    elif name == "mcp":
+        backs = {"mcp"}
+    else:
+        backs = {"filesystem"}
+
+    paths = _l.resolve_index_paths(config)
+    roots: list[str] = []
+    ws = _l.load_workspace(config)
+    if ws is not None:
+        try:
+            roots = list(ws.root_names())
+        except Exception:
+            roots = []
+
+    GetStatusTool.set_context(
+        project_name=Path(config.get("project_dir", "")).name,
+        backend=name,
+        luau_mode=(config.get("luau_mode") or "mcp"),
+        format_preset=preset,
+        exec_enabled=bool((config.get("exec") or {}).get("enabled")),
+        exec_interpreter=(config.get("exec") or {}).get("interpreter"),
+        native_tools_enabled=bool(native_cfg.get("enabled", True)),
+        native_tools_allow=native_cfg.get("allow") or [],
+        index_paths={
+            "docs": paths["docs"],
+            "code": paths["code"],
+            "lua":  paths["lua"],
+        },
+        roots=roots,
+        backends_enabled=backs,
+    )
+
+    return Session(backend, fmt=fmt, tools=TOOL_MAP)
+
+
+def plan_init_patches(config: dict, backend_name: str) -> list[dict]:
+    """Return the initial index rebuild patches (docs/py only; lua is late).
+
+    Lua is intentionally not included: MCP may still be starting, and the
+    Lua index is rebuilt once MCP transitions to ready (app.py drives
+    that via _check_mcp_transition).
+    """
+    has_fs = backend_name in ("filesystem", "composite")
+    if not has_fs:
+        return []
+    want_docs = bool(config.get("index_docs", has_fs))
+    want_py = bool(config.get("index_python", has_fs))
+    patches: list[dict] = []
+    if want_docs:
+        patches.append({"action": "rebuild_index", "arguments": {}})
+    if want_py:
+        patches.append({"action": "rebuild_code_index", "arguments": {}})
+    return patches
