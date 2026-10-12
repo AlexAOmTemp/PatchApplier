@@ -1,5 +1,7 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v429] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 183) [v431] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1167) [v479] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1169) [v481] [+1, -1] ⚠
+  + toolkit/code/manual/verify_syntax.py  (78 стр., 2.2 KB)
+  - toolkit/code/manual/verify_app_syntax.py  (35 стр., 1.0 KB)
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v302] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v305] [без изменений]

@@ -1,79 +1,49 @@
-[lua-warn] ✓ read_file: toolkit/code/toolkit/indexers/lua_runner.py L240–L275
-240: '            )\r\n'
-241: '        cursor = next_cursor\r\n'
-242: '\r\n'
-243: '    # Skip patterns from `.mcpignore` (segment-based, dot-separated paths).\r\n'
-244: '    # Applied before the reverse graph and rendering so skipped modules\r\n'
-245: '    # do not leak into `Used by:` lines of user modules.\r\n'
-246: '    if project_dir is not None:\r\n'
-247: '        from ..config import mcpignore\r\n'
-248: '        patterns = mcpignore.read(Path(project_dir))\r\n'
-249: '        if patterns:\r\n'
-250: '            items = [m for m in items\r\n'
-251: '                     if not mcpignore.path_hidden(m.get("path", ""), patterns)]\r\n'
-252: '\r\n'
-253: '    elapsed = time.time() - t0\r\n'
-254: '    # `sys.stderr` is None under pythonw.exe (no console attached). All\r\n'
-255: '    # diagnostics here are best-effort — guard instead of crashing the\r\n'
-256: '    # whole rebuild when the GUI runs without a console.\r\n'
-257: '    _err = sys.stderr\r\n'
-258: '    if _err is not None:\r\n'
-259: '        if total_reported is not None and total_reported != len(items):\r\n'
-260: '            _err.write(\r\n'
-261: '                f"[lua.index.lua] WARN total={total_reported} != received={len(items)}\\n"\r\n'
-262: '            )\r\n'
-263: '\r\n'
-264: '    used_by_map = _invert_lua_imports(items)\r\n'
-265: '    text = _render_index(items, used_by_map=used_by_map)\r\n'
-266: '    manifest = _build_manifest(items, used_by_map=used_by_map)\r\n'
-267: '    n_syms = sum(len(m.get("symbols") or []) for m in items)\r\n'
-268: '    if _err is not None:\r\n'
-269: '        _err.write(\r\n'
-270: '            f"[lua.index.lua] chunks={chunk_count} modules={len(items)} "\r\n'
-271: '            f"symbols={n_syms} total={elapsed:.3f}s\\n"\r\n'
-272: '        )\r\n'
-273: '        _err.flush()\r\n'
-274: '    return LuaIndexResult(\r\n'
-275: '        text=text,\r\n'
+[mv] ✓ move_file: Файл перемещён: toolkit/code/manual/verify_app_syntax.py -> toolkit/code/manual/verify_syntax.py (35 стр., 1038 Б)
 
-[practice-tail] ✓ read_file: toolkit/docs/TOOL_PRACTICE.md L260–L275
-260: '\n'
-261: '**Инцидент:** Первая строка `mcpignore.py` была `"` вместо `"""`. Создалось, но импорт падал.\n'
-262: '\n'
-263: '**Мораль:** при создании `.py` через `create_file` — двойная проверка кавычек/эскейпов. Если сомневаешься — создать пустой, потом `replace_in_file`.\n'
-264: '\n'
-265: '### `replace_unit` для удаления не работает\n'
-266: '\n'
-267: '**Инцидент:** `replace_unit(qualname="Class.method", new_text="")` → `result_missing_symbol`, файл не тронут.\n'
-268: '\n'
-269: '**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text="")` (метод как блок в классе) или `replace_between`.\n'
-270: '\n'
-271: '## 7. Что не использовалось и почему\n'
-272: '\n'
-273: '### Unit-write тулы (`replace_unit(block=)`, `insert_block`)\n'
-274: '\n'
-275: 'Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor\'а или точных строк. `replace_unit(Class, block=N, new_text="")` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.\n'
+[wr] ✓ overwrite_file: Файл перезаписан: toolkit/code/manual/verify_syntax.py (+43 стр., +1184 Б)
 
-[practice-jump] ✓ grep: Найдено 1 совпадений:
-toolkit/docs/TOOL_PRACTICE.md:271: ## 7. Что не использовалось и почему
-
-[git] ✓ run_python: exit=0  duration=58ms
+[run-1] ✓ run_python: exit=0  duration=52ms
 --- stdout ---
-## master
- M toolkit/code/bridge/bridge_timings.log
- M toolkit/code/toolkit/runner/gui/app.py
- M toolkit/code/toolkit/runner/last_diff.txt
- M toolkit/code/toolkit/runner/last_output.txt
- M toolkit/code/toolkit/runner/last_patch.json
-?? toolkit/code/manual/verify_app_syntax.py
-[timing] user (4 actions): 0.06s
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_runner.py
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v429] [без изменений]
+all 1 file(s) compile
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1167) [v479] [без изменений]
+[run-2] ✓ run_python: exit=0  duration=62ms
+--- stdout ---
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\code.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\diff.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\doc.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_code.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_runner.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\meta.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\state.py
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v302] [без изменений]
-[timing] auto-rebuild (3 actions): 0.84s
+all 8 file(s) compile
 
-##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.90s
+[run-3] ✓ run_python: exit=0  duration=68ms
+--- stdout ---
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\app.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\formatting.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\settings_window.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\starter_text.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\state.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree_view.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\widgets.py
+
+all 9 file(s) compile
+[timing] user (5 actions): 0.20s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v431] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1169) [v481] [+1, -1] ⚠
+  + toolkit/code/manual/verify_syntax.py  (78 стр., 2.2 KB)
+  - toolkit/code/manual/verify_app_syntax.py  (35 стр., 1.0 KB)
+
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v305] [без изменений]
+[timing] auto-rebuild (3 actions): 0.89s
+
+##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.09s
