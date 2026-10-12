@@ -310,58 +310,24 @@ def on_get_last_diff():
 def on_starter_text():
     """Copy LLM starter text (with current status appended) to clipboard."""
     lang = (CONFIG.get("ui_language") or "ru").strip() or "ru"
-    text, used = _read_starter_text(lang)
-    if text is None:
-        status_var.set(f"\u2717 \u041d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d LLM_START.*.md \u0432 {_docs_dir()}")
-        return
-
     with _state._session_lock:
         s = _state._session
-    status_block = ""
-    if s is not None:
-        try:
-            from ...tools.status import GetStatusTool
-            r = GetStatusTool().execute(backend=s.backend, fmt=s.fmt)
-            if r.status == "ok":
-                status_block = "\n\n---\n\n" + r.message
-            else:
-                status_block = f"\n\n---\n\n(status error: {r.message})"
-        except Exception as e:
-            status_block = f"\n\n---\n\n(status unavailable: {e})"
-    else:
-        status_block = "\n\n---\n\n(status unavailable: session not ready)"
-
-    extras: list[str] = []
-    if starter_include_roblox_var.get():
-        docs_dir = _docs_dir()
-        for name in ("RobloxCodeRules.md", "MCPBridgeRules.md"):
-            p = docs_dir / name
-            if p.is_file():
-                try:
-                    extras.append(
-                        "---\n\n# \u0414\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435: " + name + "\n\n"
-                        + p.read_text(encoding="utf-8")
-                    )
-                except Exception as e:
-                    extras.append(f"---\n\n({name}: cannot read: {e})")
-            else:
-                extras.append(f"---\n\n({name} not found at {p})")
-        from ...config.loader import toolkit_runtime_state_dir as _trsd
-        schema_path = _trsd() / "tools_schema.json"
-        if schema_path.is_file():
-            try:
-                extras.append(
-                    "---\n\n# \u0421\u0445\u0435\u043c\u0430 \u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u043e\u0432 (tools_schema.json)\n\n"
-                    + schema_path.read_text(encoding="utf-8")
-                )
-            except Exception as e:
-                extras.append(f"---\n\n(tools_schema.json: cannot read: {e})")
-
-    extras_block = ("\n\n" + "\n\n".join(extras)) if extras else ""
-
+    include_roblox = bool(starter_include_roblox_var.get())
+    from ...config.loader import toolkit_runtime_state_dir as _trsd
     try:
-        pyperclip.copy(text + extras_block + status_block)
-        suffix = "+roblox" if starter_include_roblox_var.get() else ""
+        full_text, used, suffix = _presenter.build_starter_text(
+            lang=lang,
+            session=s,
+            include_roblox=include_roblox,
+            docs_dir=_docs_dir(),
+            runtime_state_dir=_trsd(),
+            read_text_fn=_read_starter_text,
+        )
+    except _presenter.StarterTextError as e:
+        status_var.set(str(e))
+        return
+    try:
+        pyperclip.copy(full_text)
         status_var.set(f"\u2713 \u0421\u0442\u0430\u0440\u0442\u043e\u0432\u044b\u0439 \u0442\u0435\u043a\u0441\u0442 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d ({used}{suffix})")
     except Exception as e:
         status_var.set(f"\u2717 {e}")

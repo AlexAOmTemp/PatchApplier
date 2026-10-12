@@ -137,3 +137,80 @@ def decide_button_state(
         repeat_state=repeat_state,
         status_state="",
     )
+
+
+# -- 3c.3 starter text --------------------------------------------------
+
+
+class StarterTextError(Exception):
+    """Raised when the LLM_START text cannot be located."""
+
+
+def build_starter_text(
+    *,
+    lang: str,
+    session,
+    include_roblox: bool,
+    docs_dir: Path,
+    runtime_state_dir: Path,
+    read_text_fn,
+) -> tuple[str, str, str]:
+    """Assemble the LLM starter message: base text + optional extras + status.
+
+    Returns (full_text, used_lang, suffix). The suffix is "+roblox" when
+    extras were appended, "" otherwise.
+
+    Raises StarterTextError when the base text is missing.
+    """
+    text, used = read_text_fn(lang)
+    if text is None:
+        raise StarterTextError(
+            f"\u2717 \u041d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d LLM_START.*.md \u0432 {docs_dir}"
+        )
+
+    status_block = _build_status_block(session)
+    extras = _build_extras(include_roblox, docs_dir, runtime_state_dir)
+    extras_block = ("\n\n" + "\n\n".join(extras)) if extras else ""
+    suffix = "+roblox" if include_roblox else ""
+    return text + extras_block + status_block, used, suffix
+
+
+def _build_status_block(session) -> str:
+    if session is None:
+        return "\n\n---\n\n(status unavailable: session not ready)"
+    try:
+        from ...tools.status import GetStatusTool
+        r = GetStatusTool().execute(backend=session.backend, fmt=session.fmt)
+        if r.status == "ok":
+            return "\n\n---\n\n" + r.message
+        return f"\n\n---\n\n(status error: {r.message})"
+    except Exception as e:
+        return f"\n\n---\n\n(status unavailable: {e})"
+
+
+def _build_extras(include_roblox: bool, docs_dir: Path, runtime_state_dir: Path) -> list[str]:
+    if not include_roblox:
+        return []
+    extras: list[str] = []
+    for name in ("RobloxCodeRules.md", "MCPBridgeRules.md"):
+        p = docs_dir / name
+        if p.is_file():
+            try:
+                extras.append(
+                    "---\n\n# \u0414\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435: " + name + "\n\n"
+                    + p.read_text(encoding="utf-8")
+                )
+            except Exception as e:
+                extras.append(f"---\n\n({name}: cannot read: {e})")
+        else:
+            extras.append(f"---\n\n({name} not found at {p})")
+    schema_path = runtime_state_dir / "tools_schema.json"
+    if schema_path.is_file():
+        try:
+            extras.append(
+                "---\n\n# \u0421\u0445\u0435\u043c\u0430 \u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u043e\u0432 (tools_schema.json)\n\n"
+                + schema_path.read_text(encoding="utf-8")
+            )
+        except Exception as e:
+            extras.append(f"---\n\n(tools_schema.json: cannot read: {e})")
+    return extras
