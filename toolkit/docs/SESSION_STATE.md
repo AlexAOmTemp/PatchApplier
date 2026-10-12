@@ -1,6 +1,6 @@
 # SESSION_STATE — состояние между сессиями
 
-<!-- summary: Snapshot of what was done in the last big session (Workspace refactor) and what to pick up next. Update on session close, read on session start. -->
+<!-- summary: Snapshot of what was done in the last big session (Functional Core refactor) and what to pick up next. Update on session close, read on session start. -->
 <!-- tags: session, state, bridge -->
 
 ## Зачем этот документ
@@ -8,6 +8,45 @@
 LLM_START — стабильная инструкция. DECISIONS — почему так решено. SESSION_STATE — **где мы прямо сейчас**: что закрыто в последней сессии, что открыто, что первым делом проверить при следующем старте.
 
 Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.
+
+## Сессия: Functional Core refactor + replace_range validation (закрыта)
+
+**Тема:** сделать GUI необязательным. Развести ядро (чистые функции) и оболочку (Tk-виджеты), вынести apply-kernel в отдельный модуль, доказать headless-режим через CLI. Плюс — фиксы тулов на основе наблюдений из сессии.
+
+**Git log:** от `ec578a7 checkpoint: before MVP step 3a` до `6e0fb34 replace_range: order/after-write validation; docs updated` — ~16 коммитов.
+
+### Что сделано
+
+**Парадигма — Functional Core / Imperative Shell** (не MVP, как планировалось в DECISIONS §2.3 ранее). Зафиксировано в `DECISIONS §2.3`:
+- Ядро (`patch_runner.py`, `presenters/main.py`) — без Tk, без `pyperclip`, без `msg_queue`. Принимает `config` аргументом, возвращает dataclass'ы (`ApplyOutcome`, `ButtonDecision`).
+- Оболочка (`app.py`, `views/`) — Tk-виджеты и callback'и.
+- Связь односторонняя: View → Core. Обратных ссылок нет.
+- Почему не MVP: в Tk MVP вырождается — либо cyclic `View ↔ Presenter`, либо абстрактный View-интерфейс с 20 методами-заглушками для CLI. Functional Core снимает обе проблемы, `decide_button_state(...)` тестируется без мока.
+
+**Шаг 3a.** `_session`, `_session_lock`, `_session_backend_name`, `msg_queue` → `gui/state.py`.
+**Шаг 3b.** `worker` (165 строк) → `runner/patch_runner.py::apply_patch(session, raw_text, *, config, tool_map, backend_name, notify)` → `ApplyOutcome`. GUI-обвязка (`pyperclip`, `last_*`, `msg_queue`) осталась в `app.py`.
+**Шаг 3c.** `runner/presenters/main.py` — чистые функции: `format_project_label`, `status_visual`, `backend_states`, `project_state`, `project_ok`, `decide_button_state`, `build_starter_text`, `build_backend_for_config`, `build_session`, `plan_init_patches`, `next_language`.
+**Шаг 3c.6.** `runner/views/main_window.py::MainWindow` — фабрика виджетов с callback-dict; `views/widgets.py` (перенос из `gui/widgets.py`); `app.py::run()` — ~100 строк вместо 200+.
+**Шаг 3d.** CLI parity: `cli.py` default path идёт через `patch_runner.apply_patch`; legacy-путь через `--no-auto-rebuild`.
+
+**Расширяемость — `REQUIREMENTS.md §6 «Extension seams»`.** Шесть точек: Rojo, новые индексы, Unity bridge, новые тулы, headless, agent mode. Таблица «holds / holds w/ prep» + определения. Зафиксировано для будущих расширений.
+
+### Фиксы и улучшения тулов
+
+- **`replace_unit(part="all", new_text="")` → удаление unit.** Было `empty_input_use_delete_block`. Обоснование: адрес уже говорит «что», пустой текст другого смысла не имеет, симметрия с `delete_file`. Защита — `_check_parses(expect_missing=True)`. Причина отмены: 6 повторов в одной сессии — защита мешала, не обучала. Тест `test_strictness.py`.
+- **`replace_range`: порядок + after-write.** `Patcher.apply` делает pre-pass: `range_order` (не по убыванию `start_line`) и `range_after_write` (после другого write в тот же файл). Нарушитель отклоняется, предшествующие **применяются**. Тест `test_range_order.py` (11/11). Доки: `LLM_START §6/§13/§14` (ru+en), `TOOL_PRACTICE §6`.
+- **Ложный WARN `total != received`** в lua-индексе — исправлено (`lua_runner.py`): сравнение с размером до `.mcpignore`-фильтра; факт скрытия логируется отдельно.
+- **`metrics.py`: per-project формат.** `{projects: {name: {action: {ok, error, ...}}}}`; `set_context(project_name)` вызывается в `app.py::run()` и `cli.py::main()`. Legacy-формат не мигрируется (перезаписывается при первом bump).
+- **`manual/verify_syntax.py`** — `py_compile` в subprocess без импорта. Расширен с GUI-only до generic file/dir.
+
+### Что открыто
+
+- **`settings_window.py` не вынесен** — `_menu_project_settings` всё ещё открывает `gui/settings_window.py`. Отдельная задача, если нужна.
+- **Tooling improvements** (DECISIONS §2.3): `verify_syntax` как tool, `git_*` как tools, `error_code` для hidden paths, `get_index` path filter, LLM_START §7 про `run_python module=`. Приоритет — по фактам.
+- **`.gitignore` для runtime-логов** — `bridge_timings.log` (547 KB), `last_*.{json,txt}` ездят в каждом коммите.
+- **Rojo / Unity / agent mode** — открыто; extension seams держат, но не реализованы.
+- **`TOOL_PRACTICE §2`** — устарел: несколько тулов из «ни разу» реально использовались (`replace_range` 11, `insert_block` 21, `move_file`+`copy_file` 5). Отдельная задача — обновить.
+
 
 ## Сессия: Settings window + tool polish (закрыта)
 
@@ -166,11 +205,11 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 
 ## Что проверить в начале следующей сессии
 
-1. **`get_status`** — что backend `composite`, mcp подключён, индексы свежие (`[vN]` не пустые).
-2. **`File → Recent`** — что проект `PatchApplier` в списке, клик открывает.
-3. **`File → Project settings`** — что виден root `toolkit` с пятью `✓`.
-4. **`grep pattern="RootPolicy|FilterSpec|from toolkit.core import Policy"`** — пусто (модель ушла полностью).
-5. **`git log --oneline | head`** — верхний коммит `docs: session tool-practice notes` или новее.
+1. **`get_status`** — что backend `composite`, mcp подключён, индексы свежие (`[vN]` не пустые). В снимке — `roots:    toolkit` и `Policy Filesystem`.
+2. **`python -m toolkit.runner.cli --list-tools`** (cwd = `toolkit/code`) — 32 тула, среди них `read_unit` / `replace_unit` / `insert_block` и **нет** `replace_block` / `delete_block` / `replace_section` / `read_symbol*`.
+3. **`File → Recent`** и **`File → Project settings`** — что проект `PatchApplier` в списке, root `toolkit` с пятью `✓`.
+4. **`replace_unit(part="all", new_text="")`** на тестовом файле — должен **удалить** unit (не `empty_input_use_delete_block`).
+5. **`git log --oneline | head`** — верхний коммит `6e0fb34 replace_range: order/after-write validation; docs updated` или новее.
 
 ## Как закрывать следующую сессию
 
