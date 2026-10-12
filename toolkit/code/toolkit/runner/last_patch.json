@@ -1,19 +1,7 @@
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "views: 3c.6 — MainWindow extracted; app.run() is a thin shell"]}}]
+                "args": ["commit", "replace_unit: empty part=all deletes the unit (was empty_input_use_delete_block)"]}}]
 
-[{"id": "rv-app", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "search": "right_visible = False\n",
-                "replace": "",
-                "search_repr": false, "occurrence": 1}}]
-
-[{"id": "rv-state", "action": "replace_in_file",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/state.py",
-                "search": "right_visible = False\n",
-                "replace": "",
-                "search_repr": false, "occurrence": 1}}]
-
-[{"id": "verify", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/verify_syntax.py",
-                "args": ["toolkit/code/toolkit/runner"]}}]
+[{"id": "grep-calls", "action": "grep",
+  "arguments": {"pattern": "metrics\\.bump|from .*metrics import|import metrics",
+                "directory": "toolkit/code/toolkit", "file_glob": "*.py"}}]

@@ -73,7 +73,6 @@ msg_queue: queue.Queue = queue.Queue()
 last_applied_patch_norm = None
 last_output_text = None
 is_executing = False
-right_visible = False
 _last_mcp_ready = False
 _last_mcp_state: str = ""
 

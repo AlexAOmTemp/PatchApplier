@@ -259,6 +259,23 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 
 **Точки расширения** (см. `REQUIREMENTS.md` → «Extension seams») держат: Rojo, Unity, новые индексы, новые тулы, headless, agent-mode. Две (новые индексы, Unity bridge) потребуют локальных правок при добавлении, но не ломают архитектуру.
 
+**Tooling improvements from the 3a-3d session (открыто).** Наблюдения из сессии рефактора GUI. Приоритет — по убыванию пользы.
+
+1. **`verify_syntax` как tool.** Сейчас: `run_python(script="manual/verify_syntax.py", args=[path])`. Использовался ~6 раз, поймал бы `NameError` в `MainWindow.__init__` до перезапуска GUI. Как tool — один вызов, стандартный Result, путь не помнить. `{"action": "verify_syntax", "arguments": {"path": "..."}}`.
+
+2. **`git_*` как tools.** `_git.py` — пользовательский скрипт в `manual/`, фактически критичен для workflow (10 коммитов за сессию). Как нативные tools (`git_commit`, `git_status`, `git_diff`, `git_log`) — стандартный Result, verify-after-write, не надо помнить путь.
+
+3. **`error_code` для скрытых путей.** `file_exists`, `read_file`, `file_stat` на dot-prefix путях дают `■ Скрытая папка` **без** `error_code`. В `##RESULT` попадает только `blocked: [1]` — не отличить от `.patchignore`. Нужен `error_code="hidden_path"` (или `filter` с `reason`).
+
+4. **`get_index` path_filter.** `kind` обязателен, но нет фильтра по путям. Когда работаешь с одним файлом — 33 KB doc-индекса избыточны. `{"kind": "docs", "path_filter": "toolkit/docs/TOOL_PRACTICE.md"}`.
+
+5. **LLM_START: `run_python module=` — предупреждение.** `module` = `python -m` = `__main__`. Импорт модуля с `if __name__ == "__main__": run()` запускает его. **Инцидент:** `module="toolkit.runner.gui.app"` поднял второй GUI, мост ушёл в невалидное состояние, `rebuild_lua_code_index` падал с `Errno 22` до перезапуска. Нужно явное предупреждение в §7 и, возможно, проверка «модуль в `runner/gui/` или имеет `__main__`» → soft-warn в ответе.
+
+**Unused tools — inventory from the session.** Из 32 тулов в `TOOL_MAP` не использовались:
+
+- **`copy_unit`, `find_symbol`, `find_usages`, `symbol_graph`, `set_annotation`, `grep_lua`, `grep_replace_mcp`, `file_stat`** — не было задачи: рефакторинг шёл по горизонтали (вынос кода), не по графу (навигация, анализ, массовые замены). **Не удалять** — это резерв под другие задачи. См. TOOL_PRACTICE §3 «Ни разу не использовались» и §7 — список растёт, но по фактам это не мёртвый груз.
+- **Native Roblox tools** (`execute_luau`, `script_read`, `multi_edit`, `inspect_instance`, `search_game_tree`, генеративные) — не звал: всё делалось через унифицированные тулы, а `rebuild_lua_code_index` сам зовёт `execute_luau` под капотом. Единственный кандидат, где бы пригодился `inspect_instance` — диагностика дубля `ServerScriptService.Server.Main.server` в lua-индексе. Не стал тратить время.
+
 ### 2.4 Гигиена и хвосты
 <!-- summary: Хвосты сессии — гигиена файлов и документов, смоуки, .gitignore, переразбиение §1. -->
 

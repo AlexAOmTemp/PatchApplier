@@ -117,7 +117,9 @@ def replace_unit(source: str, path: str, address: dict,
     `scope_conflict` if both.
 
     Empty `new_text` with `block` = delete those blocks. Empty
-    `new_text` with `part` = error `empty_input_use_delete_block`.
+    `new_text` with `part="all"` = delete the whole unit (head +
+    annotation + body). Other `part` values with empty `new_text`
+    empty that part in place, leaving the unit's structure intact.
     """
     if new_text is None:
         new_text = ""
@@ -134,10 +136,7 @@ def replace_unit(source: str, path: str, address: dict,
     ext = Path(path).suffix.lower()
     unit = reader.resolve(source, path, address)
     parts = reader._normalize_parts(part)
-    if parts == ["all"] and not (new_text or "").strip():
-        raise ValueError(
-            "empty_input_use_delete_block: replace_unit does not delete a unit"
-        )
+    is_delete = parts == ["all"] and not (new_text or "").strip()
     if parts == ["all"]:
         start, end = unit.line_start, unit.line_end
     else:
@@ -166,7 +165,8 @@ def replace_unit(source: str, path: str, address: dict,
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext, source)
+    _check_parses(new_source, path, unit, ext, source,
+                  expect_missing=is_delete)
     return new_source
 
 
@@ -263,6 +263,7 @@ def insert_block(source: str, path: str, address: dict,
 
     _check_parses(new_source, path, unit, ext, source)
     return new_source
+    return new_source
 
 
 def _find_anchor_block(by_index: dict, anchor) -> "Block":
@@ -315,7 +316,8 @@ def _own_body_part(unit):
 
 
 def _check_parses(new_source: str, path: str, unit, ext: str,
-                  old_source: str | None = None) -> None:
+                  old_source: str | None = None,
+                  expect_missing: bool = False) -> None:
     """Confirm the edited source still parses and the target survives.
 
     When `old_source` is provided, additionally verify that no *unrelated*
@@ -323,6 +325,11 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
     change or vanish (that is the point of the edit); everything else must
     survive. This catches the markdown off-by-one where `part="body"` on
     a section used to eat the following section's heading.
+
+    `expect_missing=True` (used for delete-by-empty via `part="all"`)
+    relaxes the survival check on the target itself: the caller asked for
+    removal, so its absence is the desired outcome. Parsing and the
+    unrelated-unit check still run.
     """
     if ext == ".py":
         import ast
@@ -330,8 +337,8 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
             tree = ast.parse(new_source)
         except SyntaxError as e:
             raise ValueError(f"result_syntax_error: {e}")
-        # qualname must still be present
-        if unit.qualname != "<module>":
+        # qualname must still be present unless removal was requested
+        if unit.qualname != "<module>" and not expect_missing:
             found = False
             for node in ast.walk(tree):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -347,7 +354,7 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
             syms = _lua.parse_lua_symbols(new_source)
         except Exception as e:
             raise ValueError(f"result_parse_error: {e}")
-        if unit.qualname != "<module>":
+        if unit.qualname != "<module>" and not expect_missing:
             if not any(s.qualname == unit.qualname for s in syms):
                 raise ValueError(f"result_missing_symbol: {unit.qualname}")
     else:  # .md

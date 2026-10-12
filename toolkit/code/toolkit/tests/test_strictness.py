@@ -217,20 +217,28 @@ def main():
         t.expect('section_number still works',
                  r.status == 'ok' and 'b' in r.message, r.message)
 
-    # --- replace_unit: empty + part=all ---
+    # --- replace_unit: empty + part=all -> deletes the unit ---
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        (root / 'a.py').write_text('def foo():\n    pass\n', encoding='utf-8')
+        (root / 'a.py').write_text(
+            'def foo():\n    pass\n\n\ndef bar():\n    return 1\n',
+            encoding='utf-8')
         r = _run(root, [{'action': 'replace_unit', 'arguments': {
             'file_path': 'a.py',
             'address': {'qualname': 'foo'},
             'part': 'all',
             'new_text': '',
         }}])[0]
-        t.expect('empty part=all rejected with dedicated code',
-                 r.status == 'error'
-                 and r.error_code == 'empty_input_use_delete_block',
-                 f'{r.status}/{r.error_code}')
+        t.expect('empty part=all deletes the unit',
+                 r.status == 'ok',
+                 f'{r.status}/{r.error_code}: {r.message}')
+        remaining = (root / 'a.py').read_text(encoding='utf-8')
+        t.expect('deleted unit is gone',
+                 'def foo' not in remaining,
+                 repr(remaining))
+        t.expect('sibling survives',
+                 'def bar' in remaining,
+                 repr(remaining))
 
     # --- replace_unit: own_body on markdown ---
     with tempfile.TemporaryDirectory() as td:
