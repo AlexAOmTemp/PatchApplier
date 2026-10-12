@@ -214,9 +214,7 @@
 
 ### 2.3 Инфраструктура
 
-<!-- summary: Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI под MVP. -->
-
-<!-- summary: Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI под MVP. -->
+<!-- summary: Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). -->
 
 **Passthrough MCP-инструментов.** `insert_asset`, `generate_mesh`, `screen_capture` — регистрировать в `TOOL_MAP` при `MCPBackend.open()`, или оставить как есть (доступ через `MCPBackend.execute`)?
 
@@ -243,21 +241,23 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 
 Сцена (Parts, GUI, Folders) в обоих режимах идёт через MCP — ортогонально режиму Luau-кода. **Открыто** потому, что это большая задача (третий backend + переключение в GUI + параллельная логика в индексере), и делать её имеет смысл после того, как стабилизируется текущий Rojo-независимый контур.
 
-**Ремастер GUI под MVP — открыто.** Шаг 1 (разрезание монолита) сделан: `runner/gui/` — пакет из `state.py` (константы + глобалы), `formatting.py` (чистые строковые хелперы), `widgets.py` (`StatusLog`), `starter_text.py` (поиск `LLM_START.<lang>.md`), `policy_io.py` (load/save policy) и `app.py` (~1600 строк, всё остальное). Шаг 2 (вынос мёртвого subprocess-пути `_run_apply_patches` и сирот-импортов) тоже сделан.
-
-Осталось **шаг 3 — MVP-развязка**. Парадигма — **MVP (Model-View-Presenter)**, не MVVM и не классический MVC.
-
-**Почему MVP.** Tkinter не имеет data binding — MVVM пришлось бы эмулировать через `trace_add`, что размазывает логику по View (антипаттерн для десктопа). Классический MVC на десктопе путается в вопросе «кто обновляет View»; MVP явнее: Presenter владеет реактивной логикой, View пассивна (только виджеты + события).
-
-**Зачем.** Главная цель — сделать GUI **необязательным**. Вся логика в Presenter не зависит от Tk → можно подставить headless-view (CLI), и всё работает без дублирования кода. Уже есть `runner/cli.py` как один headless-view; Presenter даст второму потребителю ту же логику. `run_python` и MCP-мост перестают быть привязаны к GUI.
-
-**Конкретный план.**
-1. **3a.** `_session`, `_session_lock`, `_session_backend_name`, `msg_queue` — из `app.py` в `state.py` (или отдельный `session_store.py`).
-2. **3b.** `worker` (применение патча с авто-rebuild) — в `runner/patch_runner.py`. Сейчас `worker` дублирует то, что делает CLI subprocess'ом; станет одной общей точкой.
-3. **3c.** `app.py` — на `presenters/main.py` (логика) + `views/main_window.py` (виджеты). Presenter возвращает строки статуса колбэком, View их отображает.
-4. **3d.** `open_settings_dialog` — на `presenters/settings.py` + `views/settings.py` + `views/policy_tree.py`.
-
-**Открыто** потому, что это большая задача на несколько сессий. Делать её имеет смысл после того, как устаканится общий контур (Rojo-режим, символьный граф).
+**Ремастер GUI — закрыт (3a-3d).** Шаг 1 (разрезание монолита) сделан: `runner/gui/` — пакет из `state.py`, `formatting.py`, `widgets.py`, `starter_text.py`, `policy_io.py`, `app.py` (остаток Tk-оболочки). Шаг 2 (вынос мёртвого subprocess-пути) сделан. Шаг 3 (парадигма) закрыт.
+
+**Парадигма — Functional Core / Imperative Shell**, не MVP и не MVC. Изначально планировался MVP (Model-View-Presenter), но на реальном коде Tk-приложения он выродился в другую форму: ядро — модуль чистых функций, оболочка — Tk-виджеты и callback'и, связь односторонняя View → Core. Обратных ссылок нет.
+
+**Почему не MVP.** MVP потребовал бы: (а) класса Presenter со ссылкой на View и циклическим `View ↔ Presenter` — в Tk с его callback-моделью это ловушка; (б) абстрактного интерфейса View для подмены на CLI-View с 20 методами-заглушками. Functional Core снимает обе проблемы: `decide_button_state(...)` тестируется как чистая функция без мока View, а CLI зовёт тот же `patch_runner.apply_patch` напрямую — второй View не нужен.
+
+**Граница.** Ядро (`patch_runner.py`, `presenters/main.py`) — без Tk, без `pyperclip`, без чтения `msg_queue`. Принимает `config` аргументом, возвращает dataclass'ы (`ApplyOutcome`, `ButtonDecision`). Оболочка (`app.py`) — построение виджетов, Tk-callback'и, `msg_queue`, `pyperclip`, запись `last_*.{json,txt}`. Связь: `app.py` → ядро; ядро про `app.py` не знает.
+
+**Что вынесено.**
+1. **3a.** `_session`, `_session_lock`, `_session_backend_name`, `msg_queue` → `state.py`.
+2. **3b.** `worker` → `runner/patch_runner.py` (`apply_patch`, `ApplyOutcome`, `ApplyError`).
+3. **3c.** `presenters/main.py` — helpers, state updaters, starter text, session lifecycle. `app.py` оставлен как Tk-оболочка.
+4. **3d.** `cli.py` — default path через `patch_runner` (headless parity с GUI), legacy-путь через `--no-auto-rebuild`.
+
+**Что осталось (не блокирует).** `views/main_window.py` — вынос 200-строчного `run()` из `app.py`. Чистое разложение View, логика уже в ядре. Отдельной сессией.
+
+**Точки расширения** (см. `REQUIREMENTS.md` → «Extension seams») держат: Rojo, Unity, новые индексы, новые тулы, headless, agent-mode. Две (новые индексы, Unity bridge) потребуют локальных правок при добавлении, но не ломают архитектуру.
 
 ### 2.4 Гигиена и хвосты
 <!-- summary: Хвосты сессии — гигиена файлов и документов, смоуки, .gitignore, переразбиение §1. -->

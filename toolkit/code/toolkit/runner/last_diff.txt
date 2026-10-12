@@ -1,5 +1,8 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 183) [v452] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 183) [v454] [~2, ⇅3, +1]
+  ~ toolkit/docs/DECISIONS.md §2. Открыто (L99–L295, 32.9 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
+  ~ toolkit/docs/DECISIONS.md §2.3 Инфраструктура (L215–L259, 8.0 KB) — Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core).
+  + toolkit/docs/REQUIREMENTS.md §6. Extension seams hold without architectural breakage (L82–L105, 1.8 KB) — Six extension points the architecture must support without breaking: Rojo, new indexes, Unity bridge, new tools, headless, agent mode.
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 173, символов: 1193) [v503] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 173, символов: 1193) [v505] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v326] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v328] [без изменений]

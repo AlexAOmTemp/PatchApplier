@@ -79,6 +79,30 @@ write tool remembering to update state.
 - `verify_section` clears it without touching the file (the summary is
   confirmed correct as-is; only `summary_changed_at` moves forward).
 
+## 6. Extension seams hold without architectural breakage
+<!-- summary: Six extension points the architecture must support without breaking: Rojo, new indexes, Unity bridge, new tools, headless, agent mode. -->
+
+Architecture must absorb future extensions without breaking changes. Six
+points, ordered by proximity:
+
+| # | Seam | Status | What changes on add |
+|---|---|---|---|
+| 1 | Rojo + Luau over FS | holds | `LuauBackend` implements `Backend`; `rebuild_lua_code_index` gets a factory (`mcp` vs `rojo`). |
+| 2 | New indexes (e.g. `cs`) | holds w/ prep | Add `Format`, indexer, tool, router entry. `GetStatusTool.set_context(index_paths=)` currently fixed to 3 keys — accept iterable of `(kind, path)`. |
+| 3 | Unity bridge (MCP-like) | holds w/ prep | Extract `BridgeBackend` base + `RobloxSpec`/`UnitySpec`. 80% of `MCPBackend` (patch.json/outputs.json protocol, retry, verify) is domain-agnostic. `build_backend_for_config` → registry of builders. |
+| 4 | New tools | holds | `TOOL_MAP` is a dict; `patch_runner.apply_patch` takes it as argument. |
+| 5 | Headless (no GUI) | holds | `patch_runner.apply_patch`, `presenters/*` are Tk-free; CLI proven end-to-end. |
+| 6 | Agent mode (LLM drives tools directly) | holds | `apply_one(session, action, *, notify)` alongside `apply_patch`. `notify(kind, payload)` is the streaming seam: `notify("tool_result", result)` per action. |
+
+**What “holds” means.** Adding the seam touches one place (tool / backend
+/ registry), existing code compiles and runs unchanged. New domains slot
+into `Backend` / `Format` / `Tool` protocols; nothing in `core/` or
+`patch_runner.py` needs modification.
+
+**What “holds w/ prep” means.** A preparatory change is recommended
+before the extension lands, but it is small and localized. The extension
+itself does not require refactoring of unrelated code.
+
 ## Goals (how success is measured)
 <!-- summary: Three things we want to improve over the pre-index era. -->
 
