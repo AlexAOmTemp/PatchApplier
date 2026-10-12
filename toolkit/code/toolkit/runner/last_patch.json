@@ -1,3 +1,7 @@
+[{"id": "w", "action": "read_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+                "address": {"qualname": "worker"}}}]
+
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "manual: rename verify_app_syntax -> verify_syntax (generic file/dir mode)"]}}]
+                "args": ["commit", "gui: step 3b — extract apply kernel into runner/patch_runner.py"]}}]

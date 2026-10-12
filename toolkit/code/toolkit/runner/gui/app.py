@@ -12,6 +12,7 @@ import os
 import traceback
 
 from ...config import loader as _cfg
+from ..patch_runner import apply_patch as _apply_patch, ApplyError as _ApplyError
 from .. import projects as _projects
 from ...core.patchparse import parse_patches
 from ...core.router import plan_rebuilds
@@ -149,10 +150,11 @@ def _initialize_project():
 def worker(patch_text: str, normalized_patch: str):
     try:
         LAST_PATCH.write_text(patch_text, encoding="utf-8")
-        _state.msg_queue.put(("status", f"\u2713 \u0411\u0443\u0444\u0435\u0440 \u2192 {LAST_PATCH.name}"))
+        _state.msg_queue.put(("status", "\u2713 \u0411\u0443\u0444\u0435\u0440 \u2192 " + LAST_PATCH.name))
 
         with _state._session_lock:
             s = _state._session
+            bn = _state._session_backend_name
         if s is None:
             _state.msg_queue.put(("status", "\u2717 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
             return
@@ -169,143 +171,32 @@ def worker(patch_text: str, normalized_patch: str):
             _state.msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d"))
             _state.msg_queue.put(("error_text", err_text))
             return
-        parsed = parse_patches(_raw)
-        user_patches = parsed.actions
-        if not user_patches:
-            _state.msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043f\u0443\u0441\u0442"))
+
+        def _notify(kind, payload):
+            _state.msg_queue.put((kind, payload))
+
+        try:
+            outcome = _apply_patch(
+                s, _raw,
+                config=CONFIG,
+                tool_map=TOOL_MAP,
+                backend_name=bn,
+                notify=_notify,
+            )
+        except _ApplyError as e:
+            _state.msg_queue.put(("status", f"\u2717 {e}"))
             return
 
-        with _state._session_lock:
-            active_backend = _state._session_backend_name or CONFIG.get("backend", "filesystem")
-        supports_fs = active_backend in ("filesystem", "composite")
-        supports_mcp = active_backend in ("mcp", "composite")
+        if outcome.diff_block:
+            _save_last_diff(outcome.diff_block)
 
-        import io as _io
-        import time as _time
-        t_total0 = _time.time()
+        pyperclip.copy(outcome.output_text)
+        _save_last_output(outcome.output_text)
 
-        all_results = []
-        all_clean_lines: list[str] = []
-        all_structs: list[dict] = []
+        _state.msg_queue.put(("applied", (normalized_patch, outcome.output_text, outcome.success)))
 
-        def _apply_group(group_patches, label, diagnostics=None):
-            old_stdout = sys.stdout
-            buf = _io.StringIO()
-            t0 = _time.time()
-            try:
-                sys.stdout = buf
-                res = s.apply_patches(group_patches, diagnostics=diagnostics)
-            finally:
-                sys.stdout = old_stdout
-            elapsed = _time.time() - t0
-            raw = buf.getvalue()
-            struct = None
-            group_lines = []
-            for line in raw.splitlines():
-                if line.startswith("##RESULT:"):
-                    try:
-                        struct = json.loads(line[len("##RESULT:"):])
-                    except Exception:
-                        struct = None
-                    continue  # merged at the very end of worker()
-                group_lines.append(line)
-            # Drop the blank the Session printed before ##RESULT, so that
-            # [timing] attaches tightly to the last action line.
-            while group_lines and not group_lines[-1]:
-                group_lines.pop()
-            group_lines.append(f"[timing] {label}: {elapsed:.2f}s")
-            if all_clean_lines:
-                all_clean_lines.append("")
-            all_clean_lines.extend(group_lines)
-            all_results.extend(res)
-            if struct is not None:
-                all_structs.append(struct)
-
-        # Step 1: user patches
-        n_user = len(user_patches)
-        n_before = len(all_results)
-        _state.msg_queue.put(("status", f"\u23f3 \u041f\u0430\u0442\u0447 \u043f\u0440\u0438\u043c\u0435\u043d\u044f\u0435\u0442\u0441\u044f ({n_user} actions)..."))
-        _apply_group(user_patches, f"user ({n_user} actions)",
-                     diagnostics=parsed.diagnostics)
-        res_user = all_results[n_before:]
-
-        # Plan index rebuilds from what actually happened.
-        auto_groups = plan_rebuilds(
-            user_patches, res_user, TOOL_MAP,
-            config=CONFIG,
-            supports_fs=supports_fs, supports_mcp=supports_mcp,
-        )
-
-        # Auto-rebuild: all rebuilds in one group, per-domain labels.
-        _AUTO_LABEL = {
-            "rebuild_index": "auto-md",
-            "rebuild_code_index": "auto-py",
-            "rebuild_lua_code_index": "auto-lua",
-        }
-        if auto_groups:
-            auto_patches = []
-            for _label, patch in auto_groups:
-                p = dict(patch)
-                action = p.get("action", "")
-                p["id"] = _AUTO_LABEL.get(action, "auto")
-                auto_patches.append(p)
-            _state.msg_queue.put(("status",
-                f"\u23f3 \u0410\u0432\u0442\u043e-\u043f\u0435\u0440\u0435\u0441\u0431\u043e\u0440\u043a\u0430 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432 ({len(auto_patches)})..."))
-            _apply_group(auto_patches,
-                         f"auto-rebuild ({len(auto_patches)} actions)")
-
-        # Emit one merged ##RESULT for the whole patch (user + auto-rebuild).
-        if all_structs:
-            merged = {"ok": 0, "errors": 0, "skipped": 0,
-                      "failed": [], "blocked": []}
-            offset = 0
-            for st in all_structs:
-                merged["ok"] += st.get("ok", 0)
-                merged["errors"] += st.get("errors", 0)
-                merged["skipped"] += st.get("skipped", 0)
-                merged["failed"].extend(
-                    [offset + x for x in st.get("failed", [])])
-                merged["blocked"].extend(
-                    [offset + x for x in st.get("blocked", [])])
-                offset += (st.get("ok", 0) + st.get("errors", 0)
-                           + st.get("skipped", 0))
-            all_clean_lines.append("")
-            all_clean_lines.append(
-                f"##RESULT:{json.dumps(merged, ensure_ascii=False)}")
-
-        t_total = _time.time() - t_total0
-        output_text = "\n".join(all_clean_lines).rstrip()
-        output_text += f"\n[timing] total: {t_total:.2f}s"
-
-        # Persist only the diff block(s) for the "last diff" button.
-        _diff_block = "\n\n".join(
-            r.message for r in all_results
-            if (r.action or "").startswith("rebuild_") and r.status == "ok"
-        )
-        if _diff_block:
-            _save_last_diff(_diff_block)
-
-        pyperclip.copy(output_text)
-        _save_last_output(output_text)
-
-        err_count = sum(1 for r in all_results if r.status == "error")
-        success = (err_count == 0)
-        _state.msg_queue.put(("applied", (normalized_patch, output_text, success)))
-        _state.msg_queue.put(("status", f"\u2713 \u0413\u043e\u0442\u043e\u0432\u043e ({len(all_results)} actions, {t_total:.1f}s) \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0432 \u0431\u0443\u0444\u0435\u0440\u0435"))
-
-        # Merge error info from the last struct (partial); for multiple
-        # structs we take the union of failed/blocked ids from all of them.
-        if all_structs:
-            merged = {"ok": 0, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-            offset = 0
-            for st in all_structs:
-                merged["ok"] += st.get("ok", 0)
-                merged["errors"] += st.get("errors", 0)
-                merged["skipped"] += st.get("skipped", 0)
-                merged["failed"].extend([offset + x for x in st.get("failed", [])])
-                merged["blocked"].extend([offset + x for x in st.get("blocked", [])])
-                offset += st.get("ok", 0) + st.get("errors", 0) + st.get("skipped", 0)
-            _state.msg_queue.put(("error_text", _error_from_result(merged, output_text, 0)))
+        if outcome.merged is not None:
+            _state.msg_queue.put(("error_text", _error_from_result(outcome.merged, outcome.output_text, 0)))
         else:
             _state.msg_queue.put(("error_text", ""))
     except Exception as e:

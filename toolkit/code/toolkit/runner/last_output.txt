@@ -1,28 +1,13 @@
-[mv] ✓ move_file: Файл перемещён: toolkit/code/manual/verify_app_syntax.py -> toolkit/code/manual/verify_syntax.py (35 стр., 1038 Б)
+[create] ✓ create_file: Файл создан: toolkit/code/toolkit/runner/patch_runner.py (229 стр., 7829 Б)
 
-[wr] ✓ overwrite_file: Файл перезаписан: toolkit/code/manual/verify_syntax.py (+43 стр., +1184 Б)
+[imp] ✓ insert_at_anchor: перед L15 в toolkit/code/toolkit/runner/gui/app.py — +1 стр., +83 Б
 
-[run-1] ✓ run_python: exit=0  duration=52ms
+[worker-replace] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+
+[verify] ✓ run_python: exit=0  duration=76ms
 --- stdout ---
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_runner.py
-
-all 1 file(s) compile
-
-[run-2] ✓ run_python: exit=0  duration=62ms
---- stdout ---
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\__init__.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\code.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\diff.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\doc.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_code.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\lua_runner.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\meta.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\indexers\state.py
-
-all 8 file(s) compile
-
-[run-3] ✓ run_python: exit=0  duration=68ms
---- stdout ---
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\cli.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\__init__.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\app.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\formatting.py
@@ -32,18 +17,23 @@ ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree_view.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\widgets.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\patch_runner.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\projects.py
 
-all 9 file(s) compile
-[timing] user (5 actions): 0.20s
+all 13 file(s) compile
+[timing] user (4 actions): 0.10s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v431] [без изменений]
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v434] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1169) [v481] [+1, -1] ⚠
-  + toolkit/code/manual/verify_syntax.py  (78 стр., 2.2 KB)
-  - toolkit/code/manual/verify_app_syntax.py  (35 стр., 1.0 KB)
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 171, символов: 1177) [v484] [~1, +1, ⇅41]
+  ~ toolkit/code/toolkit/runner/gui/app.py  (-109 стр., -5.3 KB)
+      + toolkit/code/toolkit/runner/gui/app.py :: worker._notify  [function]  L175–L176
+      - toolkit/code/toolkit/runner/gui/app.py :: worker._apply_group  [function]  L191–L222
+      ~ toolkit/code/toolkit/runner/gui/app.py :: worker  [function]  L149–L315 → L150–L206
+  + toolkit/code/toolkit/runner/patch_runner.py  (229 стр., 7.6 KB)
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v305] [без изменений]
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v308] [без изменений]
 [timing] auto-rebuild (3 actions): 0.89s
 
-##RESULT:{"ok": 8, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.09s
+##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.00s
