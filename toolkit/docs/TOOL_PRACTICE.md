@@ -262,11 +262,13 @@ run_python(script="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
 
 **Мораль:** при создании `.py` через `create_file` — двойная проверка кавычек/эскейпов. Если сомневаешься — создать пустой, потом `replace_in_file`.
 
-### `replace_unit` для удаления не работает
+### `replace_unit` для удаления: было запрещено, теперь разрешено
 
-**Инцидент:** `replace_unit(qualname="Class.method", new_text="")` → `result_missing_symbol`, файл не тронут.
+**Инцидент (до фикса):** `replace_unit(qualname="Class.method", new_text="")` → `result_missing_symbol`, файл не тронут.
 
-**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text="")` (метод как блок в классе) или `replace_between`.
+**Была мораль:** «это фича (защита), но неочевидная; для удаления — `replace_unit(block=N, new_text="")` или `replace_between`».
+
+**Стало (2026-10-12):** запрет снят. Пустой `new_text` при `part="all"` — это удаление unit'а. Логика: адрес уже говорит «что именно», пустой текст другого смысла не имеет, симметрия с `replace_unit(block=N, new_text="")` и `delete_file`. Защита от случайного затирания — `_check_parses` с флагом `expect_missing=True`: парсинг проверяется, исчезновение unit ожидаемо, соседи не должны пропасть.
 
 ### `run_python(module=...)` = запуск модуля как `__main__`
 
@@ -359,9 +361,11 @@ Roblox-сторона не правила в этой сессии. Native — �
 
 Реализовано. Ярлык к `body` без детей, прописан в `MODEL.md §4` (со статусом «синтаксический ярлык, не четвёртая часть»).
 
-### ✅ P3 (закрыто): `replace_unit` с пустым `new_text`
+### ✅ P3 (закрыто, отменено 2026-10-12): `replace_unit` с пустым `new_text`
 
-Реализовано: `empty_input_use_delete_block` в `writer.replace_unit` для `part=all` + пустой текст. Сообщение: «replace_unit does not delete a unit».
+**Сначала (P3):** реализовано `empty_input_use_delete_block` в `writer.replace_unit` для `part=all` + пустой текст. Сообщение: «replace_unit does not delete a unit».
+
+**Потом (сессия 3a-3d):** 6 срабатываний в одной сессии — LLM систематически пытался так удалять unit'ы. Запрет мешал, не обучал. Отменено: пустой `new_text` с `part="all"` **удаляет** unit. Код ошибки `empty_input_use_delete_block` больше не генерится.
 
 ### ✅ P3 (закрыто): `get_status` — roots в сессии
 

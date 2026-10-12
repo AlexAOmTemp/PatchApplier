@@ -1,5 +1,14 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 183) [v467] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 183) [v469] [~5, ⇅25, +2, -2] ⚠
+  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L208–L363, 21.1 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §11. Стратегии (L440–L502, 4.8 KB, ⚠ no summary)
+  ~ toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L72, 6.9 KB, ⚠ no summary)
+  ~ toolkit/docs/TOOL_PRACTICE.md §6. Что работало плохо (L239–L290, 5.5 KB, ⚠ no summary)
+  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L340–L377, 3.1 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §`replace_unit` для удаления: было запрещено, теперь разрешено (L265–L272, 1.0 KB, ⚠ no summary)
+  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто, отменено 2026-10-12): `replace_unit` с пустым `new_text` (L364–L369, 0.7 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §`replace_unit` для удаления не работает (L265–L270, 0.4 KB, ⚠ no summary)
+  - toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `replace_unit` с пустым `new_text` (L362–L365, 0.3 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1201) [v520] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1202) [v522] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v340] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v342] [без изменений]

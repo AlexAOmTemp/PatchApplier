@@ -310,7 +310,7 @@
 |---|---|
 | `list_units` | `file_path` — карта unit'ов: qualname + kind + L-range + число блоков |
 | `read_unit` | `file_path`, `address` (JSON); опц. `part`, `block`. Текст. Диапазон блоков — с метками `=== block N ===` |
-| `replace_unit` | `file_path`, `address`, `new_text`, **ровно одно из `part` / `block`** (нет дефолта — иначе `scope_required`). `part="all"` — заменить целиком; `part="body"` — только тело, head и annotation сохраняются; `part="own_body"` — тело без подсекций. `block` (число / `"1-4"` / список) — блоки в body; пустой `new_text` с `block` удаляет их; пустой `new_text` с `part` → `empty_input_use_delete_block` |
+| `replace_unit` | `file_path`, `address`, `new_text`, **ровно одно из `part` / `block`** (нет дефолта — иначе `scope_required`). `part="all"` — заменить целиком; `part="body"` — только тело, head и annotation сохраняются; `part="own_body"` — тело без подсекций. `block` (число / `"1-4"` / список) — блоки в body. **Пустой `new_text` — удаление:** с `block` — этих блоков; с `part="all"` — unit'а целиком. С другими `part` — опустошение этой части in-place |
 | `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — номер блока или qualname дочернего unit'а (обязателен для `before`/`after`) |
 | `set_annotation` | `file_path`, `address`, `text` — заменить annotation. **Только если она уже есть** (иначе `no_annotation`). Форму выбирает тул |
 
@@ -447,6 +447,7 @@ Write без объявленных `path_args` (например, `run_python`)
 | Заменить тело функции | `replace_unit part="body"` |
 | Заменить только «своё» тело секции | `replace_unit part="own_body"` |
 | Удалить метод из класса | `replace_unit(block=N, new_text="")` |
+| Удалить unit (функцию, секцию) | `replace_unit(part="all", new_text="")` |
 | Вставить statement в функцию | `insert_block` |
 | Найти unit по имени | `find_symbol` |
 | Кто вызывает X | `symbol_graph qualname="X"` |
@@ -483,8 +484,8 @@ Write без объявленных `path_args` (например, `run_python`)
 
 **Править unit:**
 1. `read_unit` — посмотреть текущее состояние.
-2. `replace_unit` — заменить unit целиком (`part=all`) или только часть (`part="body"` — head и annotation сохраняются).
-3. `replace_unit(block=N)` — заменить блок или диапазон блоков в body. Пустой `new_text` — удалить.
+2. `replace_unit` — заменить unit целиком (`part=all`) или только часть (`part="body"` — head и annotation сохраняются). Пустой `new_text` с `part="all"` — **удалить unit целиком**.
+3. `replace_unit(block=N)` — заменить блок или диапазон блоков в body. Пустой `new_text` с `block` — **удалить блоки**.
 4. `insert_block` — вставить блок в `start` / `end` / `before anchor` / `after anchor`.
 5. `set_annotation` — заменить docstring / summary. **Только если annotation уже есть** — создание с нуля не поддержано.
 

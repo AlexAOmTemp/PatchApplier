@@ -28,7 +28,7 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 - ✅ P2: `replace_in_file` — три tier (byte-exact / trailing-whitespace / no-match + похожие строки); `regex: true`.
 - ✅ P2: `create_file` / `overwrite_file` — syntax check `.py` / `.json` (`content_syntax_error`).
 - ✅ P2: `replace_unit` для md — `part="own_body"`.
-- ✅ P3: `replace_unit` с пустым `new_text` → `empty_input_use_delete_block`.
+- ✅ P3 → отменено 2026-10-12: `replace_unit` с пустым `new_text` (было `empty_input_use_delete_block`; теперь — удаление).
 - ✅ P3: `get_status` показывает `roots:    a, b` для workspace.
 - ✅ `⚠` в diff-header при любых удалениях (маркер аномалии).
 
