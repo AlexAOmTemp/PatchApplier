@@ -182,7 +182,7 @@ By construction `errors == len(failed)` — `errors` is a counter, `failed` is t
 
 The tools `replace_range` (by line numbers) and `replace_in_file` (by text) exist, but they are **unreliable** and often crash patches:
 
-- **`replace_range`** — line numbers shift after any previous edit. Several `replace_range` calls on the same file in one patch easily delete the wrong block. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**.
+- **`replace_range`** — line numbers shift after any previous edit. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**. Patch-order is validated automatically (`range_order` / `range_after_write` — see §14): multiple ranges on one file must go **bottom-up** (strictly decreasing `start_line`), and all of them **before** any other write tool on the same file. A violating action is rejected with an explicit code, but the preceding edits **are applied**.
 - **`replace_in_file`** — fails on whitespace, indentation, invisible characters; the same string may appear in several places, `occurrence` helps but is not always enough. A separate pitfall is escapes: `\u0413` in JSON and the character `Г` in the source produce the same text, but `replace_in_file` matches **file bytes**, and `\u0413` is not there.
 
 For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit model: `read_unit` / `replace_unit` / `insert_block` / `set_annotation`. Address by `qualname` (single key across formats: `Foo.bar`, `3`, `Format`, `<module>`) or `title_match` (substring matcher on a section's title). Parts `head` / `annotation` / `body`; blocks inside body via `block`. These tools recompute positions from the AST or the document structure and are independent of prior edits.
@@ -541,6 +541,8 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - `bad_block_range` — `replace_unit(block=...)` received non-adjacent blocks (`"1,3"`); only a contiguous range is allowed.
 - `scope_required` — `replace_unit` without `part` or `block`. Pass exactly one.
 - `scope_conflict` — `replace_unit` with both `part` and `block`. Pass exactly one.
+- `range_order` — multiple `replace_range` calls on one file not in decreasing `start_line` order. Correct order is bottom-up.
+- `range_after_write` — `replace_range` follows another write tool on the same file; its line numbers are stale. Move it before the other writes.
 - `ambiguous_input` — `run_python`: both or neither of `script`/`module`.
 
 **Parsing:**
@@ -598,7 +600,10 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 
 - **Do not use `replace_in_file` for multi-line replacements.** Even 2–3 lines of context easily miss on whitespace, invisible characters, or escapes. For block edits, use `replace_between` — two short anchors instead of a long `search`.
 - **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `insert_block`, `set_annotation`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.
-- **Do not use `replace_range` more than once per file per patch.** Line numbers shift between actions.
+- **`replace_range` per file: bottom-up, and before any other write tools.** Enforced automatically in `Patcher.apply`:
+  - **`range_after_write`** — `replace_range` follows another write tool (`replace_in_file`, `replace_unit`, `overwrite_file`, …) on the same file; line numbers may have shifted. Put `replace_range` **earlier** than other writes on that file.
+  - **`range_order`** — multiple `replace_range` calls on one file not in decreasing `start_line` order. Going top-down → the lower shift breaks the upper one. Correct order — **lower first (larger `start_line`), then upper**.
+  - The violating action is rejected (`error_code` = `range_order` / `range_after_write`), but **preceding edits are applied**. The file stays in a predictable state: not “random”, but “part applied, part rejected with a reason”.
 - **Do not confuse `part` and `block`.** `part` is `head` / `annotation` / `body` (the unit's three parts). `block` is a numbered element **inside** body. They cannot be combined: `part`+`block` in one call is an error.
 - **Do not try to write an annotation where none exists.** `set_annotation` only **replaces an existing one**. If absent — `no_annotation`. To create one — `replace_unit part="body"` (insert by hand) or `insert_block`.
 - **Do not use `replace_unit(block=...)` for a non-contiguous range.** `"1,3"` → `bad_block_range`. Only contiguous (`"1-3"`). For gaps — several calls.

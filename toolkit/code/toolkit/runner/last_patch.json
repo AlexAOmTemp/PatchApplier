@@ -1,11 +1,27 @@
+[{"id": "en6", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+                "search": "- **`replace_range`** — line numbers shift after any previous edit. Several `replace_range` calls on the same file in one patch easily delete the wrong block. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**.",
+                "replace": "- **`replace_range`** — line numbers shift after any previous edit. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**. Patch-order is validated automatically (`range_order` / `range_after_write` — see §14): multiple ranges on one file must go **bottom-up** (strictly decreasing `start_line`), and all of them **before** any other write tool on the same file. A violating action is rejected with an explicit code, but the preceding edits **are applied**.",
+                "search_repr": false}}]
+
+[{"id": "en14", "action": "replace_in_file",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+                "search": "- **Do not use `replace_range` more than once per file per patch.** Line numbers shift between actions.",
+                "replace": "- **`replace_range` per file: bottom-up, and before any other write tools.** Enforced automatically in `Patcher.apply`:\n  - **`range_after_write`** — `replace_range` follows another write tool (`replace_in_file`, `replace_unit`, `overwrite_file`, …) on the same file; line numbers may have shifted. Put `replace_range` **earlier** than other writes on that file.\n  - **`range_order`** — multiple `replace_range` calls on one file not in decreasing `start_line` order. Going top-down → the lower shift breaks the upper one. Correct order — **lower first (larger `start_line`), then upper**.\n  - The violating action is rejected (`error_code` = `range_order` / `range_after_write`), but **preceding edits are applied**. The file stays in a predictable state: not “random”, but “part applied, part rejected with a reason”.",
+                "search_repr": false}}]
+
+[{"id": "en13", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/LLM_START.en.md",
+                "anchor": "- `ambiguous_input` — `run_python`: both or neither of `script`/`module`.",
+                "position": "before",
+                "new_content": "- `range_order` — multiple `replace_range` calls on one file not in decreasing `start_line` order. Correct order is bottom-up.\n- `range_after_write` — `replace_range` follows another write tool on the same file; its line numbers are stale. Move it before the other writes.\n"}}]
+
+[{"id": "tp", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+                "anchor": "### JSON-эскейпинг `\"\"\"` в `create_file`",
+                "position": "before",
+                "new_content": "### `replace_range` ×2 в одном файле — порядок снизу вверх\n\n**Инцидент:** серия `replace_range` на одном файле (верхняя правка → нижняя) — первая сдвигает строки, вторая попадает не туда. Файл остаётся валидным, содержимое — рандом.\n\n**Фикс (2026-10-12):** `Patcher.apply` делает pre-pass по патчу и отклоняет нарушителей с явным кодом:\n- `range_order` — `replace_range` не по убыванию `start_line` на том же файле.\n- `range_after_write` — `replace_range` после другого write-тула на тот же файл.\n\n**Семантика:** нарушающее действие отклоняется, но **предшествующие применяются**. Файл в предсказуемом состоянии — не рандом, а «часть применена, часть отклонена с причиной». Тест — `tests/test_range_order.py`.\n\n"}}]
+
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "docs: replace_unit empty new_text = delete (align docs with code)"]}}]
-
-[{"id": "ss", "action": "read_file",
-  "arguments": {"file_path": "toolkit/docs/SESSION_STATE.md",
-                "start_line": 1, "end_line": 40}}]
-
-[{"id": "ss2", "action": "read_file",
-  "arguments": {"file_path": "toolkit/docs/SESSION_STATE.md",
-                "start_line": 165, "end_line": 179}}]
+                "args": ["commit", "replace_range: order/after-write validation; docs updated"]}}]

@@ -1,16 +1,21 @@
-[ru313] ✓ replace_in_file: toolkit/docs/LLM_START.ru.md: заменено 1 вхожд. (последнее) — +0 стр., +88 Б
+[ru6] ✓ replace_in_file: toolkit/docs/LLM_START.ru.md: заменено 1 вхожд. (последнее) — +0 стр., +387 Б
 
-[ru449] ✓ replace_in_file: toolkit/docs/LLM_START.ru.md: заменено 1 вхожд. (последнее) — +1 стр., +98 Б
+[ru14] ✓ replace_in_file: toolkit/docs/LLM_START.ru.md: заменено 1 вхожд. (последнее) — +3 стр., +1054 Б
 
-[ru486] ✓ replace_in_file: toolkit/docs/LLM_START.ru.md: заменено 1 вхожд. (последнее) — +0 стр., +110 Б
+[ru13] ✓ insert_at_anchor: перед L546 в toolkit/docs/LLM_START.ru.md — +2 стр., +413 Б
 
-[tp265] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +2 стр., +627 Б
+[en6] ✓ grep: Найдено 3 совпадений:
+toolkit/docs/LLM_START.en.md:185: - **`replace_range`** — line numbers shift after any previous edit. Several `replace_range` calls on the same file in one patch easily delete the wrong block. Extra protection — the `expected_first_line` parameter: if the text at `start_line` does not match, the patch fails with `content_mismatch` and **the file is not touched**.
+toolkit/docs/LLM_START.en.md:190: **Text escape hatch** (`replace_between`, `replace_in_file`, `insert_at_anchor`, `replace_range`) — only for what the unit model does not address: comments between units, individual lines inside a statement, files without a parser, fenced blocks inside md.
+toolkit/docs/LLM_START.en.md:600: - **Do not use `replace_range` on supported formats.** For `.py` / `.lua` / `.md` there is always the unit model (`replace_unit`, `insert_block`, `set_annotation`) and `replace_between`. `replace_range` is only for the module-level top region and for formats without a parser. If you do need it, pass `expected_first_line`.
 
-[tp364] ✓ replace_in_file: toolkit/docs/TOOL_PRACTICE.md: заменено 1 вхожд. (последнее) — +2 стр., +444 Б
+[en14] ✓ grep: Найдено 1 совпадений:
+toolkit/docs/LLM_START.en.md:601: - **Do not use `replace_range` more than once per file per patch.** Line numbers shift between actions.
 
-[ss31] ✓ replace_in_file: toolkit/docs/SESSION_STATE.md: заменено 1 вхожд. (последнее) — +0 стр., +74 Б
+[en13] ✓ grep: Найдено 1 совпадений:
+toolkit/docs/LLM_START.en.md:544: - `ambiguous_input` — `run_python`: both or neither of `script`/`module`.
 
-[verify] ✓ run_python: exit=0  duration=256ms
+[verify] ✓ run_python: exit=0  duration=258ms
 --- stdout ---
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\__init__.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\backends\__init__.py
@@ -99,6 +104,7 @@ ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_native_tools.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_parser.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_patchparse.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_range_order.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_replace_in_file.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_reverse_deps.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tests\test_router.py
@@ -146,24 +152,18 @@ ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tools\unit\writer.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\tools\write.py
 
-all 133 file(s) compile
+all 134 file(s) compile
 [timing] user (7 actions): 0.27s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v469] [~5, ⇅25, +2, -2] ⚠
-  ~ toolkit/docs/LLM_START.ru.md §7. Действия, доступные тебе (L208–L363, 21.1 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.ru.md §11. Стратегии (L440–L502, 4.8 KB, ⚠ no summary)
-  ~ toolkit/docs/SESSION_STATE.md §Сессия: Settings window + tool polish (закрыта) (L12–L72, 6.9 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §6. Что работало плохо (L239–L290, 5.5 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §8. Предложения по улучшению тулов (L340–L377, 3.1 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §`replace_unit` для удаления: было запрещено, теперь разрешено (L265–L272, 1.0 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто, отменено 2026-10-12): `replace_unit` с пустым `new_text` (L364–L369, 0.7 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §`replace_unit` для удаления не работает (L265–L270, 0.4 KB, ⚠ no summary)
-  - toolkit/docs/TOOL_PRACTICE.md §✅ P3 (закрыто): `replace_unit` с пустым `new_text` (L362–L365, 0.3 KB, ⚠ no summary)
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v474] [~3, ⇅2]
+  ~ toolkit/docs/LLM_START.ru.md §6. Парадигма: работа по структурным единицам (L181–L207, 6.7 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §13. Коды ошибок (L514–L600, 8.6 KB, ⚠ no summary)
+  ~ toolkit/docs/LLM_START.ru.md §14. Чего не делать (L601–L618, 4.0 KB, ⚠ no summary)
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1202) [v522] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 176, символов: 1207) [v527] [без изменений]
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v342] [без изменений]
-[timing] auto-rebuild (3 actions): 0.81s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v347] [без изменений]
+[timing] auto-rebuild (3 actions): 0.83s
 
 ##RESULT:{"ok": 10, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.07s
+[timing] total: 1.10s

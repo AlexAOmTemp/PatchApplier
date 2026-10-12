@@ -62,6 +62,87 @@ def _format_id(value) -> str:
 
 
 class Patcher:
+    def _pre_validate_ranges(self, patches: list[dict]) -> dict[int, tuple[str, str]]:
+        """Pre-validate replace_range actions across the patch.
+
+        Returns {idx: (error_code, message)} for actions that must be
+        rejected before applying. `idx` is 1-based, matching apply().
+
+        Rules (patch-order is the whole point):
+          * A replace_range may not follow another write to the same file
+            (its line numbers would have shifted).
+          * Multiple replace_ranges on one file must go bottom-up
+            (strictly decreasing start_line) -- each edit then sits
+            below the ones already applied and its numbers stay valid.
+          * Other write tools MAY follow replace_range on the same file:
+            they match by content, not by position, so they stay correct.
+
+        Paths come from `path_args` / `path_list_args` of the tool class.
+        `run_python` and native actions declare no paths and are not
+        tracked -- combining them with replace_range in one patch is
+        the caller's responsibility.
+        """
+        errors: dict[int, tuple[str, str]] = {}
+        writes_seen: set[str] = set()
+        last_range_start: dict[str, int] = {}
+
+        for idx, patch in enumerate(patches, start=1):
+            action = patch.get("action")
+            args = patch.get("arguments")
+            if not action or not isinstance(args, dict):
+                continue
+            tool_cls = self.tools.get(action)
+            if tool_cls is None:
+                continue
+            op = getattr(tool_cls, "op", "write")
+            if op != "write":
+                continue
+
+            paths: list[str] = []
+            for key in getattr(tool_cls, "path_args", []) or []:
+                v = args.get(key)
+                if isinstance(v, str) and v:
+                    paths.append(v)
+            for key in getattr(tool_cls, "path_list_args", []) or []:
+                v = args.get(key)
+                if isinstance(v, list):
+                    for item in v:
+                        if isinstance(item, str) and item:
+                            paths.append(item)
+
+            if action == "replace_range":
+                fp = args.get("file_path")
+                if not isinstance(fp, str) or not fp:
+                    continue  # the tool itself reports the missing path
+                if fp in writes_seen:
+                    errors[idx] = (
+                        "range_after_write",
+                        f"replace_range on {fp!r} follows another write to "
+                        f"the same file in this patch; line numbers may have "
+                        f"shifted. Put replace_range before other writes on "
+                        f"this file, or use replace_in_file / replace_unit.",
+                    )
+                    continue
+                try:
+                    start = int(args.get("start_line"))
+                except (TypeError, ValueError):
+                    continue  # the tool reports the bad range itself
+                prev = last_range_start.get(fp)
+                if prev is not None and start >= prev:
+                    errors[idx] = (
+                        "range_order",
+                        f"replace_range on {fp!r} at L{start} follows L{prev}; "
+                        f"multiple ranges on one file must go bottom-up "
+                        f"(strictly decreasing start_line) so line numbers "
+                        f"stay valid after each edit.",
+                    )
+                    continue
+                last_range_start[fp] = start
+            else:
+                for fp in paths:
+                    writes_seen.add(fp)
+
+        return errors
     def __init__(
         self,
         backend: Backend,
@@ -76,13 +157,18 @@ class Patcher:
 
     def apply(self, patches: list[dict]) -> list[Result]:
         results: list[Result] = []
+        pre_errors = self._pre_validate_ranges(patches)
         for idx, patch in enumerate(patches, start=1):
-            r = self._apply_one(idx, patch)
+            if idx in pre_errors:
+                action = patch.get("action", "?")
+                code, msg = pre_errors[idx]
+                r = Result(status="error", message=msg,
+                           action=action, error_code=code)
+            else:
+                r = self._apply_one(idx, patch)
             if r.id_label is None and "id" in patch:
                 r.id_label = _format_id(patch["id"])
             results.append(r)
-            # Best-effort counter bump. `action` falls back to the patch's own
-            # action name when the tool did not set one on the Result.
             metrics.bump(
                 r.action or patch.get("action", "?"),
                 r.status,
