@@ -1,16 +1,27 @@
+[{"id": "r1", "action": "replace_range",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/lua_runner.py",
+                "start_line": 259, "end_line": 262,
+                "new_content": "        if total_reported is not None and total_reported != items_before_filter:\n            _err.write(\n                f\"[lua.index.lua] WARN total={total_reported} != received={items_before_filter}\\n\"\n            )\n        if hidden:\n            _err.write(\n                f\"[lua.index.lua] hidden={hidden} by .mcpignore\\n\"\n            )\n",
+                "expected_first_line": "        if total_reported is not None and total_reported != len(items):"}}]
+
+[{"id": "r2", "action": "replace_range",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/lua_runner.py",
+                "start_line": 253, "end_line": 253,
+                "new_content": "    hidden = items_before_filter - len(items)\n\n    elapsed = time.time() - t0\n",
+                "expected_first_line": "    elapsed = time.time() - t0"}}]
+
+[{"id": "r3", "action": "replace_range",
+  "arguments": {"file_path": "toolkit/code/toolkit/indexers/lua_runner.py",
+                "start_line": 246, "end_line": 246,
+                "new_content": "    items_before_filter = len(items)\n    if project_dir is not None:\n",
+                "expected_first_line": "    if project_dir is not None:"}}]
+
+[{"id": "docs", "action": "insert_at_anchor",
+  "arguments": {"file_path": "toolkit/docs/TOOL_PRACTICE.md",
+                "anchor": "## 7. Что не использовалось и почему",
+                "position": "before",
+                "new_content": "### `run_python(module=...)` = запуск модуля как `__main__`\n\n**Инцидент:** Для smoke-проверки `app.py` вызвал `run_python(module=\"toolkit.runner.gui.app\")`. Модуль импортировался, но `if __name__ == \"__main__\": run()` отработал — поднялся **второй экземпляр GUI**. Мост от нештатного спавна ушёл в невалидное состояние; последующие `rebuild_lua_code_index` падали с `OSError: [Errno 22] Invalid argument` до перезапуска GUI.\n\n**Мораль:** `module` контрактно = `python -m`, а не безопасный import. Для smoke-проверки синтаксиса без side-effects — `py_compile` через отдельный скрипт (`toolkit/code/manual/verify_app_syntax.py`). Для проверки импортов — `importlib.import_module` внутри `script=`.\n\n### `Errno 22` — транзиент от нештатного моста, не баг `MCPBackend`\n\n**Инцидент:** После нештатного спавна второго GUI `_invoke_once` писал payload в `stdin` bridge-процесса, который не был готов к handshake. Windows отдаёт это как `OSError: [Errno 22] Invalid argument`. В `bridge_timings.log` запрос не попадал — падение до записи. `grep_mcp` на маленьком payload проходил, `rebuild_lua_code_index` на большом — нет.\n\n**Мораль:** `Errno 22` в MCP-слое — сигнал «мост в странном состоянии, перезапусти GUI», а не копать код. Один раз видел стабильно — оказался не транзиент, а второй GUI.\n\n### Ложный WARN `total != received` в Lua-индексе\n\n**Инцидент:** `[lua.index.lua] WARN total=39 != received=22`. Драйвер отдал `done=true, total=39, next_cursor=39` — все 39 модулей. Python **отфильтровал** 17 из них `.mcpignore` (дефолт: `Packages`, `_Index`, `*@*`) → Wally/TestEZ vendor ушёл из индекса. WARN сравнивал `total_reported` (до фильтра) с `len(items)` (после). Ложный.\n\n**Мораль:** при фильтрации на стороне Python сравнивать `total` с размером **до** фильтра, факт скрытия логировать отдельно. Исправлено в `lua_runner.py`.\n\n"}}]
+
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "checkpoint: before MVP step 3a (gui refactor)"]}}]
-
-[{"id": "grep-session", "action": "grep",
-  "arguments": {"pattern": "_session|msg_queue|_session_lock|_session_backend_name",
-                "paths": ["toolkit/code/toolkit/runner/gui/app.py"],
-                "fixed_strings": false, "max_results": 50}}]
-
-[{"id": "grep-worker", "action": "grep",
-  "arguments": {"pattern": "^def worker|^def _run_patch|^def _start_session_in_background",
-                "paths": ["toolkit/code/toolkit/runner/gui/app.py"]}}]
-
-[{"id": "read-worker", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "worker"}}}]
+                "args": ["commit", "gui: step 3a closed; lua-runner: fix false WARN; practice: 3 new findings"]}}]

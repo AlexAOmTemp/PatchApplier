@@ -1,174 +1,79 @@
-[git-status] ✓ run_python: exit=0  duration=60ms
+[lua-warn] ✓ read_file: toolkit/code/toolkit/indexers/lua_runner.py L240–L275
+240: '            )\r\n'
+241: '        cursor = next_cursor\r\n'
+242: '\r\n'
+243: '    # Skip patterns from `.mcpignore` (segment-based, dot-separated paths).\r\n'
+244: '    # Applied before the reverse graph and rendering so skipped modules\r\n'
+245: '    # do not leak into `Used by:` lines of user modules.\r\n'
+246: '    if project_dir is not None:\r\n'
+247: '        from ..config import mcpignore\r\n'
+248: '        patterns = mcpignore.read(Path(project_dir))\r\n'
+249: '        if patterns:\r\n'
+250: '            items = [m for m in items\r\n'
+251: '                     if not mcpignore.path_hidden(m.get("path", ""), patterns)]\r\n'
+252: '\r\n'
+253: '    elapsed = time.time() - t0\r\n'
+254: '    # `sys.stderr` is None under pythonw.exe (no console attached). All\r\n'
+255: '    # diagnostics here are best-effort — guard instead of crashing the\r\n'
+256: '    # whole rebuild when the GUI runs without a console.\r\n'
+257: '    _err = sys.stderr\r\n'
+258: '    if _err is not None:\r\n'
+259: '        if total_reported is not None and total_reported != len(items):\r\n'
+260: '            _err.write(\r\n'
+261: '                f"[lua.index.lua] WARN total={total_reported} != received={len(items)}\\n"\r\n'
+262: '            )\r\n'
+263: '\r\n'
+264: '    used_by_map = _invert_lua_imports(items)\r\n'
+265: '    text = _render_index(items, used_by_map=used_by_map)\r\n'
+266: '    manifest = _build_manifest(items, used_by_map=used_by_map)\r\n'
+267: '    n_syms = sum(len(m.get("symbols") or []) for m in items)\r\n'
+268: '    if _err is not None:\r\n'
+269: '        _err.write(\r\n'
+270: '            f"[lua.index.lua] chunks={chunk_count} modules={len(items)} "\r\n'
+271: '            f"symbols={n_syms} total={elapsed:.3f}s\\n"\r\n'
+272: '        )\r\n'
+273: '        _err.flush()\r\n'
+274: '    return LuaIndexResult(\r\n'
+275: '        text=text,\r\n'
+
+[practice-tail] ✓ read_file: toolkit/docs/TOOL_PRACTICE.md L260–L275
+260: '\n'
+261: '**Инцидент:** Первая строка `mcpignore.py` была `"` вместо `"""`. Создалось, но импорт падал.\n'
+262: '\n'
+263: '**Мораль:** при создании `.py` через `create_file` — двойная проверка кавычек/эскейпов. Если сомневаешься — создать пустой, потом `replace_in_file`.\n'
+264: '\n'
+265: '### `replace_unit` для удаления не работает\n'
+266: '\n'
+267: '**Инцидент:** `replace_unit(qualname="Class.method", new_text="")` → `result_missing_symbol`, файл не тронут.\n'
+268: '\n'
+269: '**Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text="")` (метод как блок в классе) или `replace_between`.\n'
+270: '\n'
+271: '## 7. Что не использовалось и почему\n'
+272: '\n'
+273: '### Unit-write тулы (`replace_unit(block=)`, `insert_block`)\n'
+274: '\n'
+275: 'Использовал бы вместо них `replace_between` / `replace_in_file` из привычки к текстовым тулам. Каждый раз это работало, но требовало 2 anchor\'а или точных строк. `replace_unit(Class, block=N, new_text="")` или `insert_block(qualname, position="start")` были бы одним вызовом без угадывания.\n'
+
+[practice-jump] ✓ grep: Найдено 1 совпадений:
+toolkit/docs/TOOL_PRACTICE.md:271: ## 7. Что не использовалось и почему
+
+[git] ✓ run_python: exit=0  duration=58ms
 --- stdout ---
 ## master
  M toolkit/code/bridge/bridge_timings.log
+ M toolkit/code/toolkit/runner/gui/app.py
  M toolkit/code/toolkit/runner/last_diff.txt
  M toolkit/code/toolkit/runner/last_output.txt
  M toolkit/code/toolkit/runner/last_patch.json
+?? toolkit/code/manual/verify_app_syntax.py
+[timing] user (4 actions): 0.06s
 
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v429] [без изменений]
 
-[app-units] ✓ list_units: <module>                                 [module  ] L1-1278  blocks=35
-_load_last_state                         [function] L72-86  blocks=3
-_project_state                           [function] L92-97  blocks=5
-_validate_project                        [function] L100-107  blocks=5
-_initialize_project                      [function] L112-150  blocks=1
-worker                                   [function] L153-319  blocks=1
-_run_patch                               [function] L322-333  blocks=10
-on_button_click                          [function] L336-356  blocks=8
-on_repeat_click                          [function] L359-376  blocks=6
-on_get_last_patch                        [function] L379-388  blocks=2
-on_get_last_output                       [function] L393-402  blocks=3
-on_get_last_diff                         [function] L405-422  blocks=4
-on_starter_text                          [function] L429-486  blocks=10
-_format_project_label                    [function] L489-496  blocks=5
-update_project_status                    [function] L499-504  blocks=5
-update_button_state                      [function] L507-539  blocks=8
-_status_visual                           [function] L542-550  blocks=4
-_backend_states                          [function] L553-567  blocks=5
-_apply_backend_states                    [function] L570-597  blocks=2
-_check_mcp_transition                    [function] L600-638  blocks=10
-_rebuild_lua_after_ready                 [function] L641-673  blocks=11
-_on_mcp_reconnect                        [function] L676-695  blocks=6
-_on_mcp_reconnect._do                    [function] L686-694  blocks=2
-poll_queue                               [function] L698-739  blocks=6
-periodic_button_state                    [function] L742-744  blocks=2
-_load_ws_or_error                        [function] L749-754  blocks=4
-_build_backend_for_config                [function] L757-828  blocks=16
-_start_session_in_background             [function] L831-921  blocks=5
-_start_session_in_background._run        [function] L840-919  blocks=9
-_menu_project_settings                   [function] L924-957  blocks=6
-_menu_project_settings._on_settings_saved [function] L937-942  blocks=2
-_switch_project                          [function] L960-982  blocks=9
-_menu_new_project                        [function] L985-1018  blocks=8
-_menu_open_project                       [function] L1021-1034  blocks=5
-_menu_open_recent                        [function] L1037-1038  blocks=1
-_refresh_recent_menu                     [function] L1044-1067  blocks=6
-run                                      [function] L1072-1274  blocks=91
-run._make_copyable                       [function] L1113-1123  blocks=4
-run._make_copyable._show_menu            [function] L1118-1122  blocks=1
-run._copy_project_path                   [function] L1147-1154  blocks=2
-run._on_lang_click                       [function] L1187-1199  blocks=6
-run.toggle_topmost                       [function] L1222-1223  blocks=1
-run.toggle_right_panel                   [function] L1242-1252  blocks=3
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1167) [v479] [без изменений]
 
-[state-units] ✓ list_units: <module>                                 [module  ] L1-106  blocks=43
-_find_toolkit_root                       [function] L22-44  blocks=3
-
-[state-read] ✓ read_file: toolkit/code/toolkit/runner/gui/state.py
-1: '"""Shared GUI state and constants.\n'
-2: '\n'
-3: 'Everything here is process-global: Tk variables, config cache, session\n'
-4: 'handle, tiny inter-thread queue. Imported by presenters and views so they\n'
-5: 'read the same singletons. No Tk widgets are constructed here except the\n'
-6: 'StatusLog class (which is a widget, and belongs in views/ on the next\n'
-7: 'migration step — kept here for now so the split is incremental).\n'
-8: '"""\n'
-9: 'from __future__ import annotations\n'
-10: '\n'
-11: 'import queue\n'
-12: 'import threading\n'
-13: 'import tkinter as tk\n'
-14: 'from pathlib import Path\n'
-15: '\n'
-16: '\n'
-17: '# gui package lives at toolkit/runner/gui/__init__.py\n'
-18: 'HERE = Path(__file__).resolve().parent          # toolkit/runner/gui/\n'
-19: 'RUNNER_DIR = HERE.parent                        # toolkit/runner/\n'
-20: '\n'
-21: '\n'
-22: 'def _find_toolkit_root(start: Path) -> Path:\n'
-23: '    """Locate the toolkit root by walking up from `start`.\n'
-24: '\n'
-25: '    Two markers identify the root in a layout-independent way: the\n'
-26: '    toolkit-wide `.patch_applier.json` file, and `docs/LLM_START.*.md`\n'
-27: '    (the starter text). Either is enough. This makes the toolkit\n'
-28: '    relocatable: move the whole directory anywhere, or reshape its\n'
-29: '    internal structure, without touching this module.\n'
-30: '\n'
-31: '    Falls back to `start.parents[3]` (the current layout) if neither\n'
-32: '    marker is found — e.g. a partially installed toolkit.\n'
-33: '    """\n'
-34: '    p = start\n'
-35: '    for _ in range(8):\n'
-36: '        if (p / ".patch_applier.json").is_file():\n'
-37: '            return p\n'
-38: '        docs = p / "docs"\n'
-39: '        if docs.is_dir() and any(docs.glob("LLM_START.*.md")):\n'
-40: '            return p\n'
-41: '        if p.parent == p:\n'
-42: '            break\n'
-43: '        p = p.parent\n'
-44: '    return start.parents[3] if len(start.parents) >= 4 else start\n'
-45: '\n'
-46: '\n'
-47: 'TOOLKIT_ROOT = _find_toolkit_root(HERE)                # toolkit/\n'
-48: 'PROJECT_ROOT = TOOLKIT_ROOT.parent              # project root\n'
-49: '\n'
-50: '\n'
-51: '# Persistent state kept next to the GUI (still in runner/, not in gui/,\n'
-52: '# because the runner scripts read/write them).\n'
-53: 'LAST_PATCH = RUNNER_DIR / "last_patch.json"\n'
-54: 'LAST_OUTPUT = RUNNER_DIR / "last_output.txt"\n'
-55: 'LAST_DIFF = RUNNER_DIR / "last_diff.txt"\n'
-56: '\n'
-57: 'HOTKEY = "ctrl+alt+space"\n'
-58: 'BUTTON_STATE_REFRESH_MS = 1000\n'
-59: '\n'
-60: 'WIDTH_LEFT = 390\n'
-61: 'WIDTH_RIGHT = 240\n'
-62: 'WIDTH_TOGGLE = 30\n'
-63: 'WINDOW_H = 400\n'
-64: 'COLLAPSED_W = WIDTH_LEFT + WIDTH_TOGGLE + 22\n'
-65: 'EXPANDED_W = COLLAPSED_W + WIDTH_RIGHT + 10\n'
-66: '\n'
-67: 'MONO_FONT = ("Consolas", 10)\n'
-68: '\n'
-69: '\n'
-70: '\n'
-71: 'msg_queue: queue.Queue = queue.Queue()\n'
-72: '\n'
-73: 'last_applied_patch_norm = None\n'
-74: 'last_output_text = None\n'
-75: 'is_executing = False\n'
-76: 'right_visible = False\n'
-77: '_last_mcp_ready = False\n'
-78: '_last_mcp_state: str = ""\n'
-79: '\n'
-80: 'CONFIG: dict = {}\n'
-81: 'PROJECT_OK = False\n'
-82: '\n'
-83: '# Persistent Session for in-process patching.\n'
-84: '_session = None\n'
-85: '_session_lock = threading.Lock()\n'
-86: '_session_backend_name = None\n'
-87: '\n'
-88: '# Tk variables — created lazily by app.run() (they need a Tk root).\n'
-89: '# Kept here as module-level names so presenters/handlers can reference them\n'
-90: '# after run() populates them.\n'
-91: 'mcp_status_var = None\n'
-92: 'status_label = None\n'
-93: 'status_var = None\n'
-94: 'fs_status_var = None\n'
-95: 'mcp_status_var = None\n'
-96: 'fs_status_label = None\n'
-97: 'mcp_status_label = None\n'
-98: 'error_var = None\n'
-99: 'project_label = None\n'
-100: 'right_panel = None\n'
-101: 'toggle_btn = None\n'
-102: 'btn = None\n'
-103: 'repeat_btn = None\n'
-104: 'root = None\n'
-105: 'starter_include_roblox_var = None\n'
-106: 'mcp_reconnect_btn = None\n'
-[timing] user (4 actions): 0.08s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 180) [v418] [без изменений]
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 169, символов: 1166) [v467] [без изменений]
-
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v291] [без изменений]
-[timing] auto-rebuild (3 actions): 0.80s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v302] [без изменений]
+[timing] auto-rebuild (3 actions): 0.84s
 
 ##RESULT:{"ok": 7, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.88s
+[timing] total: 0.90s

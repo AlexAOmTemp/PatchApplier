@@ -268,6 +268,24 @@ run_python(script="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
 
 **Мораль:** это **фича** (защита), но неочевидная. Для удаления — `replace_unit(block=N, new_text="")` (метод как блок в классе) или `replace_between`.
 
+### `run_python(module=...)` = запуск модуля как `__main__`
+
+**Инцидент:** Для smoke-проверки `app.py` вызвал `run_python(module="toolkit.runner.gui.app")`. Модуль импортировался, но `if __name__ == "__main__": run()` отработал — поднялся **второй экземпляр GUI**. Мост от нештатного спавна ушёл в невалидное состояние; последующие `rebuild_lua_code_index` падали с `OSError: [Errno 22] Invalid argument` до перезапуска GUI.
+
+**Мораль:** `module` контрактно = `python -m`, а не безопасный import. Для smoke-проверки синтаксиса без side-effects — `py_compile` через отдельный скрипт (`toolkit/code/manual/verify_app_syntax.py`). Для проверки импортов — `importlib.import_module` внутри `script=`.
+
+### `Errno 22` — транзиент от нештатного моста, не баг `MCPBackend`
+
+**Инцидент:** После нештатного спавна второго GUI `_invoke_once` писал payload в `stdin` bridge-процесса, который не был готов к handshake. Windows отдаёт это как `OSError: [Errno 22] Invalid argument`. В `bridge_timings.log` запрос не попадал — падение до записи. `grep_mcp` на маленьком payload проходил, `rebuild_lua_code_index` на большом — нет.
+
+**Мораль:** `Errno 22` в MCP-слое — сигнал «мост в странном состоянии, перезапусти GUI», а не копать код. Один раз видел стабильно — оказался не транзиент, а второй GUI.
+
+### Ложный WARN `total != received` в Lua-индексе
+
+**Инцидент:** `[lua.index.lua] WARN total=39 != received=22`. Драйвер отдал `done=true, total=39, next_cursor=39` — все 39 модулей. Python **отфильтровал** 17 из них `.mcpignore` (дефолт: `Packages`, `_Index`, `*@*`) → Wally/TestEZ vendor ушёл из индекса. WARN сравнивал `total_reported` (до фильтра) с `len(items)` (после). Ложный.
+
+**Мораль:** при фильтрации на стороне Python сравнивать `total` с размером **до** фильтра, факт скрытия логировать отдельно. Исправлено в `lua_runner.py`.
+
 ## 7. Что не использовалось и почему
 
 ### Unit-write тулы (`replace_unit(block=)`, `insert_block`)

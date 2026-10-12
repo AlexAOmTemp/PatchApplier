@@ -17,6 +17,7 @@ from ...core.patchparse import parse_patches
 from ...core.router import plan_rebuilds
 from ...tools import TOOL_MAP
 
+from . import state as _state
 from .state import (
     HERE, RUNNER_DIR, TOOLKIT_ROOT, PROJECT_ROOT,
     LAST_PATCH, LAST_OUTPUT, LAST_DIFF,
@@ -44,7 +45,6 @@ from .starter_text import (
 from .widgets import StatusLog as _StatusLog
 
 
-msg_queue = queue.Queue()
 
 last_applied_patch_norm = None
 last_output_text = None
@@ -56,10 +56,6 @@ _last_mcp_state: str = ""
 CONFIG = {}
 PROJECT_OK = False
 
-# Persistent Session for in-process patching.
-_session = None
-_session_lock = threading.Lock()
-_session_backend_name = None
 mcp_status_var = None
 status_label = None
 
@@ -111,11 +107,11 @@ def _validate_project() -> bool:
 
 def _initialize_project():
     try:
-        with _session_lock:
-            s = _session
-            bn = _session_backend_name or CONFIG.get("backend", "filesystem")
+        with _state._session_lock:
+            s = _state._session
+            bn = _state._session_backend_name or CONFIG.get("backend", "filesystem")
         if s is None:
-            msg_queue.put(("status", "\u26a0 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
+            _state.msg_queue.put(("status", "\u26a0 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
             return
         has_fs = bn in ("filesystem", "composite")
         want_docs = bool(CONFIG.get("index_docs", has_fs))
@@ -128,7 +124,7 @@ def _initialize_project():
         # Lua index is NOT built here: mcp may still be starting. It is
         # rebuilt once mcp transitions to ready (see _check_mcp_transition).
         if not patches:
-            msg_queue.put(("status", "\u2139 \u041d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432"))
+            _state.msg_queue.put(("status", "\u2139 \u041d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432"))
             return
         import io as _io
         old_stdout = sys.stdout
@@ -145,20 +141,20 @@ def _initialize_project():
         if _diff_block:
             _save_last_diff(_diff_block)
         ok = all(r.status == "ok" for r in results)
-        msg_queue.put(("status", "\u2713 \u041f\u0440\u043e\u0435\u043a\u0442 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d" if ok else "\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438"))
+        _state.msg_queue.put(("status", "\u2713 \u041f\u0440\u043e\u0435\u043a\u0442 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d" if ok else "\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438"))
     except Exception as e:
-        msg_queue.put(("status", f"\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438: {e}"))
+        _state.msg_queue.put(("status", f"\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438: {e}"))
 
 
 def worker(patch_text: str, normalized_patch: str):
     try:
         LAST_PATCH.write_text(patch_text, encoding="utf-8")
-        msg_queue.put(("status", f"\u2713 \u0411\u0443\u0444\u0435\u0440 \u2192 {LAST_PATCH.name}"))
+        _state.msg_queue.put(("status", f"\u2713 \u0411\u0443\u0444\u0435\u0440 \u2192 {LAST_PATCH.name}"))
 
-        with _session_lock:
-            s = _session
+        with _state._session_lock:
+            s = _state._session
         if s is None:
-            msg_queue.put(("status", "\u2717 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
+            _state.msg_queue.put(("status", "\u2717 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
             return
 
         try:
@@ -170,17 +166,17 @@ def worker(patch_text: str, normalized_patch: str):
             except Exception:
                 pass
             _save_last_output(err_text)
-            msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d"))
-            msg_queue.put(("error_text", err_text))
+            _state.msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043d\u0435 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u043d"))
+            _state.msg_queue.put(("error_text", err_text))
             return
         parsed = parse_patches(_raw)
         user_patches = parsed.actions
         if not user_patches:
-            msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043f\u0443\u0441\u0442"))
+            _state.msg_queue.put(("status", "\u2717 \u041f\u0430\u0442\u0447 \u043f\u0443\u0441\u0442"))
             return
 
-        with _session_lock:
-            active_backend = _session_backend_name or CONFIG.get("backend", "filesystem")
+        with _state._session_lock:
+            active_backend = _state._session_backend_name or CONFIG.get("backend", "filesystem")
         supports_fs = active_backend in ("filesystem", "composite")
         supports_mcp = active_backend in ("mcp", "composite")
 
@@ -228,7 +224,7 @@ def worker(patch_text: str, normalized_patch: str):
         # Step 1: user patches
         n_user = len(user_patches)
         n_before = len(all_results)
-        msg_queue.put(("status", f"\u23f3 \u041f\u0430\u0442\u0447 \u043f\u0440\u0438\u043c\u0435\u043d\u044f\u0435\u0442\u0441\u044f ({n_user} actions)..."))
+        _state.msg_queue.put(("status", f"\u23f3 \u041f\u0430\u0442\u0447 \u043f\u0440\u0438\u043c\u0435\u043d\u044f\u0435\u0442\u0441\u044f ({n_user} actions)..."))
         _apply_group(user_patches, f"user ({n_user} actions)",
                      diagnostics=parsed.diagnostics)
         res_user = all_results[n_before:]
@@ -253,7 +249,7 @@ def worker(patch_text: str, normalized_patch: str):
                 action = p.get("action", "")
                 p["id"] = _AUTO_LABEL.get(action, "auto")
                 auto_patches.append(p)
-            msg_queue.put(("status",
+            _state.msg_queue.put(("status",
                 f"\u23f3 \u0410\u0432\u0442\u043e-\u043f\u0435\u0440\u0435\u0441\u0431\u043e\u0440\u043a\u0430 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432 ({len(auto_patches)})..."))
             _apply_group(auto_patches,
                          f"auto-rebuild ({len(auto_patches)} actions)")
@@ -294,8 +290,8 @@ def worker(patch_text: str, normalized_patch: str):
 
         err_count = sum(1 for r in all_results if r.status == "error")
         success = (err_count == 0)
-        msg_queue.put(("applied", (normalized_patch, output_text, success)))
-        msg_queue.put(("status", f"\u2713 \u0413\u043e\u0442\u043e\u0432\u043e ({len(all_results)} actions, {t_total:.1f}s) \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0432 \u0431\u0443\u0444\u0435\u0440\u0435"))
+        _state.msg_queue.put(("applied", (normalized_patch, output_text, success)))
+        _state.msg_queue.put(("status", f"\u2713 \u0413\u043e\u0442\u043e\u0432\u043e ({len(all_results)} actions, {t_total:.1f}s) \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442 \u0432 \u0431\u0443\u0444\u0435\u0440\u0435"))
 
         # Merge error info from the last struct (partial); for multiple
         # structs we take the union of failed/blocked ids from all of them.
@@ -309,14 +305,14 @@ def worker(patch_text: str, normalized_patch: str):
                 merged["failed"].extend([offset + x for x in st.get("failed", [])])
                 merged["blocked"].extend([offset + x for x in st.get("blocked", [])])
                 offset += st.get("ok", 0) + st.get("errors", 0) + st.get("skipped", 0)
-            msg_queue.put(("error_text", _error_from_result(merged, output_text, 0)))
+            _state.msg_queue.put(("error_text", _error_from_result(merged, output_text, 0)))
         else:
-            msg_queue.put(("error_text", ""))
+            _state.msg_queue.put(("error_text", ""))
     except Exception as e:
-        msg_queue.put(("status", f"\u2717 {e}"))
+        _state.msg_queue.put(("status", f"\u2717 {e}"))
         print(traceback.format_exc(), file=sys.stderr)
     finally:
-        msg_queue.put(("done", None))
+        _state.msg_queue.put(("done", None))
 
 
 def _run_patch(patch_text: str):
@@ -434,8 +430,8 @@ def on_starter_text():
         status_var.set(f"\u2717 \u041d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d LLM_START.*.md \u0432 {_docs_dir()}")
         return
 
-    with _session_lock:
-        s = _session
+    with _state._session_lock:
+        s = _state._session
     status_block = ""
     if s is not None:
         try:
@@ -622,25 +618,25 @@ def _check_mcp_transition(session, backend_name: str) -> None:
         if bool(CONFIG.get("index_lua", True)):
             threading.Thread(target=_rebuild_lua_after_ready, daemon=True).start()
         if backend_name == "composite":
-            msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (composite, mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d)"))
+            _state.msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (composite, mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d)"))
         else:
-            msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (mcp)"))
+            _state.msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (mcp)"))
     elif is_failed:
         reason = mcp_state.split(":", 1)[1].strip() if ":" in mcp_state else mcp_state
         if len(reason) > 100:
             reason = reason[:100] + "\u2026"
         if backend_name == "composite":
-            msg_queue.put(("status",
+            _state.msg_queue.put(("status",
                 f"\u26a0 Session: fs \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d, mcp \u043d\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0451\u043d ({reason})"))
         else:
-            msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430: mcp \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d ({reason})"))
+            _state.msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430: mcp \u043d\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0435\u043d ({reason})"))
 
     _last_mcp_ready = is_ready
 
 
 def _rebuild_lua_after_ready() -> None:
-    with _session_lock:
-        s = _session
+    with _state._session_lock:
+        s = _state._session
     if s is None:
         return
     import io as _io
@@ -653,8 +649,8 @@ def _rebuild_lua_after_ready() -> None:
         )
     except Exception as e:
         sys.stdout = old_stdout
-        msg_queue.put(("status", f"\u2717 Lua index rebuild failed: {e}"))
-        msg_queue.put(("last_output", buf.getvalue()))
+        _state.msg_queue.put(("status", f"\u2717 Lua index rebuild failed: {e}"))
+        _state.msg_queue.put(("last_output", buf.getvalue()))
         return
     finally:
         sys.stdout = old_stdout
@@ -664,9 +660,9 @@ def _rebuild_lua_after_ready() -> None:
     )
     if _diff_block:
         _save_last_diff(_diff_block)
-    msg_queue.put(("last_output", buf.getvalue()))
+    _state.msg_queue.put(("last_output", buf.getvalue()))
     ok = all(r.status == "ok" for r in results)
-    msg_queue.put((
+    _state.msg_queue.put((
         "status",
         "\u2713 Lua \u0438\u043d\u0434\u0435\u043a\u0441 \u043f\u0435\u0440\u0435\u0441\u0442\u0440\u043e\u0435\u043d" if ok
         else "\u2717 Lua \u0438\u043d\u0434\u0435\u043a\u0441: \u043e\u0448\u0438\u0431\u043a\u0430",
@@ -674,8 +670,8 @@ def _rebuild_lua_after_ready() -> None:
 
 
 def _on_mcp_reconnect():
-    with _session_lock:
-        s = _session
+    with _state._session_lock:
+        s = _state._session
     if s is None:
         return
     fn = getattr(s.backend, "reopen", None)
@@ -697,9 +693,9 @@ def _on_mcp_reconnect():
 
 def poll_queue():
     global is_executing, last_applied_patch_norm, last_output_text
-    with _session_lock:
-        _s = _session
-        _bn = _session_backend_name
+    with _state._session_lock:
+        _s = _state._session
+        _bn = _state._session_backend_name
     if _s is not None:
         try:
             _apply_backend_states(_backend_states(_s, _bn or ""))
@@ -708,7 +704,7 @@ def poll_queue():
     _check_mcp_transition(_s, _bn or "")
     try:
         while True:
-            kind, payload = msg_queue.get_nowait()
+            kind, payload = _state.msg_queue.get_nowait()
             if kind == "status":
                 status_var.set(payload)
             elif kind == "error_text":
@@ -831,17 +827,16 @@ def _build_backend_for_config():
 def _start_session_in_background():
     """Close any existing session and start a new one from CONFIG.
 
-    Reports via msg_queue 'mcp_status' events. On success, assigns the global
-    _session. Safe to call multiple times (restarts the session).
+    Reports via _state.msg_queue 'mcp_status' events. On success, assigns the global
+    _state._session. Safe to call multiple times (restarts the session).
     """
     global _last_mcp_ready, _last_mcp_state
     _last_mcp_ready = False
     _last_mcp_state = ""
     def _run():
-        global _session, _session_backend_name
-        with _session_lock:
-            old = _session
-            _session = None
+        with _state._session_lock:
+            old = _state._session
+            _state._session = None
         if old is not None:
             try:
                 old.__exit__(None, None, None)
@@ -850,7 +845,7 @@ def _start_session_in_background():
 
         backend, name = _build_backend_for_config()
         if backend is None:
-            msg_queue.put(("status", f"\u2717 {name}"))
+            _state.msg_queue.put(("status", f"\u2717 {name}"))
             return
 
         from ...core import Session
@@ -905,18 +900,18 @@ def _start_session_in_background():
             )
             s = Session(backend, fmt=fmt, tools=TOOL_MAP)
             s.open_async()
-            with _session_lock:
-                _session = s
-                _session_backend_name = name
+            with _state._session_lock:
+                _state._session = s
+                _state._session_backend_name = name
             if name == "composite":
-                msg_queue.put(("status", "\u23f3 Session: fs \u0433\u043e\u0442\u043e\u0432, mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
+                _state.msg_queue.put(("status", "\u23f3 Session: fs \u0433\u043e\u0442\u043e\u0432, mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
             elif name == "mcp":
-                msg_queue.put(("status", "\u23f3 Session: mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
+                _state.msg_queue.put(("status", "\u23f3 Session: mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
             else:
-                msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (filesystem)"))
+                _state.msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (filesystem)"))
             threading.Thread(target=_initialize_project, daemon=True).start()
         except Exception as e:
-            msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0441\u0442\u0430\u0440\u0442\u043e\u0432\u0430\u043b\u0430 ({name}): {e}"))
+            _state.msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0441\u0442\u0430\u0440\u0442\u043e\u0432\u0430\u043b\u0430 ({name}): {e}"))
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -978,7 +973,7 @@ def _switch_project(project_dir: str, project_name: str | None = None) -> None:
     update_project_status()
     update_button_state()
     _refresh_recent_menu()
-    msg_queue.put(("status", f"\u23f3 \u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043f\u0440\u043e\u0435\u043a\u0442: {p.name}..."))
+    _state.msg_queue.put(("status", f"\u23f3 \u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043f\u0440\u043e\u0435\u043a\u0442: {p.name}..."))
     _start_session_in_background()
 
 
@@ -1266,8 +1261,8 @@ def run():
 
     # Release session on close.
     try:
-        with _session_lock:
-            s = _session
+        with _state._session_lock:
+            s = _state._session
         if s is not None:
             s.__exit__(None, None, None)
     except Exception:

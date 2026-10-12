@@ -243,6 +243,7 @@ def build_lua_index(
     # Skip patterns from `.mcpignore` (segment-based, dot-separated paths).
     # Applied before the reverse graph and rendering so skipped modules
     # do not leak into `Used by:` lines of user modules.
+    items_before_filter = len(items)
     if project_dir is not None:
         from ..config import mcpignore
         patterns = mcpignore.read(Path(project_dir))
@@ -250,15 +251,21 @@ def build_lua_index(
             items = [m for m in items
                      if not mcpignore.path_hidden(m.get("path", ""), patterns)]
 
+    hidden = items_before_filter - len(items)
+
     elapsed = time.time() - t0
     # `sys.stderr` is None under pythonw.exe (no console attached). All
     # diagnostics here are best-effort — guard instead of crashing the
     # whole rebuild when the GUI runs without a console.
     _err = sys.stderr
     if _err is not None:
-        if total_reported is not None and total_reported != len(items):
+        if total_reported is not None and total_reported != items_before_filter:
             _err.write(
-                f"[lua.index.lua] WARN total={total_reported} != received={len(items)}\n"
+                f"[lua.index.lua] WARN total={total_reported} != received={items_before_filter}\n"
+            )
+        if hidden:
+            _err.write(
+                f"[lua.index.lua] hidden={hidden} by .mcpignore\n"
             )
 
     used_by_map = _invert_lua_imports(items)

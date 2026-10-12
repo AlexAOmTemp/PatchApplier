@@ -1,1 +1,5 @@
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v292] [без изменений]
+.patch_applier/INDEX.md (файлов: 23, без summary: 180) [v429] [без изменений]
+
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 170, символов: 1167) [v479] [без изменений]
+
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v302] [без изменений]
