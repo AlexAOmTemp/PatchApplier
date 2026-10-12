@@ -271,6 +271,12 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 
 5. **LLM_START: `run_python module=` — предупреждение.** `module` = `python -m` = `__main__`. Импорт модуля с `if __name__ == "__main__": run()` запускает его. **Инцидент:** `module="toolkit.runner.gui.app"` поднял второй GUI, мост ушёл в невалидное состояние, `rebuild_lua_code_index` падал с `Errno 22` до перезапуска. Нужно явное предупреждение в §7 и, возможно, проверка «модуль в `runner/gui/` или имеет `__main__`» → soft-warn в ответе.
 
+6. **`settings_window.py` не вынесен.** `_menu_project_settings` всё ещё открывает `gui/settings_window.py` напрямую (581 строка Tk). В Functional-Core парадигму не завернут. Отдельная задача, если понадобится headless-доступ к настройкам проекта — сейчас это чисто GUI-операция.
+
+7. **`.gitignore` для runtime-логов.** `toolkit/code/bridge/bridge_timings.log` (547 KB на момент сессии) и `toolkit/code/toolkit/runner/last_*.{json,txt}` ездят в каждом коммите. Кандидаты: `runtime/logs/`, `last_*.{json,txt}`, `*.log`. Решение: добавить в `toolkit/.gitignore` (или `.patchignore`, если это runtime, не история).
+
+8. **`TOOL_PRACTICE §2` устарел.** Таблица «Инвентарь: что использовалось» — снимок прошлой сессии. Три тула из «ни разу» реально использовались: `replace_range` (11 раз), `insert_block` (21), `move_file` + `copy_file` (5). Обновить таблицу реальными цифрами из `metrics.json`, пометить, что «не использовался» ≠ «не рекомендован». Отдельная задача.
+
 **Unused tools — inventory from the session.** Из 32 тулов в `TOOL_MAP` не использовались:
 
 - **`copy_unit`, `find_symbol`, `find_usages`, `symbol_graph`, `set_annotation`, `grep_lua`, `grep_replace_mcp`, `file_stat`** — не было задачи: рефакторинг шёл по горизонтали (вынос кода), не по графу (навигация, анализ, массовые замены). **Не удалять** — это резерв под другие задачи. См. TOOL_PRACTICE §3 «Ни разу не использовались» и §7 — список растёт, но по фактам это не мёртвый груз.

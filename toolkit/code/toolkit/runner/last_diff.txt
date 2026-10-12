@@ -1,10 +1,8 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 184) [v475] [~4, ⇅26, +1]
-  ~ toolkit/docs/LLM_START.en.md §6. Paradigm: work through structural units (L179–L205, 4.4 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.en.md §13. Error codes (L512–L598, 6.4 KB, ⚠ no summary)
-  ~ toolkit/docs/LLM_START.en.md §14. What not to do (L599–L616, 2.7 KB, ⚠ no summary)
-  ~ toolkit/docs/TOOL_PRACTICE.md §6. Что работало плохо (L239–L300, 6.5 KB, ⚠ no summary)
-  + toolkit/docs/TOOL_PRACTICE.md §`replace_range` ×2 в одном файле — порядок снизу вверх (L259–L268, 1.1 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 23, без summary: 188) [v476] [~1, ⇅8, +2]
+  ~ toolkit/docs/SESSION_STATE.md §Что проверить в начале следующей сессии (L206–L213, 1.0 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Сессия: Functional Core refactor + replace_range validation (закрыта) (L12–L50, 5.4 KB, ⚠ no summary)
+  + toolkit/docs/SESSION_STATE.md §Фиксы и улучшения тулов (L34–L41, 1.6 KB, ⚠ no summary)
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 176, символов: 1207) [v528] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 176, символов: 1207) [v529] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v348] [без изменений]
+CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v349] [без изменений]
