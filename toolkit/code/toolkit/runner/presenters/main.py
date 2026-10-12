@@ -383,3 +383,21 @@ def plan_init_patches(config: dict, backend_name: str) -> list[dict]:
     if want_py:
         patches.append({"action": "rebuild_code_index", "arguments": {}})
     return patches
+
+
+# -- 3c.6 view helpers ---------------------------------------------------
+
+
+def next_language(current: str, available: list[str]) -> str:
+    """Return the next language in `available` after `current` (cyclic).
+
+    If `current` is not in `available`, returns available[0]. Empty list
+    returns current unchanged (caller's problem).
+    """
+    if not available:
+        return current
+    try:
+        i = available.index(current)
+    except ValueError:
+        return available[0]
+    return available[(i + 1) % len(available)]

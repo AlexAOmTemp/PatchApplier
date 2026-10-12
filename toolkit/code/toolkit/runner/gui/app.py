@@ -45,7 +45,7 @@ from .starter_text import (
     scan_langs as _scan_starter_langs,
     read_text as _read_starter_text,
 )
-from .widgets import StatusLog as _StatusLog
+from ..views.widgets import StatusLog as _StatusLog
 
 
 
@@ -768,182 +768,73 @@ def run():
     global fs_status_var, mcp_status_var, fs_status_label, mcp_status_label
     global mcp_reconnect_btn
     global project_label, right_panel, toggle_btn
+    global _recent_menu
 
     CONFIG.update(_cfg.load())
     _load_last_state()
 
-    root = tk.Tk()
-    root.title("Patch Applier")
-    root.geometry(f"{COLLAPSED_W}x{WINDOW_H}")
-    root.resizable(False, False)
-
-    keyboard.add_hotkey(HOTKEY, lambda: root.after(0, on_button_click))
-    # --- Menu bar ---
-    global _recent_menu
-    menubar = tk.Menu(root)
-    file_menu = tk.Menu(menubar, tearoff=0)
-    file_menu.add_command(label="New project\u2026", command=_menu_new_project)
-    file_menu.add_command(label="Open project\u2026", command=_menu_open_project)
-    _recent_menu = tk.Menu(file_menu, tearoff=0)
-    file_menu.add_cascade(label="Recent", menu=_recent_menu)
-    file_menu.add_separator()
-    file_menu.add_command(label="Project settings\u2026",
-                          command=_menu_project_settings)
-    _refresh_recent_menu()
-    file_menu.add_separator()
-    file_menu.add_command(label="Exit", command=root.destroy)
-    menubar.add_cascade(label="File", menu=file_menu)
-    root.config(menu=menubar)
-
-
-    main_frame = tk.Frame(root)
-    main_frame.pack(fill="both", expand=True)
-
-    left_panel = tk.Frame(main_frame, width=WIDTH_LEFT, height=WINDOW_H - 20)
-    left_panel.pack_propagate(False)
-    left_panel.pack(side="left", fill="y", padx=(10, 0), pady=10)
-
-    def _make_copyable(label_widget):
-        menu = tk.Menu(label_widget, tearoff=0)
-        menu.add_command(
-            label="Копировать",
-            command=lambda: pyperclip.copy(label_widget.cget("text")))
-        def _show_menu(event):
-            try:
-                menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                menu.grab_release()
-        label_widget.bind("<Button-3>", _show_menu)
-
-    patches_frame = tk.LabelFrame(left_panel, text="Патчи", padx=8, pady=6)
-    patches_frame.pack(fill="x")
-
-    btn = tk.Button(patches_frame, text=f"Выполнить ({HOTKEY})",
-                    command=on_button_click, font=("Arial", 12), height=2)
-    btn.pack(fill="x", pady=(0, 4))
-
-    repeat_btn = tk.Button(patches_frame, text="↻ Повторить последний патч",
-                           command=on_repeat_click)
-    repeat_btn.pack(fill="x", pady=(0, 4))
-
-    tk.Button(patches_frame, text="📋 Получить последний патч",
-              command=on_get_last_patch).pack(fill="x", pady=(0, 4))
-
-    tk.Button(patches_frame, text="📋 Получить последний результат",
-              command=on_get_last_output).pack(fill="x", pady=(0, 4))
-
-    project_label = tk.Label(left_panel, text="⚠ укажите путь к проекту",
-                             anchor="w", fg="#c07000", wraplength=WIDTH_LEFT - 10,
-                             justify="left", cursor="hand2")
-    project_label.pack(fill="x", pady=(8, 0))
-
-    def _copy_project_path(_e=None):
-        proj_v = CONFIG.get("project_dir", "").strip()
-        if proj_v:
-            try:
-                pyperclip.copy(proj_v)
-                status_var.set(f"✓ Путь скопирован: {proj_v}")
-            except Exception as e:
-                status_var.set(f"✗ {e}")
-    project_label.bind("<Button-1>", _copy_project_path)
-
-    status_var = _StatusLog(left_panel)
-    status_var.pack(fill="both", expand=True, pady=(6, 0))
-
-    # Status row — pinned to the bottom of the left panel.
-    # Backend indicators on the left, language toggle on the right.
-    backend_row = tk.Frame(left_panel)
-    backend_row.pack(side="bottom", fill="x", pady=(6, 0))
-
-    fs_status_var = tk.StringVar(value="")
-    fs_status_label = tk.Label(backend_row, textvariable=fs_status_var,
-                               anchor="w", fg="#808080",
-                               font=("Consolas", 9))
-    fs_status_label.pack(side="left")
-
-    mcp_status_var = tk.StringVar(value="")
-    mcp_status_label = tk.Label(backend_row, textvariable=mcp_status_var,
-                                anchor="w", fg="#808080",
-                                font=("Consolas", 9))
-    mcp_status_label.pack(side="left", padx=(10, 0))
-
-    mcp_reconnect_btn = tk.Button(backend_row, text="\u21bb", width=2,
-                                  command=_on_mcp_reconnect, state="disabled")
-    mcp_reconnect_btn.pack(side="left", padx=(6, 0))
-
+    from ..views.main_window import MainWindow
     _langs = _scan_starter_langs() or ["ru"]
     _cur = (CONFIG.get("ui_language") or "ru").strip() or "ru"
     if _cur not in _langs:
         _cur = _langs[0]
-    lang_var = tk.StringVar(value=_cur)
 
-    def _on_lang_click():
-        options = _langs
+    def _on_copy_project_path():
+        proj_v = CONFIG.get("project_dir", "").strip()
+        if not proj_v:
+            return
         try:
-            i = options.index(lang_var.get())
-        except ValueError:
-            i = 0
-        nxt = options[(i + 1) % len(options)]
-        lang_var.set(nxt)
-        CONFIG["ui_language"] = nxt
-        try:
-            _cfg.save(CONFIG)
-        except Exception:
-            pass
+            pyperclip.copy(proj_v)
+            status_var.set(f"\u2713 \u041f\u0443\u0442\u044c \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d: {proj_v}")
+        except Exception as e:
+            status_var.set(f"\u2717 {e}")
 
-    lang_btn = tk.Button(backend_row, textvariable=lang_var, width=5,
-                         font=("Consolas", 9), command=_on_lang_click)
-    lang_btn.pack(side="right")
+    mw = MainWindow(
+        config=CONFIG,
+        callbacks={
+            "on_button_click": on_button_click,
+            "on_repeat_click": on_repeat_click,
+            "on_get_last_patch": on_get_last_patch,
+            "on_get_last_output": on_get_last_output,
+            "on_get_last_diff": on_get_last_diff,
+            "on_starter_text": on_starter_text,
+            "on_mcp_reconnect": _on_mcp_reconnect,
+            "on_copy_project_path": _on_copy_project_path,
+            "on_new_project": _menu_new_project,
+            "on_open_project": _menu_open_project,
+            "on_project_settings": _menu_project_settings,
+            "next_language": _presenter.next_language,
+            "save_config": _cfg.save,
+        },
+        hotkey=HOTKEY,
+        langs=_langs,
+        initial_lang=_cur,
+        geometry_collapsed=f"{COLLAPSED_W}x{WINDOW_H}",
+        geometry_expanded=f"{EXPANDED_W}x{WINDOW_H}",
+        width_left=WIDTH_LEFT,
+        width_toggle=WIDTH_TOGGLE,
+        width_right=WIDTH_RIGHT,
+        window_h=WINDOW_H,
+    )
 
-    clear_log_btn = tk.Button(backend_row, text="\u2715", width=2,
-                              font=("Consolas", 9), command=status_var.clear)
-    clear_log_btn.pack(side="right", padx=(0, 4))
+    root = mw.root
+    btn = mw.btn
+    repeat_btn = mw.repeat_btn
+    status_var = mw.status_var
+    starter_include_roblox_var = mw.starter_include_roblox_var
+    fs_status_var = mw.fs_status_var
+    mcp_status_var = mw.mcp_status_var
+    fs_status_label = mw.fs_status_label
+    mcp_status_label = mw.mcp_status_label
+    mcp_reconnect_btn = mw.mcp_reconnect_btn
+    project_label = mw.project_label
+    right_panel = mw.right_panel
+    toggle_btn = mw.toggle_btn
+    _recent_menu = mw.recent_menu
 
-    # Правый клик → копировать текст сообщения
-    _make_copyable(project_label)
+    keyboard.add_hotkey(HOTKEY, lambda: root.after(0, on_button_click))
 
-    toggle_frame = tk.Frame(main_frame, width=WIDTH_TOGGLE)
-    toggle_frame.pack_propagate(False)
-    toggle_frame.pack(side="left", fill="y", padx=(6, 6), pady=10)
-    toggle_btn = tk.Button(toggle_frame, text="→", command=lambda: toggle_right_panel(), width=2)
-    toggle_btn.pack(fill="both", expand=True)
-
-    right_panel = tk.Frame(main_frame, width=WIDTH_RIGHT)
-    right_panel.pack_propagate(False)
-
-    topmost_var = tk.BooleanVar(value=True)
-    def toggle_topmost():
-        root.attributes("-topmost", topmost_var.get())
-    tk.Checkbutton(right_panel, text="Поверх всех окон",
-                   variable=topmost_var, command=toggle_topmost).pack(anchor="w", pady=(0, 8))
-
-    tk.Button(right_panel, text="📊 Получить последний дифф",
-              command=on_get_last_diff).pack(fill="x", pady=(0, 8))
-
-    # --- Start session block ---
-    session_frame = tk.LabelFrame(right_panel, text="Старт сессии", padx=8, pady=6)
-    session_frame.pack(fill="x", pady=(0, 8))
-
-    tk.Button(session_frame, text="📄 Стартовый текст для LLM",
-              command=on_starter_text).pack(fill="x")
-
-    starter_include_roblox_var = tk.BooleanVar(value=False)
-    tk.Checkbutton(session_frame, text="+ RobloxCodeRules.md",
-                   variable=starter_include_roblox_var,
-                   justify="left").pack(anchor="w", pady=(4, 0))
-
-    def toggle_right_panel():
-        global right_visible
-        right_visible = not right_visible
-        if right_visible:
-            right_panel.pack(side="right", fill="y", padx=(0, 10), pady=10)
-            toggle_btn.config(text="←")
-            root.geometry(f"{EXPANDED_W}x{WINDOW_H}")
-        else:
-            right_panel.pack_forget()
-            toggle_btn.config(text="→")
-            root.geometry(f"{COLLAPSED_W}x{WINDOW_H}")
-
+    _refresh_recent_menu()
     update_project_status()
     update_button_state()
 
@@ -951,13 +842,9 @@ def run():
     root.after(BUTTON_STATE_REFRESH_MS, periodic_button_state)
     root.attributes("-topmost", True)
 
-    # Always start a session. For filesystem it completes instantly;
-    # for mcp/composite it runs in background and reports status.
     root.after(500, _start_session_in_background)
-
     root.mainloop()
 
-    # Release session on close.
     try:
         with _state._session_lock:
             s = _state._session

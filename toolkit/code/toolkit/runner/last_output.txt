@@ -1,10 +1,6 @@
-[d217] ✓ replace_range: L217–L219 → L217–L217 в toolkit/docs/DECISIONS.md — -2 стр., -197 Б
+[run] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
 
-[d246] ✗ replace_range: content_mismatch: L246 = 'Осталось **шаг 3 — MVP-развязка**. Парадигма — **MVP (Model-View-Presenter)**, не MVVM и не классический MVC.', expected '**Ремастер GUI под MVP — открыто.** Шаг 1 (разрезание монолита) сделан: `runner/gui/` — пакет из `state.py` (константы + глобалы), `formatting.py` (чистые строковые хелперы), `widgets.py` (`StatusLog`), `starter_text.py` (поиск `LLM_START.<lang>.md`), `policy_io.py` (load/save policy) и `app.py` (~1600 строк, всё остальное). Шаг 2 (вынос мёртвого subprocess-пути `_run_apply_patches` и сирот-импортов) тоже сделан.'
-
-[req-ext] ✓ insert_at_anchor: перед L82 в toolkit/docs/REQUIREMENTS.md — +24 стр., +1872 Б
-
-[verify-d] ✓ run_python: exit=0  duration=71ms
+[verify] ✓ run_python: exit=0  duration=70ms
 --- stdout ---
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\__init__.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\cli.py
@@ -16,24 +12,23 @@ ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\state.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree_view.py
-ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\widgets.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\patch_runner.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\presenters\__init__.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\presenters\main.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\projects.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\views\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\views\main_window.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\views\widgets.py
 
-all 15 file(s) compile
-[timing] user (4 actions): 0.08s
+all 17 file(s) compile
+[timing] user (2 actions): 0.08s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v454] [~2, ⇅3, +1]
-  ~ toolkit/docs/DECISIONS.md §2. Открыто (L99–L295, 32.9 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ toolkit/docs/DECISIONS.md §2.3 Инфраструктура (L215–L259, 8.0 KB) — Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core).
-  + toolkit/docs/REQUIREMENTS.md §6. Extension seams hold without architectural breakage (L82–L105, 1.8 KB) — Six extension points the architecture must support without breaking: Rojo, new indexes, Unity bridge, new tools, headless, agent mode.
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v459] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 173, символов: 1193) [v505] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 175, символов: 1201) [v512] [без изменений]
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v328] [без изменений]
-[timing] auto-rebuild (3 actions): 0.79s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v333] [без изменений]
+[timing] auto-rebuild (3 actions): 0.81s
 
-##RESULT:{"ok": 6, "errors": 1, "skipped": 0, "failed": [2], "blocked": []}
-[timing] total: 0.87s
+##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.89s
