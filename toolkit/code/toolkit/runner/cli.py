@@ -39,6 +39,8 @@ from toolkit.core.patchparse import parse_patches
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
+from toolkit.runner.patch_runner import apply_patch as _apply_patch
+
 
 
 # --- argparse ---------------------------------------------------------------
@@ -73,6 +75,9 @@ def _parse_args(argv=None):
                    help="Skip patch_file; only rebuild CODE_INDEX")
     p.add_argument("--rebuild-lua-only", action="store_true",
                    help="Skip patch_file; only rebuild Lua code index")
+    p.add_argument("--no-auto-rebuild", action="store_true",
+                   help=("Legacy mode: apply only the user patch, no router-driven "
+                         "index rebuilds. Default is to mirror the GUI (auto-rebuild)."))
     p.add_argument("--list-tools", action="store_true",
                    help="Print registered tools and exit")
     # MCP overrides (take precedence over config mcp.* fields)
@@ -247,6 +252,9 @@ def main(argv=None) -> int:
     patches: list[dict] = []
     only_patches: list[dict] = []
     parsed = None
+    raw_text: str | None = None
+    use_apply_kernel = False
+
     if args.rebuild_only:
         only_patches.append(_rebuild_patch(args, cfg))
     if args.rebuild_code_only:
@@ -262,17 +270,26 @@ def main(argv=None) -> int:
             print(f"[error] patch file not found: {patch_path}", file=sys.stderr)
             return 2
         try:
+            raw_text = patch_path.read_text(encoding="utf-8")
             parsed = _load_patches(patch_path)
             patches = parsed.actions
         except Exception as e:
             print(f"[error] failed to parse patch: {e}", file=sys.stderr)
             return 1
-        if args.rebuild_index:
-            patches.append(_rebuild_patch(args, cfg))
-        if args.rebuild_code_index:
-            patches.append(_rebuild_code_patch(args, cfg))
-        if args.rebuild_lua_index:
-            patches.append(_rebuild_lua_patch(args, cfg))
+        force_rebuild = (args.rebuild_index
+                         or args.rebuild_code_index
+                         or args.rebuild_lua_index)
+        if force_rebuild or args.no_auto_rebuild:
+            # Legacy path: apply user patches plus explicit --rebuild-*.
+            if args.rebuild_index:
+                patches.append(_rebuild_patch(args, cfg))
+            if args.rebuild_code_index:
+                patches.append(_rebuild_code_patch(args, cfg))
+            if args.rebuild_lua_index:
+                patches.append(_rebuild_lua_patch(args, cfg))
+        else:
+            # Default: same kernel as the GUI -- router-driven auto-rebuild.
+            use_apply_kernel = True
     else:
         print("[error] no patch_file and no --rebuild-*-only flag",
               file=sys.stderr)
@@ -281,7 +298,8 @@ def main(argv=None) -> int:
     print(f"Backend:     {backend_name}")
     print(f"Project:     {project_dir}")
     print(f"Config:      {cfg_path if cfg_path else cfg_loader.config_path()}")
-    print(f"Format:      {preset}  |  Tools: {len(TOOL_MAP)}  |  Patches: {len(patches)}")
+    print(f"Format:      {preset}  |  Tools: {len(TOOL_MAP)}"
+          + (f"  |  Patches: {len(patches)}" if not use_apply_kernel else ""))
     print()
 
     try:
@@ -319,8 +337,18 @@ def main(argv=None) -> int:
     )
 
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
-        diags = parsed.diagnostics if parsed is not None else None
-        results = s.apply_patches(patches, diagnostics=diags)
+        if use_apply_kernel and raw_text is not None:
+            outcome = _apply_patch(
+                s, raw_text,
+                config=cfg,
+                tool_map=TOOL_MAP,
+                backend_name=backend_name,
+            )
+            print(outcome.output_text)
+            results = outcome.all_results
+        else:
+            diags = parsed.diagnostics if parsed is not None else None
+            results = s.apply_patches(patches, diagnostics=diags)
 
     err = sum(1 for r in results if r.status == "error")
     return 1 if err else 0

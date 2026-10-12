@@ -1,27 +1,3 @@
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "presenters: 3c.4b — session lifecycle in app.py uses presenter"]}}]
-
-[{"id": "mps", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_menu_project_settings"}}}]
-
-[{"id": "sp", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_switch_project"}}}]
-
-[{"id": "mnp", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_menu_new_project"}}}]
-
-[{"id": "mop", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_menu_open_project"}}}]
-
-[{"id": "mor", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_menu_open_recent"}}}]
-
-[{"id": "rrm", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_refresh_recent_menu"}}}]
+                "args": ["commit", "cli: default path goes through patch_runner (headless parity with GUI)"]}}]
