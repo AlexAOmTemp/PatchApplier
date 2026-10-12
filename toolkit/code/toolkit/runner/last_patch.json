@@ -1,31 +1,27 @@
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "presenters: 3c.4a — session lifecycle helpers"]}}]
+                "args": ["commit", "presenters: 3c.4b — session lifecycle in app.py uses presenter"]}}]
 
-[{"id": "lwe", "action": "replace_unit",
+[{"id": "mps", "action": "read_unit",
   "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_load_ws_or_error"},
-                "part": "body",
-                "new_text": "    return _presenter.load_workspace_or_none(project_dir, CONFIG)\n"}}]
+                "address": {"qualname": "_menu_project_settings"}}}]
 
-[{"id": "bbc", "action": "replace_unit",
+[{"id": "sp", "action": "read_unit",
   "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_build_backend_for_config"},
-                "part": "body",
-                "new_text": "    try:\n        return _presenter.build_backend_for_config(CONFIG)\n    except _presenter.BackendError as e:\n        return None, str(e)\n"}}]
+                "address": {"qualname": "_switch_project"}}}]
 
-[{"id": "init", "action": "replace_unit",
+[{"id": "mnp", "action": "read_unit",
   "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_initialize_project"},
-                "part": "body",
-                "new_text": "    try:\n        with _state._session_lock:\n            s = _state._session\n            bn = _state._session_backend_name or CONFIG.get(\"backend\", \"filesystem\")\n        if s is None:\n            _state.msg_queue.put((\"status\", \"\\u26a0 Session \\u043d\\u0435 \\u0433\\u043e\\u0442\\u043e\\u0432\\u0430\"))\n            return\n        patches = _presenter.plan_init_patches(CONFIG, bn)\n        if not patches:\n            _state.msg_queue.put((\"status\", \"\\u2139 \\u041d\\u0435\\u0442 \\u0430\\u043a\\u0442\\u0438\\u0432\\u043d\\u044b\\u0445 \\u0438\\u043d\\u0434\\u0435\\u043a\\u0441\\u043e\\u0432\"))\n            return\n        import io as _io\n        old_stdout = sys.stdout\n        buf = _io.StringIO()\n        try:\n            sys.stdout = buf\n            results = s.apply_patches(patches)\n        finally:\n            sys.stdout = old_stdout\n        _diff_block = \"\\n\\n\".join(\n            r.message for r in results\n            if (r.action or \"\").startswith(\"rebuild_\") and r.status == \"ok\"\n        )\n        if _diff_block:\n            _save_last_diff(_diff_block)\n        ok = all(r.status == \"ok\" for r in results)\n        _state.msg_queue.put((\"status\", \"\\u2713 \\u041f\\u0440\\u043e\\u0435\\u043a\\u0442 \\u0438\\u043d\\u0438\\u0446\\u0438\\u0430\\u043b\\u0438\\u0437\\u0438\\u0440\\u043e\\u0432\\u0430\\u043d\" if ok else \"\\u2717 \\u041e\\u0448\\u0438\\u0431\\u043a\\u0430 \\u0438\\u043d\\u0438\\u0446\\u0438\\u0430\\u043b\\u0438\\u0437\\u0430\\u0446\\u0438\\u0438\"))\n    except Exception as e:\n        _state.msg_queue.put((\"status\", f\"\\u2717 \\u041e\\u0448\\u0438\\u0431\\u043a\\u0430 \\u0438\\u043d\\u0438\\u0446\\u0438\\u0430\\u043b\\u0438\\u0437\\u0430\\u0446\\u0438\\u0438: {e}\"))\n"}}]
+                "address": {"qualname": "_menu_new_project"}}}]
 
-[{"id": "ssb", "action": "replace_unit",
+[{"id": "mop", "action": "read_unit",
   "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "_start_session_in_background"},
-                "part": "body",
-                "new_text": "    global _last_mcp_ready, _last_mcp_state\n    _last_mcp_ready = False\n    _last_mcp_state = \"\"\n\n    def _run():\n        with _state._session_lock:\n            old = _state._session\n            _state._session = None\n        if old is not None:\n            try:\n                old.__exit__(None, None, None)\n            except Exception:\n                pass\n\n        try:\n            backend, name = _presenter.build_backend_for_config(CONFIG)\n        except _presenter.BackendError as e:\n            _state.msg_queue.put((\"status\", f\"\\u2717 {e}\"))\n            return\n\n        try:\n            s = _presenter.build_session(backend, name, CONFIG)\n            s.open_async()\n            with _state._session_lock:\n                _state._session = s\n                _state._session_backend_name = name\n            if name == \"composite\":\n                _state.msg_queue.put((\"status\", \"\\u23f3 Session: fs \\u0433\\u043e\\u0442\\u043e\\u0432, mcp \\u043f\\u043e\\u0434\\u043a\\u043b\\u044e\\u0447\\u0430\\u0435\\u0442\\u0441\\u044f...\"))\n            elif name == \"mcp\":\n                _state.msg_queue.put((\"status\", \"\\u23f3 Session: mcp \\u043f\\u043e\\u0434\\u043a\\u043b\\u044e\\u0447\\u0430\\u0435\\u0442\\u0441\\u044f...\"))\n            else:\n                _state.msg_queue.put((\"status\", \"\\u2713 Session \\u0433\\u043e\\u0442\\u043e\\u0432\\u0430 (filesystem)\"))\n            threading.Thread(target=_initialize_project, daemon=True).start()\n        except Exception as e:\n            _state.msg_queue.put((\"status\", f\"\\u2717 Session \\u043d\\u0435 \\u0441\\u0442\\u0430\\u0440\\u0442\\u043e\\u0432\\u0430\\u043b\\u0430 ({name}): {e}\"))\n\n    threading.Thread(target=_run, daemon=True).start()\n"}}]
+                "address": {"qualname": "_menu_open_project"}}}]
 
-[{"id": "verify", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/verify_syntax.py",
-                "args": ["toolkit/code/toolkit/runner"]}}]
+[{"id": "mor", "action": "read_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+                "address": {"qualname": "_menu_open_recent"}}}]
+
+[{"id": "rrm", "action": "read_unit",
+  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
+                "address": {"qualname": "_refresh_recent_menu"}}}]

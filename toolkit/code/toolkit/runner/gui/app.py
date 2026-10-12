@@ -108,16 +108,7 @@ def _initialize_project():
         if s is None:
             _state.msg_queue.put(("status", "\u26a0 Session \u043d\u0435 \u0433\u043e\u0442\u043e\u0432\u0430"))
             return
-        has_fs = bn in ("filesystem", "composite")
-        want_docs = bool(CONFIG.get("index_docs", has_fs))
-        want_py = bool(CONFIG.get("index_python", has_fs))
-        patches: list[dict] = []
-        if has_fs and want_docs:
-            patches.append({"action": "rebuild_index", "arguments": {}})
-        if has_fs and want_py:
-            patches.append({"action": "rebuild_code_index", "arguments": {}})
-        # Lua index is NOT built here: mcp may still be starting. It is
-        # rebuilt once mcp transitions to ready (see _check_mcp_transition).
+        patches = _presenter.plan_init_patches(CONFIG, bn)
         if not patches:
             _state.msg_queue.put(("status", "\u2139 \u041d\u0435\u0442 \u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0434\u0435\u043a\u0441\u043e\u0432"))
             return
@@ -563,10 +554,7 @@ def periodic_button_state():
 
 def _load_ws_or_error(project_dir):
     """Load workspace.json from a project folder; None if missing."""
-    from ...config import loader as _l
-    state_dir = Path(project_dir) / _l.resolve_state_dir(CONFIG)
-    from ...config.workspace import load as _ws_load
-    return _ws_load(state_dir)
+    return _presenter.load_workspace_or_none(project_dir, CONFIG)
 
 
 def _build_backend_for_config():
@@ -575,72 +563,10 @@ def _build_backend_for_config():
     Returns (backend, name) where name is filesystem|mcp|composite.
     On failure returns (None, error_message).
     """
-    from ...backends import FilesystemBackend, MCPBackend, CompositeBackend
-    backend_name = CONFIG.get("backend", "filesystem")
-    work_dir = CONFIG.get("project_dir", "").strip()
-    if not work_dir or not Path(work_dir).is_dir():
-        return None, "project_dir not set or not a directory"
-
-    if backend_name == "filesystem":
-        ws = _load_ws_or_error(work_dir)
-        if ws is None:
-            return None, "workspace.json not found in project folder"
-        from ...backends.workspace import WorkspaceBackend
-        from ...config import loader as _l
-        state_dir = Path(work_dir) / _l.resolve_state_dir(CONFIG)
-        return WorkspaceBackend(ws, state_dir), "filesystem"
-
-    from ...config.loader import default_bridge_script
-    mcp_cfg = dict(CONFIG.get("mcp") or {})
-    override = mcp_cfg.get("bridge_script")
-    if override:
-        bridge_path = Path(override)
-        if not bridge_path.is_absolute():
-            bridge_path = (Path(work_dir) / override).resolve()
-    else:
-        bridge_path = default_bridge_script()
-    if not bridge_path.is_file():
-        if backend_name == "mcp":
-            return None, f"bridge not found: {bridge_path}"
-        # For composite we still build a backend; MCP will fail on open
-        # and FS remains usable (see CompositeBackend.open semantics).
-
-    native_cfg = mcp_cfg.get("native_tools") or {}
-    from ...config.loader import resolve_state_dir as _resolve_state
-    mcp_backend = MCPBackend(
-        bridge_script=str(bridge_path),
-        command=mcp_cfg.get("command", "python -u"),
-        mcp_command=mcp_cfg.get("mcp_command") or "cmd.exe",
-        mcp_args=mcp_cfg.get("mcp_args")
-                 or r"/c cd /d %LOCALAPPDATA%\Roblox && .\mcp.bat",
-        working_dir=work_dir,
-        state_subdir=_resolve_state(CONFIG),
-        preflight=mcp_cfg.get("preflight", True),
-        auto_switch=mcp_cfg.get("auto_switch", True),
-        ready_timeout=float(mcp_cfg.get("ready_timeout", 120.0)),
-        call_timeout=float(mcp_cfg.get("call_timeout", 180.0)),
-        studio_timeout=float(mcp_cfg.get("studio_timeout", 60.0)),
-        max_retries=int(mcp_cfg.get("max_retries", 6)),
-        retry_delay=float(mcp_cfg.get("retry_delay", 1.0)),
-        native_tools_enabled=bool(native_cfg.get("enabled", True)),
-        native_tools_allow=native_cfg.get("allow") or None,
-        quiet_bridge=bool(mcp_cfg.get("quiet_bridge", True)),
-    )
-
-    if backend_name == "mcp":
-        return mcp_backend, "mcp"
-    if backend_name == "composite":
-        ws = _load_ws_or_error(work_dir)
-        if ws is None:
-            return None, "workspace.json not found in project folder"
-        from ...backends.workspace import WorkspaceBackend
-        from ...config import loader as _l
-        state_dir = Path(work_dir) / _l.resolve_state_dir(CONFIG)
-        return CompositeBackend([
-            ("fs", WorkspaceBackend(ws, state_dir)),
-            ("mcp", mcp_backend),
-        ]), "composite"
-    return None, f"unknown backend: {backend_name}"
+    try:
+        return _presenter.build_backend_for_config(CONFIG)
+    except _presenter.BackendError as e:
+        return None, str(e)
 
 
 def _start_session_in_background():
@@ -652,6 +578,7 @@ def _start_session_in_background():
     global _last_mcp_ready, _last_mcp_state
     _last_mcp_ready = False
     _last_mcp_state = ""
+
     def _run():
         with _state._session_lock:
             old = _state._session
@@ -662,62 +589,14 @@ def _start_session_in_background():
             except Exception:
                 pass
 
-        backend, name = _build_backend_for_config()
-        if backend is None:
-            _state.msg_queue.put(("status", f"\u2717 {name}"))
+        try:
+            backend, name = _presenter.build_backend_for_config(CONFIG)
+        except _presenter.BackendError as e:
+            _state.msg_queue.put(("status", f"\u2717 {e}"))
             return
 
-        from ...core import Session
-        from ...formats import Format
-        from ...tools import TOOL_MAP
         try:
-            preset = CONFIG.get("format_preset", "default")
-            fmt = Format.load(preset, CONFIG.get("format") or None)
-            from ...tools.shell import RunPythonTool
-            RunPythonTool.set_config(
-                CONFIG.get("exec"),
-                CONFIG.get("project_dir", ""),
-            )
-            from ...tools.index import install_index_paths
-            install_index_paths(CONFIG)
-            from ...tools.status import GetStatusTool
-            from ...config.loader import resolve_index_paths
-            _mcp_cfg = CONFIG.get("mcp") or {}
-            _native_cfg = _mcp_cfg.get("native_tools") or {}
-            if name == "composite":
-                _backs = {"filesystem", "mcp"}
-            elif name == "mcp":
-                _backs = {"mcp"}
-            else:
-                _backs = {"filesystem"}
-            _paths = resolve_index_paths(CONFIG)
-            _roots: list[str] = []
-            try:
-                _proj = CONFIG.get("project_dir", "").strip()
-                if _proj:
-                    _state_sub = _cfg.resolve_state_dir(CONFIG)
-                    _ws = _projects.load_workspace(_proj, _state_sub)
-                    _roots = list(_ws.root_names())
-            except Exception:
-                _roots = []
-            GetStatusTool.set_context(
-                project_name=Path(CONFIG.get("project_dir", "")).name,
-                backend=name,
-                luau_mode=(CONFIG.get("luau_mode") or "mcp"),
-                format_preset=preset,
-                exec_enabled=bool((CONFIG.get("exec") or {}).get("enabled")),
-                exec_interpreter=(CONFIG.get("exec") or {}).get("interpreter"),
-                native_tools_enabled=bool(_native_cfg.get("enabled", True)),
-                native_tools_allow=_native_cfg.get("allow") or [],
-                index_paths={
-                    "docs": _paths["docs"],
-                    "code": _paths["code"],
-                    "lua":  _paths["lua"],
-                },
-                roots=_roots,
-                backends_enabled=_backs,
-            )
-            s = Session(backend, fmt=fmt, tools=TOOL_MAP)
+            s = _presenter.build_session(backend, name, CONFIG)
             s.open_async()
             with _state._session_lock:
                 _state._session = s

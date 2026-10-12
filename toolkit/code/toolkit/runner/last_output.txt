@@ -1,18 +1,45 @@
-[trim] ✓ replace_range: L307–L322 → L307–L385 в toolkit/code/toolkit/runner/presenters/main.py — +63 стр., +2046 Б
-
-[verify] ✓ run_python: exit=0  duration=46ms
+[commit] ✓ run_python: exit=0  duration=147ms
 --- stdout ---
+[add rc=0]
+[commit rc=0]
+[master c6792ef] presenters: 3c.4a — session lifecycle helpers
+ 5 files changed, 217 insertions(+), 210 deletions(-)
+
+[lwe] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+
+[bbc] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+
+[init] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+
+[ssb] ✓ replace_unit: toolkit/code/toolkit/runner/gui/app.py: replace_unit применён
+
+[verify] ✓ run_python: exit=0  duration=69ms
+--- stdout ---
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\cli.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\__init__.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\app.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\formatting.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\settings_window.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\starter_text.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\state.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\tree_view.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\gui\widgets.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\patch_runner.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\presenters\__init__.py
 ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\presenters\main.py
+ok  D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier\toolkit\code\toolkit\runner\projects.py
 
-all 1 file(s) compile
-[timing] user (2 actions): 0.05s
+all 15 file(s) compile
+[timing] user (6 actions): 0.27s
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v446] [без изменений]
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 23, без summary: 183) [v447] [без изменений]
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 173, символов: 1193) [v497] [без изменений]
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 173, символов: 1193) [v498] [без изменений]
 
-[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v320] [без изменений]
-[timing] auto-rebuild (3 actions): 0.83s
+[auto-lua] ✓ rebuild_lua_code_index: CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v321] [без изменений]
+[timing] auto-rebuild (3 actions): 0.81s
 
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.88s
+##RESULT:{"ok": 9, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.08s
