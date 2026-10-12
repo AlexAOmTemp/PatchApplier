@@ -1,7 +1,21 @@
-[{"id": "w", "action": "read_unit",
-  "arguments": {"file_path": "toolkit/code/toolkit/runner/gui/app.py",
-                "address": {"qualname": "worker"}}}]
-
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "gui: step 3b — extract apply kernel into runner/patch_runner.py"]}}]
+                "args": ["commit", "presenters: 3c.1-3c.2 (helpers, state updaters); fix CONFIG locality"]}}]
+
+[{"id": "st-append", "action": "insert_block",
+  "arguments": {
+    "file_path": "toolkit/code/toolkit/runner/presenters/main.py",
+    "address": {"qualname": "<module>"},
+    "position": "end",
+    "new_text": "\n\n# -- 3c.3 starter text --------------------------------------------------\n\n\nclass StarterTextError(Exception):\n    \"\"\"Raised when the LLM_START text cannot be located.\"\"\"\n\n\ndef build_starter_text(\n    *,\n    lang: str,\n    session,\n    include_roblox: bool,\n    docs_dir: Path,\n    runtime_state_dir: Path,\n    read_text_fn,\n) -> tuple[str, str, str]:\n    \"\"\"Assemble the LLM starter message: base text + optional extras + status.\n\n    Returns (full_text, used_lang, suffix). The suffix is \"+roblox\" when\n    extras were appended, \"\" otherwise.\n\n    Raises StarterTextError when the base text is missing.\n    \"\"\"\n    text, used = read_text_fn(lang)\n    if text is None:\n        raise StarterTextError(\n            f\"\\u2717 \\u041d\\u0435 \\u043d\\u0430\\u0439\\u0434\\u0435\\u043d LLM_START.*.md \\u0432 {docs_dir}\"\n        )\n\n    status_block = _build_status_block(session)\n    extras = _build_extras(include_roblox, docs_dir, runtime_state_dir)\n    extras_block = (\"\\n\\n\" + \"\\n\\n\".join(extras)) if extras else \"\"\n    suffix = \"+roblox\" if include_roblox else \"\"\n    return text + extras_block + status_block, used, suffix\n\n\ndef _build_status_block(session) -> str:\n    if session is None:\n        return \"\\n\\n---\\n\\n(status unavailable: session not ready)\"\n    try:\n        from ...tools.status import GetStatusTool\n        r = GetStatusTool().execute(backend=session.backend, fmt=session.fmt)\n        if r.status == \"ok\":\n            return \"\\n\\n---\\n\\n\" + r.message\n        return f\"\\n\\n---\\n\\n(status error: {r.message})\"\n    except Exception as e:\n        return f\"\\n\\n---\\n\\n(status unavailable: {e})\"\n\n\ndef _build_extras(include_roblox: bool, docs_dir: Path, runtime_state_dir: Path) -> list[str]:\n    if not include_roblox:\n        return []\n    extras: list[str] = []\n    for name in (\"RobloxCodeRules.md\", \"MCPBridgeRules.md\"):\n        p = docs_dir / name\n        if p.is_file():\n            try:\n                extras.append(\n                    \"---\\n\\n# \\u0414\\u043e\\u043f\\u043e\\u043b\\u043d\\u0435\\u043d\\u0438\\u0435: \" + name + \"\\n\\n\"\n                    + p.read_text(encoding=\"utf-8\")\n                )\n            except Exception as e:\n                extras.append(f\"---\\n\\n({name}: cannot read: {e})\")\n        else:\n            extras.append(f\"---\\n\\n({name} not found at {p})\")\n    schema_path = runtime_state_dir / \"tools_schema.json\"\n    if schema_path.is_file():\n        try:\n            extras.append(\n                \"---\\n\\n# \\u0421\\u0445\\u0435\\u043c\\u0430 \\u043d\\u0430\\u0442\\u0438\\u0432\\u043d\\u044b\\u0445 \\u0438\\u043d\\u0441\\u0442\\u0440\\u0443\\u043c\\u0435\\u043d\\u0442\\u043e\\u0432 (tools_schema.json)\\n\\n\"\n                + schema_path.read_text(encoding=\"utf-8\")\n            )\n        except Exception as e:\n            extras.append(f\"---\\n\\n(tools_schema.json: cannot read: {e})\")\n    return extras\n"}}]
+
+[{"id": "ost", "action": "replace_unit",
+  "arguments": {
+    "file_path": "toolkit/code/toolkit/runner/gui/app.py",
+    "address": {"qualname": "on_starter_text"},
+    "part": "body",
+    "new_text": "    lang = (CONFIG.get(\"ui_language\") or \"ru\").strip() or \"ru\"\n    with _state._session_lock:\n        s = _state._session\n    include_roblox = bool(starter_include_roblox_var.get())\n    from ...config.loader import toolkit_runtime_state_dir as _trsd\n    try:\n        full_text, used, suffix = _presenter.build_starter_text(\n            lang=lang,\n            session=s,\n            include_roblox=include_roblox,\n            docs_dir=_docs_dir(),\n            runtime_state_dir=_trsd(),\n            read_text_fn=_read_starter_text,\n        )\n    except _presenter.StarterTextError as e:\n        status_var.set(str(e))\n        return\n    try:\n        pyperclip.copy(full_text)\n        status_var.set(f\"\\u2713 \\u0421\\u0442\\u0430\\u0440\\u0442\\u043e\\u0432\\u044b\\u0439 \\u0442\\u0435\\u043a\\u0441\\u0442 \\u0441\\u043a\\u043e\\u043f\\u0438\\u0440\\u043e\\u0432\\u0430\\u043d ({used}{suffix})\")\n    except Exception as e:\n        status_var.set(f\"\\u2717 {e}\")\n"}}]
+
+[{"id": "verify", "action": "run_python",
+  "arguments": {"script": "toolkit/code/manual/verify_syntax.py",
+                "args": ["toolkit/code/toolkit/runner"]}}]

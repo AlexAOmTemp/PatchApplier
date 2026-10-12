@@ -13,6 +13,8 @@ import traceback
 
 from ...config import loader as _cfg
 from ..patch_runner import apply_patch as _apply_patch, ApplyError as _ApplyError
+from ..presenters import main as _presenter
+
 from .. import projects as _projects
 from ...core.patchparse import parse_patches
 from ...core.router import plan_rebuilds
@@ -87,21 +89,13 @@ def _load_last_state():
 
 
 def _project_state():
-    proj = CONFIG.get("project_dir", "").strip()
-    out = CONFIG.get("index_output", "").strip()
-    fm = CONFIG.get("filter_mode", "none")
-    fd = CONFIG.get("filter_dirs", []) or []
-    return proj, out, fm, fd
+    return _presenter.project_state(CONFIG)
 
 
 def _validate_project() -> bool:
     global PROJECT_OK
-    proj, _, _, _ = _project_state()
-    if not proj or not Path(proj).is_dir():
-        PROJECT_OK = False
-        return False
-    PROJECT_OK = True
-    return True
+    PROJECT_OK = _presenter.project_ok(CONFIG)
+    return PROJECT_OK
 
 
 
@@ -374,67 +368,43 @@ def on_starter_text():
 
 
 def _format_project_label():
-    proj = CONFIG.get("project_dir", "").strip()
-    if not proj:
-        return "\u26a0 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043f\u0443\u0442\u044c \u043a \u043f\u0440\u043e\u0435\u043a\u0442\u0443", "#c07000"
-    if not Path(proj).is_dir():
-        return f"\u26a0 \u043f\u0430\u043f\u043a\u0430 \u043d\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442: {proj}", "#c07000"
-    backend = CONFIG.get("backend", "composite")
-    return f"\U0001F4C1 {proj}  [{backend}]", "#308030"
+    return _presenter.format_project_label(CONFIG)
 
 
 def update_project_status():
     global PROJECT_OK
-    text, color = _format_project_label()
+    text, color = _presenter.format_project_label(CONFIG)
     project_label.config(text=text, fg=color)
-    proj, _, _, _ = _project_state()
-    PROJECT_OK = bool(proj) and Path(proj).is_dir()
+    PROJECT_OK = _presenter.project_ok(CONFIG)
 
 
 def update_button_state():
     if is_executing:
         return
-    if not PROJECT_OK:
-        btn.config(state="disabled", text=f"\u0412\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c ({HOTKEY})")
-        repeat_btn.config(state="disabled")
-        status_var.set_state("")
-        return
-    if LAST_PATCH.exists():
-        repeat_btn.config(state="normal")
-    else:
-        repeat_btn.config(state="disabled")
     try:
         current_raw = pyperclip.paste() or ""
     except Exception:
         current_raw = ""
-    current_norm = normalize_patch(current_raw)
-    is_dup = (last_applied_patch_norm is not None
-              and current_norm
-              and current_norm == last_applied_patch_norm)
-    is_response_echo = (last_output_text is not None
-                        and current_raw.strip()
-                        and current_raw.strip() == last_output_text.strip())
-    if is_dup:
-        btn.config(state="disabled", text="\u2713 \u0423\u0436\u0435 \u043f\u0440\u0438\u043c\u0435\u043d\u0451\u043d")
-        status_var.set_state(
-            "\u26a0 \u042d\u0442\u043e\u0442 \u043f\u0430\u0442\u0447 \u0443\u0436\u0435 \u043f\u0440\u0438\u043c\u0435\u043d\u0451\u043d. \u0414\u043b\u044f \u043f\u043e\u0432\u0442\u043e\u0440\u0430 \u043d\u0430\u0436\u043c\u0438 \u00ab\u21bb \u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439\u00bb.")
-    elif is_response_echo:
-        btn.config(state="disabled", text="\u23f8 \u0421\u043a\u043e\u043f\u0438\u0440\u0443\u0439 \u043d\u043e\u0432\u044b\u0439 \u043f\u0430\u0442\u0447")
-        status_var.set_state("")
-    else:
-        btn.config(state="normal", text=f"\u0412\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c ({HOTKEY})")
-        status_var.set_state("")
+    try:
+        last_exists = LAST_PATCH.exists()
+    except Exception:
+        last_exists = False
+    decision = _presenter.decide_button_state(
+        project_ok=PROJECT_OK,
+        last_patch_exists=last_exists,
+        current_raw=current_raw,
+        last_applied_norm=last_applied_patch_norm,
+        last_output_text=last_output_text,
+        hotkey=HOTKEY,
+    )
+    btn.config(state=decision.btn_state, text=decision.btn_text)
+    repeat_btn.config(state=decision.repeat_state)
+    status_var.set_state(decision.status_state)
 
 
 def _status_visual(name: str, state: str) -> tuple[str, str]:
     """Return (text, hex_color) for one backend indicator."""
-    if state == "ready":
-        return f"{name} \u25cf", "#306030"          # dark green
-    if state == "starting":
-        return f"{name} \u23f3", "#8b6914"           # dark yellow
-    if state.startswith("failed"):
-        return f"{name} \u2717", "#a02020"           # red
-    return f"{name} \u2014", "#808080"               # gray
+    return _presenter.status_visual(name, state)
 
 
 def _backend_states(session, backend_name: str) -> dict:
@@ -443,15 +413,7 @@ def _backend_states(session, backend_name: str) -> dict:
     Composite exposes backend_state_all(); non-composite (filesystem or
     MCP-only) falls back to a single indicator based on is_alive().
     """
-    getter = getattr(session.backend, "backend_state_all", None)
-    if callable(getter):
-        return getter()
-    key = "mcp" if backend_name == "mcp" else "fs"
-    try:
-        alive = session.backend.is_alive()
-    except Exception:
-        alive = False
-    return {key: "ready" if alive else "failed: not alive"}
+    return _presenter.backend_states(session, backend_name)
 
 
 def _apply_backend_states(states: dict) -> None:
