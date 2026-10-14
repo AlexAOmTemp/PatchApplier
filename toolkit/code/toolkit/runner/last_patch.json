@@ -1,2 +1,3 @@
 [{"id": "commit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_git.py", "args": ["commit", "session: unified text matcher, full-source hash, lua index write fix, verify_syntax fix, LLM_START §5/§8/§16"]}}]
+  "arguments": {"script": "toolkit/code/manual/_git.py",
+                "args": ["commit", "gui: settings UX — ignore rules inline, disable/enable, close confirmation, centered dialogs, simpler project label"]}}]

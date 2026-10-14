@@ -22,35 +22,20 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .patchignore import parse, segment_hidden
+from .patchignore import Rule, parse, segment_hidden
 
 
 MCPIGNORE_NAME = ".mcpignore"
 
 
 DEFAULT_MCPIGNORE = """\
-# .mcpignore — like .patchignore, but for Roblox DataModel paths.
-#
-# Each line is a glob (*, ?, [seq]) matched against every dot-separated
-# segment of a module path. A module is skipped from the Lua index when
-# any of its segments matches a pattern. Prefix with ! to un-hide; the
-# last matching pattern wins.
-#
-# Consulted only when `luau: mcp`. For `luau: rojo` the filesystem
-# rules in `.patchignore` apply instead.
-#
-# To fully open the index, delete every non-comment line, or use
-# "Reset to default" in the toolkit settings dialog.
-
-# Wally / package-manager conventions.
 _Index
 Packages
-# Versioned package segments: roblox_testez@0.4.1, lm-loleris_profilestore@1.0.3.
 *@*
 """
 
 
-def read(project_dir: Path) -> list[tuple[str, bool]]:
+def read(project_dir: Path) -> list[Rule]:
     """Read `.mcpignore` from project_dir. Missing file -> empty list."""
     p = Path(project_dir) / MCPIGNORE_NAME
     if not p.is_file():
@@ -72,7 +57,7 @@ def ensure_default(project_dir: Path) -> None:
         pass
 
 
-def path_hidden(dotted_path: str, patterns: list[tuple[str, bool]]) -> bool:
+def path_hidden(dotted_path: str, patterns: list[Rule]) -> bool:
     """True if any dot-separated segment of `dotted_path` matches a
     hiding pattern (last match wins, per segment)."""
     if not dotted_path or not patterns:

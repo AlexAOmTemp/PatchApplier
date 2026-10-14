@@ -7,13 +7,17 @@ Section order follows the workflow: choose what you work with (Sources),
 remove noise (visibility rules, inside Sources), then tune policy (Roots).
 
   - project name (Entry, right-click or Ctrl+C to copy)
+  - folder path (readonly Entry, copyable)
   - Sources (LabelFrame):
-      [x] Documentation (.md)                [Hide paths…] (N rules)
-      [x] Python (.py)                       (toggle + nested exec)
+      [x] Documentation (.md)
+      [x] Python (.py)
           [x] Allow Python scripts
-      [x] MCP (Roblox scene + code)          [Hide modules…] (N rules)
+      [x] MCP (Roblox scene + code)
       [x] Lua files on disk (.luau)
           Luau source: ( ) MCP  ( ) Rojo
+  - Ignore rules (LabelFrame):
+      Filesystem ignore  (N rules)  [Edit…]
+      MCP ignore         (N rules)  [Edit…]
   - Roots (LabelFrame, hidden when no FS source is on):
       notebook with per-root PolicyTree, Add/Remove, Show hidden, legend
   - OK / Cancel
@@ -59,6 +63,28 @@ _LEGEND = (
 )
 
 
+def _center_on_parent(dlg: tk.Toplevel, parent, w: int, h: int) -> None:
+    """Set dialog geometry to `w x h`, centred on `parent`.
+
+    Tk on Windows does not centre a Toplevel on its parent automatically,
+    even with `transient()` — the window lands in the top-left of the
+    screen. This computes absolute coordinates from the parent's screen
+    rectangle. Sizes are passed explicitly because the dialog has not been
+    laid out yet when this runs.
+    """
+    try:
+        parent.update_idletasks()
+        px = parent.winfo_rootx()
+        py = parent.winfo_rooty()
+        pw = parent.winfo_width()
+        ph = parent.winfo_height()
+        x = px + max(0, (pw - w) // 2)
+        y = py + max(0, (ph - h) // 2)
+        dlg.geometry(f"{w}x{h}+{x}+{y}")
+    except Exception:
+        dlg.geometry(f"{w}x{h}")
+
+
 # --- entry with layout-independent Ctrl+C / Ctrl+A -----------------------
 
 
@@ -101,17 +127,19 @@ def _make_copyable_entry(entry: tk.Entry) -> None:
 
 
 def _open_ignore_editor(parent, path: Path, title: str,
-                        default_text: str, on_saved=None) -> None:
+                        description: str, default_text: str,
+                        on_saved=None) -> None:
     dlg = tk.Toplevel(parent)
     dlg.title(title)
     dlg.transient(parent)
     dlg.grab_set()
-    dlg.geometry("560x460")
+    _center_on_parent(dlg, parent, 560, 460)
     dlg.minsize(420, 340)
 
     tk.Label(
-        dlg, anchor="w", justify="left",
-        text=("One line = one pattern (.gitignore-like).\n"
+        dlg, anchor="w", justify="left", wraplength=520,
+        text=(description + "\n\n"
+              "One line = one pattern (.gitignore-like).\n"
               "*, ?, [seq], ! — same as .gitignore."),
     ).pack(fill="x", padx=12, pady=(12, 4))
 
@@ -127,8 +155,19 @@ def _open_ignore_editor(parent, path: Path, title: str,
         raw = path.read_text(encoding="utf-8") if path.is_file() else default_text
     except Exception:
         raw = default_text
-    for line in raw.splitlines():
-        lb.insert("end", line)
+
+    rules: list = _pi.parse(raw)
+
+    def _render_rules() -> None:
+        lb.delete(0, "end")
+        for i, r in enumerate(rules):
+            prefix = "" if r.enabled else "@"
+            if r.negated:
+                prefix += "!"
+            lb.insert("end", prefix + r.glob)
+            if not r.enabled:
+                lb.itemconfig(i, fg="#999")
+        _sync_toggle_btn()
 
     entry_row = tk.Frame(dlg)
     entry_row.pack(fill="x", padx=12, pady=(0, 6))
@@ -136,32 +175,69 @@ def _open_ignore_editor(parent, path: Path, title: str,
     entry.pack(side="left", fill="x", expand=True)
 
     def _add(*_a):
-        v = entry.get()
-        if v.strip():
-            lb.insert("end", v)
+        v = entry.get().strip()
+        if v:
+            new_rules = _pi.parse(v)
+            rules.extend(new_rules)
+            _render_rules()
         entry.delete(0, "end")
 
     def _remove(*_a):
         for i in reversed(lb.curselection()):
-            lb.delete(i)
+            del rules[i]
+        _render_rules()
+
+    def _toggle_enabled(*_a):
+        sel = lb.curselection()
+        if len(sel) != 1:
+            return
+        i = sel[0]
+        r = rules[i]
+        rules[i] = _pi.Rule(r.glob, r.negated, not r.enabled)
+        _render_rules()
+        lb.selection_set(i)
+
+    dis_btn_holder: dict = {}
+
+    def _sync_toggle_btn(*_a):
+        btn = dis_btn_holder.get("btn")
+        if btn is None:
+            return
+        sel = lb.curselection()
+        if len(sel) != 1:
+            btn.config(state="disabled", text="Disable")
+            return
+        r = rules[sel[0]]
+        btn.config(state="normal",
+                   text=("Enable" if not r.enabled else "Disable"))
+
+    lb.bind("<<ListboxSelect>>", _sync_toggle_btn)
+    lb.bind("<Double-Button-1>", _toggle_enabled)
 
     def _reset():
         if not messagebox.askyesno(title, "Reset to default?", parent=dlg):
             return
-        lb.delete(0, "end")
-        for ln in default_text.splitlines():
-            lb.insert("end", ln)
+        rules.clear()
+        rules.extend(_pi.parse(default_text))
+        _render_rules()
 
     def _open_all():
         if not messagebox.askyesno(title, "Remove all rules?", parent=dlg):
             return
-        lb.delete(0, "end")
+        rules.clear()
+        _render_rules()
 
     entry.bind("<Return>", _add)
     tk.Button(entry_row, text="Add", command=_add, width=10).pack(
         side="left", padx=(6, 0))
     tk.Button(entry_row, text="Remove", command=_remove, width=10).pack(
         side="left", padx=(6, 0))
+    dis_btn = tk.Button(entry_row, text="Disable", command=_toggle_enabled,
+                        width=10, state="disabled")
+    dis_btn.pack(side="left", padx=(6, 0))
+    dis_btn_holder["btn"] = dis_btn
+
+    _render_rules()
 
     tools_row = tk.Frame(dlg)
     tools_row.pack(fill="x", padx=12, pady=(0, 6))
@@ -173,10 +249,9 @@ def _open_ignore_editor(parent, path: Path, title: str,
     btn_row.pack(fill="x", padx=12, pady=(6, 12))
 
     def _ok():
-        lines = [str(x) for x in lb.get(0, "end")]
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            path.write_text(_pi.serialize(rules), encoding="utf-8")
         except Exception as e:
             messagebox.showerror("Error", str(e), parent=dlg)
             return
@@ -186,6 +261,27 @@ def _open_ignore_editor(parent, path: Path, title: str,
                 on_saved()
             except Exception:
                 pass
+
+    _initial_rules = list(rules)
+
+    def _on_close():
+        """Window X: ask to save if the rule list changed."""
+        if rules == _initial_rules:
+            dlg.destroy()
+            return
+        ans = messagebox.askyesnocancel(
+            title,
+            "Save changes before closing?",
+            parent=dlg,
+        )
+        if ans is None:      # Cancel — stay open
+            return
+        if ans:              # Yes — save, then close
+            _ok()
+        else:                # No — discard, close
+            dlg.destroy()
+
+    dlg.protocol("WM_DELETE_WINDOW", _on_close)
 
     tk.Button(btn_row, text="OK", command=_ok, width=10).pack(side="right")
     tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(
@@ -204,7 +300,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     dlg.title("Project settings")
     dlg.transient(parent)
     dlg.grab_set()
-    dlg.geometry("820x820")
+    _center_on_parent(dlg, parent, 820, 820)
     dlg.minsize(700, 700)
 
     main = tk.Frame(dlg, padx=12, pady=12)
@@ -219,8 +315,14 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     name_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
     _make_copyable_entry(name_entry)
 
-    tk.Label(main, text=f"Folder: {project_dir}", anchor="w",
-             fg="#666").pack(fill="x")
+    folder_row = tk.Frame(main)
+    folder_row.pack(fill="x")
+    tk.Label(folder_row, text="Folder:").pack(side="left")
+    folder_var = tk.StringVar(value=str(project_dir))
+    folder_entry = tk.Entry(folder_row, textvariable=folder_var,
+                            state="readonly", readonlybackground="#f0f0f0")
+    folder_entry.pack(side="left", fill="x", expand=True, padx=(8, 0))
+    _make_copyable_entry(folder_entry)
 
     # --- state --------------------------------------------------------
     docs_var = tk.BooleanVar(value=bool(config.get("index_docs", True)))
@@ -250,12 +352,12 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     src = tk.LabelFrame(main, text="Sources", padx=8, pady=8)
     src.pack(fill="x", pady=(8, 0))
 
-    # Row 1: Documentation + Hide paths button (right-aligned)
+    # Row 1: Documentation + FS ignore (right-aligned)
     r_docs = tk.Frame(src)
     r_docs.pack(fill="x")
     tk.Checkbutton(r_docs, text="Documentation (.md)", variable=docs_var,
                    anchor="w").pack(side="left")
-    pi_btn = tk.Button(r_docs, text="Hide paths\u2026",
+    pi_btn = tk.Button(r_docs, text="FS ignore",
                        command=lambda: _open_pi(), width=14)
     pi_btn.pack(side="right")
     tk.Label(r_docs, textvariable=pi_label_var, fg="#888",
@@ -276,16 +378,13 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
                          font=("Consolas", 8))
     exec_hint.pack(side="left", padx=(8, 0))
 
-    # Row 3: MCP + Hide modules button (right-aligned)
-    # Label adapts to Luau source: when code comes from disk (Rojo), the
-    # bridge is only used for the scene; when code goes through .Source,
-    # it carries both. Neutral fallback while both are off.
+    # Row 3: MCP + MCP ignore (right-aligned)
     mcp_label_var = tk.StringVar(value="MCP (Roblox bridge)")
     r_mcp = tk.Frame(src)
     r_mcp.pack(fill="x", pady=(4, 0))
     tk.Checkbutton(r_mcp, textvariable=mcp_label_var, variable=mcp_var,
                    anchor="w").pack(side="left")
-    mi_btn = tk.Button(r_mcp, text="Hide modules\u2026",
+    mi_btn = tk.Button(r_mcp, text="MCP ignore",
                        command=lambda: _open_mi(), width=14)
     mi_btn.pack(side="right")
     tk.Label(r_mcp, textvariable=mi_label_var, fg="#888",
@@ -511,9 +610,13 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             _invalidate_scan()
             pi_label_var.set(_count_label(pi_path))
             _on_show_hidden()
-        _open_ignore_editor(dlg, pi_path, "Hide filesystem paths",
-                            _pi.DEFAULT_PATCHIGNORE,
-                            on_saved=_after_edit)
+        _open_ignore_editor(
+            dlg, pi_path, "Filesystem ignore",
+            "Rules that hide files and folders from the toolkit.\n"
+            "Applies to disk roots: Documentation, Python, Lua-on-disk.\n"
+            "Hidden paths are refused by indexes, reads, writes, and grep.",
+            _pi.DEFAULT_PATCHIGNORE,
+            on_saved=_after_edit)
 
     def _on_scan_cache_dirty():
         """Called after any change that alters which dirs exist or are hidden.
@@ -528,9 +631,13 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         _on_tab_changed()
 
     def _open_mi():
-        _open_ignore_editor(dlg, mi_path, "Hide Roblox modules",
-                            _mi.DEFAULT_MCPIGNORE,
-                            on_saved=lambda: mi_label_var.set(_count_label(mi_path)))
+        _open_ignore_editor(
+            dlg, mi_path, "MCP ignore",
+            "Rules that hide Roblox modules from the Lua index.\n"
+            "Applies to Roblox DataModel paths (services, modules).\n"
+            "Consulted only when Luau source is MCP.",
+            _mi.DEFAULT_MCPIGNORE,
+            on_saved=lambda: mi_label_var.set(_count_label(mi_path)))
 
     # --- reactive rules ----------------------------------------------
 
@@ -647,6 +754,35 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     luau_var.trace_add("write", lambda *_: _defer(_sync_all))
     _sync_all()
 
+    # --- snapshot for close confirmation -------------------------------
+    # Compare widgets' current state to this snapshot when the user
+    # closes via the window X. Explicit Cancel closes without asking.
+    _initial = {
+        "name": w.name,
+        "roots": frozenset(w.root_names()),
+        "docs": bool(docs_var.get()),
+        "py": bool(py_var.get()),
+        "mcp": bool(mcp_var.get()),
+        "rojo": bool(rojo_var.get()),
+        "luau": luau_var.get(),
+        "exec": bool(exec_var.get()),
+    }
+
+    def _current_state() -> dict:
+        return {
+            "name": (name_var.get().strip() or w.name),
+            "roots": frozenset(w.root_names()),
+            "docs": bool(docs_var.get()),
+            "py": bool(py_var.get()),
+            "mcp": bool(mcp_var.get()),
+            "rojo": bool(rojo_var.get()),
+            "luau": luau_var.get(),
+            "exec": bool(exec_var.get()),
+        }
+
+    def _has_changes() -> bool:
+        return _current_state() != _initial
+
     # --- buttons ------------------------------------------------------
     btn_row = tk.Frame(main)
     btn_row.pack(fill="x", pady=(12, 0))
@@ -697,6 +833,25 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
                 on_save(new_name or None)
             except Exception:
                 pass
+
+    def _on_close_main():
+        """Window X: ask to save if anything changed; Cancel = stay."""
+        if not _has_changes():
+            dlg.destroy()
+            return
+        ans = messagebox.askyesnocancel(
+            "Project settings",
+            "Save changes before closing?",
+            parent=dlg,
+        )
+        if ans is None:      # Cancel — stay open
+            return
+        if ans:              # Yes — save, then close
+            _ok()
+        else:                # No — discard, close
+            dlg.destroy()
+
+    dlg.protocol("WM_DELETE_WINDOW", _on_close_main)
 
     tk.Button(btn_row, text="OK", command=_ok, width=10).pack(side="right")
     tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(

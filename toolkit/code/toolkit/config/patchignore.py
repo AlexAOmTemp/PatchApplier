@@ -21,10 +21,26 @@ text below. `Reset to default` in the GUI restores exactly that text.
 from __future__ import annotations
 
 import fnmatch
+from dataclasses import dataclass
 from pathlib import Path
 
 
 PATCHIGNORE_NAME = ".patchignore"
+
+
+@dataclass(frozen=True)
+class Rule:
+    """One hiding rule.
+
+    `enabled=False` (written as `@pattern` in the file) means the rule is
+    preserved but not consulted — a way to keep a rule around without
+    deleting it. `negated` (written as `!pattern`) un-hides a segment.
+    The prefix order in the file is `@` then `!`: `@!foo` is a disabled
+    negation.
+    """
+    glob: str
+    negated: bool = False
+    enabled: bool = True
 
 # Service directory: toolkit state (indices, .version, MCP runtime).
 # Hardcoded, not governed by .patchignore:
@@ -42,39 +58,32 @@ def is_state_path(rel_str: str) -> bool:
 
 
 DEFAULT_PATCHIGNORE = """\
-# .patchignore — like .gitignore, but for the toolkit.
-#
-# Each line is a glob (*, ?, [seq]) matched against every directory
-# segment of a path. A path is hidden if any of its segments matches
-# a pattern. Prefix with ! to un-hide; the last matching pattern wins.
-#
-# Hidden paths are refused by the toolkit (read / write / index), and
-# not shown in the policy tree unless "show hidden" is on.
-#
-# To fully open a project, delete every non-comment line, or use
-# "Reset to default" / "Open all" in the toolkit settings dialog.
-
-# Dot-directories: .git, .venv, .pytest_cache, ...
 .*
-# ...except this file itself, so it stays readable in the tree.
-# (`.patch_applier` is hardcoded as service and needs no entry here.)
 !.patchignore
 !.mcpignore
-
-# Non-dot build noise.
 __pycache__
 node_modules
 venv
 """
 
 
-def parse(text: str) -> list[tuple[str, bool]]:
-    """Return [(glob, negated), ...] in file order. Malformed lines skipped."""
-    out: list[tuple[str, bool]] = []
+def parse(text: str) -> list[Rule]:
+    """Return [Rule, ...] in file order. Malformed lines skipped.
+
+    Line syntax: `# comment`, `pattern`, `!pattern` (negation),
+    `@pattern` (disabled), `@!pattern` (disabled negation).
+    """
+    out: list[Rule] = []
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
+        enabled = True
+        if line.startswith("@"):
+            enabled = False
+            line = line[1:].strip()
+            if not line:
+                continue
         negated = False
         if line.startswith("!"):
             negated = True
@@ -85,11 +94,22 @@ def parse(text: str) -> list[tuple[str, bool]]:
         line = line.strip("/")
         if not line:
             continue
-        out.append((line, negated))
+        out.append(Rule(line, negated, enabled))
     return out
 
 
-def read(project_dir: Path) -> list[tuple[str, bool]]:
+def serialize(rules: list[Rule]) -> str:
+    """Render rules back to file text (with @ / ! prefixes)."""
+    lines: list[str] = []
+    for r in rules:
+        prefix = "" if r.enabled else "@"
+        if r.negated:
+            prefix += "!"
+        lines.append(prefix + r.glob)
+    return "\n".join(lines) + ("\n" if lines else "")
+
+
+def read(project_dir: Path) -> list[Rule]:
     """Read `.patchignore` from project_dir. Missing file -> empty list."""
     p = Path(project_dir) / PATCHIGNORE_NAME
     if not p.is_file():
@@ -111,16 +131,18 @@ def ensure_default(project_dir: Path) -> None:
         pass
 
 
-def segment_hidden(seg: str, patterns: list[tuple[str, bool]]) -> bool:
-    """True if `seg` matches a hiding pattern (last match wins)."""
+def segment_hidden(seg: str, patterns: list[Rule]) -> bool:
+    """True if `seg` matches an enabled hiding pattern (last match wins)."""
     hidden = False
-    for glob, negated in patterns:
-        if fnmatch.fnmatchcase(seg, glob):
-            hidden = not negated
+    for r in patterns:
+        if not r.enabled:
+            continue
+        if fnmatch.fnmatchcase(seg, r.glob):
+            hidden = not r.negated
     return hidden
 
 
-def path_hidden(rel_str: str, patterns: list[tuple[str, bool]]) -> bool:
+def path_hidden(rel_str: str, patterns: list[Rule]) -> bool:
     """True if any directory segment of `rel_str` is hidden.
 
     Patterns match a single path segment only (no `/` in the pattern

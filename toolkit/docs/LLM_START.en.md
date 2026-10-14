@@ -128,23 +128,9 @@ The index is the map of the world: files, sections, line ranges, sizes, dependen
 
 **Format is groups.** Each action in its own `[...]`; groups go one after another. The separator (newline or comma) does not matter. A single action is also one group.
 
-**One fence for the whole patch, not per group.** This rule has no exceptions. The whole reply goes in **one** fence with all groups inside. A fence per `[...]` splits the patch into several documents on the user's side, and they copy them one by one — or lose some.
+**One fence for the whole reply.** No exceptions. The whole reply goes in **one** code block (or none at all), with all groups inside. A fence per `[...]` splits the patch into several documents on the user's side — they copy them one by one and lose some actions.
 
-| How you write it | What the user sees | Result |
-|---|---|---|
-| **one** fence, all groups inside | one code block | ✓ one Ctrl+C |
-| no fence, just groups in a row | raw JSON | ✓ copies |
-| **its own fence per group** | N separate blocks | ✗ breaks copying, splits the patch |
-| one fence, but not all groups | part of the patch | ✗ silently drops actions |
-
-The same rule applies to the examples in §16 — each example there is shown as **one** fence.
-
-**Antipattern — the "broken fence".** This is the most common LLM mistake. Each group gets wrapped in its own code block:
-
-> fence → `[action 1]` → close fence
-> fence → `[action 2]` → close fence
-
-On the user's side this is N separate blocks, copied one by one. Some actions are lost. **Check before sending:** count the code-fence openings in your reply. It must be **exactly one** — or zero, if you write without a fence.
+**Check before sending:** count the code-fence openings in your reply. It must be **exactly one** — or zero, if you write without a fence.
 
 **One action — one group.** Never merge several actions into a single array. Groups give independence (see below).
 

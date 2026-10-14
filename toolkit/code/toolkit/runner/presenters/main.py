@@ -25,8 +25,8 @@ def format_project_label(config: dict) -> tuple[str, str]:
         return "\u26a0 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043f\u0443\u0442\u044c \u043a \u043f\u0440\u043e\u0435\u043a\u0442\u0443", "#c07000"
     if not Path(proj).is_dir():
         return f"\u26a0 \u043f\u0430\u043f\u043a\u0430 \u043d\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442: {proj}", "#c07000"
-    backend = config.get("backend", "composite")
-    return f"\U0001F4C1 {proj}  [{backend}]", "#308030"
+    name = config.get("project_name") or Path(proj).name or proj
+    return f"\U0001F4C1 {name}", "#308030"
 
 
 def status_visual(name: str, state: str) -> tuple[str, str]:
