@@ -1,3 +1,3 @@
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "SESSION_STATE: close matcher + index fixes + GUI settings session"]}}]
+                "args": ["commit", "gui: fix settings freeze (var-set loop), new-project workflow, per-project exec/index_rojo, symmetric roots panel"]}}]

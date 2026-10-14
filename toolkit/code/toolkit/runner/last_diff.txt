@@ -1,3 +1,1 @@
-.patch_applier/INDEX.md (файлов: 52, без summary: 224) [v579] [⇅17, +2]
-  + PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md §Сессия: единый текстовый матчер + фиксы индекса + GUI settings UX (закрыта) (L12–L84, 8.5 KB, ⚠ no summary)
-  + PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md §Ключевые решения (L18–L25, 2.2 KB)
+.patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 267, символов: 861) [v439] [без изменений]

@@ -1,24 +1,23 @@
-[read] ✓ read_file: PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md L12–L30
-12: '## Сессия: единый текстовый матчер + фиксы индекса + GUI settings UX (закрыта)\n'
-13: '\n'
-14: '**Тема:** снять накопившийся долг по текстовому матчингу, найти и починить баги индекса (лимит 2048, двойной префикс), привести в порядок GUI settings, зафиксировать дизайн `.llmscope` в DECISIONS.\n'
-15: '\n'
-16: '**Git log:** `fba696c` (матчер + индекс + LLM_START) → `94c5dd1` (GUI settings UX) → `255bdc2` (scope design + session state).\n'
-17: '\n'
-18: '### Ключевые решения\n'
-19: '\n'
-20: '- **Формат патча — один фенс на весь ответ.** Формулировка «один фенс на патч» была слабее: оставляла дыру «а если в ответе два патча». Упростили до одной строки + проверка «посчитай фенсы перед отправкой».\n'
-21: '- **`source_hash` без лимита.** Лимит 2048 байт убран во всех трёх местах (Python `formats/code.py`, Lua `lua_symbols.lua`, `code_index_regen.lua`). **Мотивации лимита не нашли** ни в коде, ни в доках — считаем техническим долгом. Кросс-сравнение Python↔Lua хешей нигде не используется (grep пуст).\n'
-22: '- **Lua-индекс и `backend.write`.** `RebuildLuaCodeIndexTool` писал через `Path.write_text` в обход backend (двойной префикс `.patch_applier/.patch_applier/`). Приведён к тому же способу, что `RebuildIndexTool` и `RebuildCodeIndexTool` — все три через `backend.write`. Унификация достигнута без отдельного хелпера.\n'
-23: '- **Scope — отложен.** Дизайн зафиксирован в `DECISIONS §2.2`. Два варианта: A (scope режет build индекса) и B (фильтруется только представление). Три мотивации: handoff через контекстные окна, индекс на больших корнях, повторение `directory=`. Метрика готовности: 3+ случая за сессию, когда нужна «записка себе». Сейчас — 0.\n'
-24: '- **GUI settings — простота важнее структуры.** Пробовали три вложенных LabelFrame в Sources — оказалось громоздко. Вернулись к плоскому списку, переименовали кнопки: `Hide paths` → `FS ignore`, `Hide modules` → `MCP ignore`. Описания — внутри диалогов.\n'
-25: '\n'
-26: '### Что сделано\n'
-27: '\n'
-28: '**LLM_START (ru + en):**\n'
-29: '- §5 — упрощён до одного правила про фенс + проверки. Антипаттерн «разорванный фенс» удалён (не понадобился).\n'
-30: '- §8 — переписан в три операциональных правила чтения diff: (1) проверяй diff после каждого write, (2) сверяй `[vN]` при неожиданном, (3) `[без изменений]` ≠ «файлы не менялись» (warm-up мог уже собрать).\n'
-[timing] user (1 actions): 0.00s
+[new-reset] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — +9 стр., +379 Б
 
-##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+[ok-fix] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py: заменено 1 вхожд. (последнее) — +11 стр., +461 Б
+
+[roots-keep] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py: заменено 1 вхожд. (последнее) — +2 стр., +146 Б
+
+[name-cb] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py: заменено 1 вхожд. (последнее) — +1 стр., +63 Б
+
+[verify] ✓ verify_syntax: all 3 file(s) compile
+[timing] user (5 actions): 0.02s
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1228) [v683] [~3, ⇅32]
+  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py  (+9 стр., +0.4 KB)
+  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py  (+3 стр., +0.2 KB)
+  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py  (+11 стр., +0.5 KB)
+      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py :: _menu_new_project  [function]  L688–L739 → L688–L748
+      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L312–L893 → L312–L896
+      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._sync_roots_visibility  [function]  L713–L726 → L714–L729
+      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py :: project_ok  [function]  L72–L84 → L72–L95
+[timing] auto-rebuild (1 actions): 1.25s
+
+##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.27s

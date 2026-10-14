@@ -658,6 +658,17 @@ def _switch_project(project_dir: str, project_name: str | None = None) -> None:
     build — that is the correct behaviour (no fallback in the new model).
     """
     p = Path(project_dir).resolve()
+    # Read the target project's config BEFORE writing anything: DEFAULTS +
+    # tool-wide + that project's per-project overlay. Without this step,
+    # CONFIG still holds the previously-active project's settings, and
+    # `save` would copy them into the new project's config.json — the
+    # exact "backend/indexes leak from A into B" bug.
+    try:
+        fresh = _cfg.load(project_dir=p)
+    except Exception:
+        fresh = {}
+    if fresh:
+        CONFIG.update(fresh)
     CONFIG["project_dir"] = str(p)
     try:
         _cfg.save(CONFIG)
@@ -707,7 +718,34 @@ def _menu_new_project() -> None:
     except Exception as e:
         messagebox.showerror("\u041e\u0448\u0438\u0431\u043a\u0430", str(e), parent=root)
         return
-    _switch_project(folder, name)
+    # New project is created but not configured: workspace.json exists,
+    # but no per-project config.json yet. project_ok() reports "not
+    # configured" until the user saves the settings dialog.
+    #
+    # Reset CONFIG completely before priming it. Without the reset, fields
+    # the previous project happened to have set (index_rojo, luau_mode,
+    # exec, ...) leak into this brand-new project's settings dialog — the
+    # user saw "Lua files on disk" pre-checked on a fresh project because
+    # CONFIG still carried index_rojo=True from whatever project was open
+    # a moment ago.
+    #
+    # We do NOT call _switch_project here: no session should be started
+    # until the user confirms a source selection. _menu_project_settings
+    # calls _switch_project on save, which is what creates config.json.
+    from ...config.loader import DEFAULTS as _CFG_DEFAULTS
+    CONFIG.clear()
+    CONFIG.update(_CFG_DEFAULTS)
+    CONFIG["project_dir"] = str(Path(folder).resolve())
+    CONFIG["backend"] = "filesystem"
+    CONFIG["index_docs"] = False
+    CONFIG["index_python"] = False
+    CONFIG["index_lua"] = False
+    CONFIG["index_rojo"] = False
+    CONFIG["luau_mode"] = "mcp"
+    update_project_status()
+    update_button_state()
+    _refresh_recent_menu()
+    _menu_project_settings()
 
 
 def _menu_open_project() -> None:

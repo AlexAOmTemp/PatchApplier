@@ -71,13 +71,24 @@ def _center_on_parent(dlg: tk.Toplevel, parent, w: int, h: int) -> None:
     screen. This computes absolute coordinates from the parent's screen
     rectangle. Sizes are passed explicitly because the dialog has not been
     laid out yet when this runs.
+
+    Deliberately does NOT call `parent.update_idletasks()`. That runs any
+    pending idle callbacks (e.g. a `_sync_all` queued by a checkbox change
+    a moment ago) synchronously, which on a large workspace can block the
+    GUI thread for seconds while the dialog has already grabbed focus —
+    the window then looks hung. Reading the parent's geometry as-is is
+    enough: if the parent was drawn, coordinates are correct; if not, the
+    dialog lands near the screen corner for one frame instead of freezing.
     """
     try:
-        parent.update_idletasks()
         px = parent.winfo_rootx()
         py = parent.winfo_rooty()
         pw = parent.winfo_width()
         ph = parent.winfo_height()
+        if pw <= 1 or ph <= 1:
+            # Parent not laid out yet — skip centring, keep size only.
+            dlg.geometry(f"{w}x{h}")
+            return
         x = px + max(0, (pw - w) // 2)
         y = py + max(0, (ph - h) // 2)
         dlg.geometry(f"{w}x{h}+{x}+{y}")
@@ -132,7 +143,6 @@ def _open_ignore_editor(parent, path: Path, title: str,
     dlg = tk.Toplevel(parent)
     dlg.title(title)
     dlg.transient(parent)
-    dlg.grab_set()
     _center_on_parent(dlg, parent, 560, 460)
     dlg.minsize(420, 340)
 
@@ -287,6 +297,14 @@ def _open_ignore_editor(parent, path: Path, title: str,
     tk.Button(btn_row, text="Cancel", command=dlg.destroy, width=10).pack(
         side="right", padx=(0, 6))
 
+    # Grab focus only after the dialog is fully built. If anything above
+    # raises or hangs, no phantom grab holds the GUI hostage.
+    dlg.grab_set()
+
+    # Grab focus only after the dialog is fully built. If anything above
+    # raises, no phantom grab is left holding the GUI hostage.
+    dlg.grab_set()
+
 
 # --- main window ----------------------------------------------------------
 
@@ -299,7 +317,6 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     dlg = tk.Toplevel(parent)
     dlg.title("Project settings")
     dlg.transient(parent)
-    dlg.grab_set()
     _center_on_parent(dlg, parent, 820, 820)
     dlg.minsize(700, 700)
 
@@ -329,7 +346,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     py_var = tk.BooleanVar(value=bool(config.get("index_python", True)))
     backend_now = (config.get("backend") or "composite")
     mcp_var = tk.BooleanVar(value=backend_now in ("mcp", "composite"))
-    rojo_var = tk.BooleanVar(value=bool(config.get("index_lua", False)))
+    rojo_var = tk.BooleanVar(value=bool(config.get("index_rojo", False)))
     luau_var = tk.StringVar(value=(config.get("luau_mode") or "mcp"))
     exec_var = tk.BooleanVar(value=bool((config.get("exec") or {}).get("enabled")))
 
@@ -594,8 +611,9 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     add_btn.pack(side="left")
     rm_btn = tk.Button(roots_ctrl, text="Remove root", command=_remove_root)
     rm_btn.pack(side="left", padx=(6, 0))
-    tk.Checkbutton(roots_ctrl, text="Show hidden", variable=show_hidden_var).pack(
-        side="right")
+    show_hidden_cb = tk.Checkbutton(roots_ctrl, text="Show hidden",
+                                    variable=show_hidden_var)
+    show_hidden_cb.pack(side="right")
 
     tk.Label(roots_frame, text=_LEGEND, anchor="w", justify="left",
              fg="#666", font=("Consolas", 8)).pack(fill="x", pady=(6, 0))
@@ -651,6 +669,12 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             exec_hint.config(text="(requires Python)")
 
     def _sync_luau_state():
+        # IMPORTANT: `luau_var.set(...)` fires the write trace even when the
+        # value is unchanged, which schedules another `_sync_all` via
+        # after_idle. Without a guard that becomes an infinite loop the
+        # moment this function runs with exactly one of MCP / Rojo on —
+        # the mainloop keeps re-scheduling itself and the GUI freezes.
+        # Only call `set` when the value actually differs.
         mcp = bool(mcp_var.get())
         rojo = bool(rojo_var.get())
         if not mcp and not rojo:
@@ -659,13 +683,15 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             luau_hint.config(text="(no Luau source enabled)")
             return
         if mcp and not rojo:
-            luau_var.set("mcp")
+            if luau_var.get() != "mcp":
+                luau_var.set("mcp")
             luau_mcp_rb.config(state="disabled")
             luau_rojo_rb.config(state="disabled")
             luau_hint.config(text="(only MCP)")
             return
         if not mcp and rojo:
-            luau_var.set("rojo")
+            if luau_var.get() != "rojo":
+                luau_var.set("rojo")
             luau_mcp_rb.config(state="disabled")
             luau_rojo_rb.config(state="disabled")
             luau_hint.config(text="(only Rojo)")
@@ -686,19 +712,21 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         mi_btn.config(state=("normal" if use_mcp_code else "disabled"))
 
     def _sync_roots_visibility():
+        # The Roots panel stays on screen at all times; only its controls
+        # enable/disable with the filesystem sources. Hiding the panel
+        # when sources turn off (the earlier pack_forget) made the toggle
+        # asymmetric: opening the dialog with sources off showed the panel
+        # disabled, but toggling sources off after opening it made the
+        # panel vanish. Disabling in place is symmetric and less
+        # surprising.
         fs_any = bool(docs_var.get() or py_var.get())
-        if fs_any:
-            if not roots_frame.winfo_ismapped():
-                roots_frame.pack(fill="both", expand=True, pady=(8, 0))
-                # after the Sources frame; main already contains src
-                roots_frame.pack_configure(after=src)
-        else:
-            if roots_frame.winfo_ismapped():
-                roots_frame.pack_forget()
-        # Add/Remove also gated by fs_any
         st = "normal" if fs_any else "disabled"
         add_btn.config(state=st)
         rm_btn.config(state=st)
+        try:
+            show_hidden_cb.config(state=st)
+        except Exception:
+            pass
 
     def _sync_tree_columns():
         # Only re-render when the visible column set actually changed.
@@ -747,12 +775,21 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         except Exception:
             fn()
 
+    # ORDER MATTERS. `_sync_all()` calls `_sync_luau_state()`, which may
+    # call `luau_var.set(...)` to force a value ("only MCP" / "only Rojo").
+    # Tk fires a variable's write trace on every `set()` even when the value
+    # is unchanged. With the traces registered first, that `set()` scheduled
+    # another `_sync_all` via after_idle, which scheduled another, and so
+    # on: an infinite loop that froze the dialog. Registering the traces
+    # AFTER the initial sync means the initial set() calls have no
+    # listeners; once registered, real user clicks are the only writers.
+    _sync_all()
+
     docs_var.trace_add("write", lambda *_: _defer(_sync_all))
     py_var.trace_add("write", lambda *_: _defer(_sync_all))
     mcp_var.trace_add("write", lambda *_: _defer(_sync_all))
     rojo_var.trace_add("write", lambda *_: _defer(_sync_all))
     luau_var.trace_add("write", lambda *_: _defer(_sync_all))
-    _sync_all()
 
     # --- snapshot for close confirmation -------------------------------
     # Compare widgets' current state to this snapshot when the user
@@ -805,6 +842,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         config["index_docs"] = docs
         config["index_python"] = py
         config["index_lua"] = bool(mcp or rojo)
+        config["index_rojo"] = rojo
 
         if mcp and rojo:
             config["luau_mode"] = luau_var.get() or "rojo"

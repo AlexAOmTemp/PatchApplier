@@ -38,8 +38,13 @@ TOOL_FIELDS = frozenset({
     "format_preset",
     "format",
     "mcp",
-    "exec",
 })
+# `exec` is intentionally NOT in TOOL_FIELDS: `exec.enabled` is a
+# per-project security choice ("is run_python allowed in this project?").
+# When it lived tool-wide, unchecking "Allow Python scripts" in one
+# project silently disabled it everywhere. Environment fields
+# (interpreter, timeouts) are still per-project too — nobody customises
+# them anyway, and a uniform split is simpler than a nested one.
 
 DEFAULTS: dict = {
     "project_dir": "",
@@ -70,7 +75,15 @@ DEFAULTS: dict = {
     # backend checkboxes.
     "index_docs": True,
     "index_python": True,
+    # Aggregate "any Lua source on?" — read by router to decide whether
+    # to rebuild the Lua index after a write. Derived from MCP + Rojo
+    # sources on save; never edited directly.
     "index_lua": True,
+    # "Lua files on disk (.luau)" — the Rojo source toggle. Kept as a
+    # separate field because it cannot be reconstructed from `index_lua`:
+    # with MCP-sourced Lua on, `index_lua` is True regardless of Rojo,
+    # so reading rojo_var from it turned the checkbox on by itself.
+    "index_rojo": False,
     # Files skipped by the docs indexer (by basename). Must cover every
     # index artifact it would otherwise try to index recursively:
     # INDEX.md (docs), CODE_INDEX.md (Python), CODE_INDEX_LUA.md (Luau).

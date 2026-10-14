@@ -26,6 +26,9 @@ def format_project_label(config: dict) -> tuple[str, str]:
     if not Path(proj).is_dir():
         return f"\u26a0 \u043f\u0430\u043f\u043a\u0430 \u043d\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442: {proj}", "#c07000"
     name = config.get("project_name") or Path(proj).name or proj
+    if not (Path(proj) / ".patch_applier" / "config.json").is_file():
+        return (f"\U0001F4C1 {name}  \u2014 \u043f\u0440\u043e\u0435\u043a\u0442 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d "
+                f"(File \u2192 Project settings)", "#c07000")
     return f"\U0001F4C1 {name}", "#308030"
 
 
@@ -67,9 +70,29 @@ def project_state(config: dict) -> tuple[str, str, str, list]:
 
 
 def project_ok(config: dict) -> bool:
-    """True iff project_dir is set and points at a real directory."""
+    """True iff project_dir points at a real, *configured* project.
+
+    A project is configured once a per-project `config.json` exists in
+    its state dir. `create_project` writes workspace.json and the ignore
+    files but not config.json: a freshly created project stays "not
+    configured" until the user picks sources in the settings dialog,
+    which is what triggers the first save.
+    """
     proj, _, _, _ = project_state(config)
-    return bool(proj) and Path(proj).is_dir()
+    if not proj or not Path(proj).is_dir():
+        return False
+    if not (Path(proj) / ".patch_applier" / "config.json").is_file():
+        return False
+    # A project saved with every source off is still "not configured" —
+    # there is nothing for the toolkit to do. The user must pick at least
+    # one source (Documentation / Python / any Lua) before Apply becomes
+    # meaningful, and that is exactly what project_ok gates.
+    has_source = bool(
+        config.get("index_docs")
+        or config.get("index_python")
+        or config.get("index_lua")
+    )
+    return has_source
 
 
 @dataclass
