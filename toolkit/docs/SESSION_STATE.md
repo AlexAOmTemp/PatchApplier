@@ -55,7 +55,7 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 
 ### Что открыто
 
-- **`.llmscope` + три тула.** Согласовано в деталях: include-only белый список, файл в `state_dir`, `get_scope` / `set_scope` / `clear_scope`, секция `## Scope` в `get_status`, фильтрация в `list_files` / `survey_dir` / `grep`. Отдельная сессия.
+- **`.llmscope` + три тула.** Дизайн перенесён в `DECISIONS §1` — «Scope — LLM-editable soft filter (2026-10-14)». Согласовано в деталях, реализация — отдельная сессия.
 - **Единый текстовый матчинг.** `toolkit/matching/text.py` с `find_text(...)`; tier'ы (`none` / `trailing` / `eol` / `eol+trailing`), общий для `replace_in_file` / `replace_between` / `insert_at_anchor` / `replace_range`. Единый `no_match` с кандидатами. Отдельная сессия. См. `DECISIONS §Единый текстовый матчинг`.
 - **`get_index overview`.** Сжатый вид на 5 KB вместо 150 KB. Идея: единая точка входа поверх трёх файлов; не «один индекс» — «разные источники, единое представление».
 - **Rojo backend.** Третий namespace.

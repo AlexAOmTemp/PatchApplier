@@ -1,1 +1,6 @@
-.patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v406] [без изменений]
+.patch_applier/INDEX.md (файлов: 52, без summary: 219) [v576] [~2, -3] ⚠
+  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2. Открыто (L161–L505, 55.1 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
+  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2.2 Граф и анализ (L230–L399, 27.1 KB, ⚠ stale, ⚠ large) — Реализовано: маркеры (факты), suppression `# pa:`, модульный reverse, `find_usages`, source_hash в diff (лимит 2048 снят 2026-10-14, двойной префикс в Lua-индексе исправлен), `grep_replace_mcp` (MCP-side rename), `grep_replace` (FS-side, shared matcher, симметрия с `grep`), `⚠ no summary` только на `##`. Открыто: символьный reverse, diff edges, новые маркеры.
+  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант A: scope режет и build индекса, и read-тулы (L310–L351, 4.7 KB, ⚠ no summary)
+  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант B (альтернатива): индекс строится полностью, фильтруется только отображение (L352–L369, 1.6 KB, ⚠ no summary)
+  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Статус: отложено (L370–L505, 22.7 KB, ⚠ no summary)
