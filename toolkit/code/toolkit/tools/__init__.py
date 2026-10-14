@@ -1,12 +1,25 @@
-"""Tools registry. Runners import TOOL_MAP and pass it to Session."""
+"""Tools registry. Runners import TOOL_MAP and pass it to Session.
+
+Deprecated tools (removed from TOOL_MAP 2026-10-11, see DECISIONS §2.1):
+
+- Symbol tools (list_symbols / read_symbol / replace_symbol* / replace_statement /
+  delete_symbol / insert_symbol / move_symbol / replace_function* / list_symbols_lua /
+  read_symbol_lua / replace_function_lua) — superseded by the unit model.
+- Section tools (replace_section / set_summary / verify_section) — superseded by
+  replace_unit / set_annotation.
+
+Class definitions remain in `tools/write.py`, `tools/code.py`, `tools/lua_code.py`,
+`tools/symbols/*`, `tools/unit/tool.py`. To reactivate one, add its import and a
+TOOL_MAP entry back.
+"""
 
 from .read import (
     ReadFileTool, FileExistsTool, FileStatTool, ListFilesTool, GrepTool,
+    SurveyDirTool,
 )
 from .write import (
     ReplaceInFileTool, ReplaceRangeTool, ReplaceBetweenTool,
-    InsertAtAnchorTool, ReplaceSectionTool, SetSummaryTool,
-    VerifySectionTool,
+    InsertAtAnchorTool,
 )
 from .fileops import (
     CreateFileTool, OverwriteFileTool, DeleteFileTool, MoveFileTool,
@@ -17,25 +30,18 @@ from .index import (
     GetIndexTool,
 )
 from .status import GetStatusTool
-from .code import (
-    ListSymbolsTool, ReadSymbolTool,
-    ReplaceSymbolTool, ReplaceSymbolBodyTool,
-    ReplaceSymbolSignatureTool, DeleteSymbolTool, InsertSymbolTool,
-    MoveSymbolTool, ReplaceStatementTool,
-)
 from .find_symbol import FindSymbolTool
 from .symbol_graph import SymbolGraphTool
 from .grep_mcp import GrepMcpTool
 from .grep_replace_mcp import GrepReplaceMcpTool
+from .grep_replace import GrepReplaceTool
 from .find_usages import FindUsagesTool
 from .copy import CopyUnitTool
-from .lua_code import (
-    ListSymbolsLuaTool, ReadSymbolLuaTool, ReplaceFunctionLuaTool,
-)
 from .shell import RunPythonTool
+from .verify import VerifySyntaxTool
 from .unit import (
     ReadUnitTool, ListUnitsTool, SetAnnotationTool,
-    ReplaceUnitTool, ReplaceBlockTool, DeleteBlockTool, InsertBlockTool,
+    ReplaceUnitTool, InsertBlockTool,
 )
 
 
@@ -44,8 +50,10 @@ TOOL_MAP: dict[str, type] = {
     "file_exists": FileExistsTool,
     "file_stat": FileStatTool,
     "list_files": ListFilesTool,
+    "survey_dir": SurveyDirTool,
     "grep": GrepTool,
     "grep_mcp": GrepMcpTool,
+    "grep_replace": GrepReplaceTool,
     "grep_replace_mcp": GrepReplaceMcpTool,
     # Legacy alias — old name kept for pre-rename patches.
     "grep_lua": GrepMcpTool,
@@ -68,9 +76,7 @@ TOOL_MAP: dict[str, type] = {
     "find_usages": FindUsagesTool,
     "symbol_graph": SymbolGraphTool,
     "run_python": RunPythonTool,
-    # Unit model — cross-format read/write (DECISIONS §2.1).
-    # `replace_block` / `delete_block` removed 2026-10-11 — folded into
-    # `replace_unit(block=...)`. See DECISIONS §2.1.
+    "verify_syntax": VerifySyntaxTool,
     "read_unit": ReadUnitTool,
     "list_units": ListUnitsTool,
     "set_annotation": SetAnnotationTool,
@@ -78,35 +84,25 @@ TOOL_MAP: dict[str, type] = {
     "insert_block": InsertBlockTool,
 }
 
-# Deprecated 2026-10-11 (see DECISIONS §2.1). Removed from the map, files
-# remain in the tree for reference: replace_section / set_summary /
-# verify_section (superseded by unit model), list_symbols / read_symbol /
-# replace_symbol* / replace_statement / delete_symbol / insert_symbol /
-# move_symbol / replace_function* (Python symbol tools), list_symbols_lua /
-# read_symbol_lua / replace_function_lua (Lua symbol tools).
-
 __all__ = [
     "TOOL_MAP",
     "ReadFileTool", "FileExistsTool", "FileStatTool", "ListFilesTool", "GrepTool",
+    "SurveyDirTool",
     "ReplaceInFileTool", "ReplaceRangeTool", "ReplaceBetweenTool",
-    "InsertAtAnchorTool", "ReplaceSectionTool", "SetSummaryTool",
-    "VerifySectionTool",
+    "InsertAtAnchorTool",
     "CreateFileTool", "OverwriteFileTool", "DeleteFileTool", "MoveFileTool",
     "CopyFileTool",
     "RebuildIndexTool", "RebuildCodeIndexTool", "RebuildLuaCodeIndexTool",
     "GetIndexTool", "GetStatusTool",
-    "ListSymbolsTool", "ReadSymbolTool",
-    "ReplaceSymbolTool", "ReplaceSymbolBodyTool",
-    "ReplaceSymbolSignatureTool", "DeleteSymbolTool", "InsertSymbolTool",
-    "MoveSymbolTool", "ReplaceStatementTool",
     "FindSymbolTool",
     "FindUsagesTool",
     "SymbolGraphTool",
     "GrepMcpTool",
     "GrepReplaceMcpTool",
+    "GrepReplaceTool",
     "CopyUnitTool",
-    "ListSymbolsLuaTool", "ReadSymbolLuaTool", "ReplaceFunctionLuaTool",
     "RunPythonTool",
+    "VerifySyntaxTool",
     "ReadUnitTool", "ListUnitsTool", "SetAnnotationTool",
-    "ReplaceUnitTool", "ReplaceBlockTool", "DeleteBlockTool", "InsertBlockTool",
+    "ReplaceUnitTool", "InsertBlockTool",
 ]

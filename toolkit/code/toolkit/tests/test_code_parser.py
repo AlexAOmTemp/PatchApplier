@@ -205,11 +205,14 @@ def main():
     t.expect("different input -> different hash", h1 != h3)
     t.expect("empty -> (17, 0)", source_hash("") == (17, 0))
 
-    # --- hash of a long source is limited to 2048 bytes ---
+    # --- hash covers the whole source (no 2048-byte limit) ---
     long_a = "a" * 5000
     long_b = "a" * 2048 + "b" * 2952
-    t.expect("hash ignores bytes past limit",
-             source_hash(long_a)[0] == source_hash(long_b)[0])
+    t.expect("hash covers whole source",
+             source_hash(long_a)[0] != source_hash(long_b)[0])
+    # Two identical long sources still hash identically (stability).
+    t.expect("long sources stable",
+             source_hash(long_a)[0] == source_hash("a" * 5000)[0])
 
     print()
     if t.failed:

@@ -3,18 +3,17 @@
 All paths are relative to the root. Sandbox enforcement: any path that
 resolves outside the root is rejected before I/O.
 
-Hiding: `.patchignore` in the project root holds gitignore-like patterns.
-A path is hidden if any of its segments (or a path prefix) matches a
-pattern. Hidden paths are refused before the policy is consulted, unless
-the caller has an explicit True override for the path or one of its
-named ancestors.
+This class does **not** know about `.patchignore`. Hiding rules are a
+workspace concern: `WorkspaceBackend` reads them from its own state_dir
+and applies them in `filter_check` before delegating. A bare
+FilesystemBackend driven directly (tests, ad-hoc tools) sees everything
+inside its root and consults no policy.
 """
 from __future__ import annotations
 
 import shutil
 from pathlib import Path
 
-from ..config import patchignore
 from ..core.models import FileStat
 
 
@@ -25,8 +24,6 @@ class FilesystemBackend:
         # and sandbox enforcement use self._root.
         self._root = Path(working_dir).resolve()
         self._opened = False
-        # Populated on `open()` — empty until then means nothing hidden.
-        self._patterns: list[tuple[str, bool]] = []
 
     # --- lifecycle --------------------------------------------------------
 
@@ -35,8 +32,6 @@ class FilesystemBackend:
             raise RuntimeError(f"working_dir не существует: {self._root}")
         if not self._root.is_dir():
             raise RuntimeError(f"working_dir не директория: {self._root}")
-        patchignore.ensure_default(self._root)
-        self._patterns = patchignore.read(self._root)
         self._opened = True
 
     def close(self) -> None:
@@ -44,15 +39,6 @@ class FilesystemBackend:
 
     def is_alive(self) -> bool:
         return self._opened
-
-    def reload_patterns(self) -> None:
-        """Re-read `.patchignore` from disk.
-
-        Call after the user edits the file (via the toolkit dialog or
-        manually) so the running session picks up the new rules without a
-        full restart.
-        """
-        self._patterns = patchignore.read(self._root)
 
     # --- helpers ----------------------------------------------------------
 
@@ -186,7 +172,7 @@ class FilesystemBackend:
         d.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(s, d)
 
-    def filter_check(self, path: str, op: str) -> str | None:
+    def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
         """No path-level policy at the FS level.
 
         In the new model, FilesystemBackend is used as a sub-backend of

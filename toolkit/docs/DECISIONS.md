@@ -60,7 +60,7 @@
 
 ### Workspace refactor
 
-<!-- summary: Завершён. Однокорневая модель удалена целиком; единая модель Workspace с пятью флагами PathPolicy (read / write / index_docs / index_py / index_lua) и per-path overrides. Шаги 1-4, 6 закрыты. GUI: File menu + Project settings + recent.json. Открыто: 7.3 (дерево файлов), редактор per-path, multi-root smoke, P1-фиксы тулов. -->
+<!-- summary: Завершён. Однокорневая модель удалена целиком; единая модель Workspace с пятью флагами PathPolicy (read / write / index_docs / index_py / index_lua) и per-path overrides. Шаги 1-4, 6 закрыты. GUI: File menu + Project settings + recent.json; Project settings оптимизирован (lazy render, кэш скана, cap по числу директорий). Проверено live на двух корнях (PatchApplier: toolkit + RimWorld). Открыто: 7.3 (дерево файлов), редактор per-path, единый текстовый матчинг. -->
 **Что это.** Переход от однокорневой модели (`project_dir` = `working_dir` = место state) к multi-root workspace. Дизайн: `docs/WORKSPACE.md`, `docs/WORKSPACE_BACKEND.md`.
 
 **Сделано (шаги 1–4 + 6):**
@@ -80,7 +80,14 @@
 
 **Инфраструктура.** `toolkit/code/manual/_git.py` — обёртка над git для чекпоинтов между большими патчами.
 
-**P1-фиксы тулов (следующая сессия после Workspace).** `insert_at_anchor` — auto-`\n` между anchor и `new_content`, чтобы не склеивать строки (`from a import b` + `from c import d` → сломанный синтаксис). `replace_between` — EOL-нормализация anchor'ов, чтобы LF-anchor находился в CRLF-файле. Оба фикса — из `TOOL_PRACTICE.md §8`, регрессии в `test_tool_edge_cases.py`. См. также §2.5.
+**P1-фиксы тулов (сделано).** `insert_at_anchor` — auto-`\n` между anchor и `new_content`. `replace_between` — EOL-нормализация anchor'ов. Регрессии в `test_tool_edge_cases.py`.
+
+**Пост-рефакторинг (2026-10-13).** Закрыты последствия перехода на multi-root:
+
+- **`FilesystemBackend` больше не знает про `.patchignore`.** Раньше `open()` делал `patchignore.ensure_default(self._root)` — побочный эффект однокорневой модели, оставлявший дефолтный `.patchignore` в каждом корне. Поле `self._patterns` и метод `reload_patterns` не использовались вовсе (`filter_check` — `None`, policy в `WorkspaceBackend`). Всё удалено; авторитетный `.patchignore` — один, в `state_dir`.
+- **GUI Project settings оптимизирован.** Три уровня: (1) `scan_subdirs_ex` с уровнем-за-уровнем обходом и `DEFAULT_SCAN_MAX_ROWS=200` (RimWorld `Mods/` останавливается на depth 2, не уходит в глубину каждого мода); (2) скан всегда с `show_hidden=True` (superset), фильтр в памяти — toggle show hidden без повторного диска; (3) чанковый рендер строк через `after` + кэш подписи в `PolicyTree.render`. Плюс census в корневой строке (`[RimWorld] (115 dirs, 3 hidden) (truncated at depth 3)`).
+- **Отображение корневой политики.** `_flag_state` выводил состояние из наличия override (`.` → показывал точку, если `overrides["."]` отсутствовал). Для корня точки нет — наследовать не от чего. Теперь корневая строка всегда показывает эффективную политику. Два корня с идентичной политикой выглядят одинаково.
+- **Multi-root проверен live.** Проект PatchApplier, корни `toolkit` + `RimWorld`. `test_workspace_backend.py` — 29/29.
 
 **Git hygiene.** `.patch_applier/.gitignore` — индексируемые артефакты исключены; `workspace.json`, `.patchignore`, `.mcpignore`, `config.json` — в гите. `toolkit/.gitignore` — `runtime/`, `__pycache__/`. Раньше индексы и рантайм утекали в коммиты — теперь изолированы.
 
@@ -90,12 +97,67 @@
 
 - **Дерево файлов в GUI (7.3).** Сейчас GUI не имеет file explorer вообще. Нужен design-док перед кодом.
 - **Редактор per-path overrides.** Сейчас Project settings работает только с per-root default. Path-level — через `workspace.json` руками.
-- **Multi-root smoke на живом проекте.** Формально покрыто `test_workspace_backend.py`, но 2+ roots в реальном проекте не запускали.
-- **Шаг 5 (индексаторы).** Работают через `list("")` — контракт один-в-многие. На двух корнях не проверяли.
-- **P1-фиксы тулов** (`insert_at_anchor` + `\n`, `replace_between` EOL). См. `TOOL_PRACTICE.md §8`.
+- **Шаг 5 (индексаторы).** Работают через `list("")`. На двух корнях в живом проекте проверено.
 - **Уборка:** временные `_recon.py` / `_cleanup.py` / `_final_cleanup.py` / `_git_status.py`; устаревшие symbol-tools из `TOOL_MAP`.
 
-**Root внутри state.** Сейчас `state_dir` (`.patch_applier/`) физически внутри корня `toolkit/`. Работает через `_state_rel_for`, но при создании нового проекта через GUI root'ы будут отдельные, state — сбоку.
+**Root внутри state — снято.** В проекте PatchApplier `state_dir` (`.patch_applier/`) лежит рядом с корнями, не внутри. `_state_rel_for` остаётся для случая embedded-проектов, где root и state вложены друг в друга.
+
+### Единый текстовый матчинг (открыто)
+
+<!-- summary: Семантика матчинга строк размазана по четырём текстовым тулам. `replace_in_file` имеет tier'ы (byte-exact / trailing-whitespace); `replace_between` / `insert_at_anchor` / `replace_range` — byte-exact без нормализации. CRLF-файл + LF-anchor = no_match. Направление: единый модуль `toolkit/matching/text.py`, общий для всех четырёх тулов. -->
+
+**Проблема.** Один и тот же текст в файле и в аргументе патча может отличаться EOL (`\r\n` vs `\n`) или trailing whitespace. Сейчас каждый тул решает это сам или не решает вовсе:
+
+| Тул | Byte-exact | Trailing WS | EOL | Диагностика no_match |
+|---|---|---|---|---|
+| `replace_in_file` | ✅ | ✅ (tier 2) | ❌ | tier 3: top-3 похожих с маркерами |
+| `replace_between` | ✅ | ❌ | ❌ | общая, без деталей |
+| `insert_at_anchor` | ✅ | ❌ | ❌ | общая, без деталей |
+| `replace_range` | ✅ (`expected_first_line`) | ❌ | ❌ | `content_mismatch` без деталей |
+
+Практическое следствие: патч из LF-скрипта, применённый к CRLF-файлу, падает с `no_match` там, где инструмент мог бы найти с оговоркой. Замечено на живом проекте (RimWorld XML, `.Source`).
+
+**Направление.** Единый модуль `toolkit/matching/text.py`, рядом с существующим `Pattern`:
+
+```python
+class TextMatch:
+    start: int
+    end: int
+    normalization: str        # "none" | "trailing" | "eol" | "eol+trailing"
+    candidates: list[str]     # при no_match — top-N похожих
+
+def find_text(haystack, needle, *,
+              normalize_eol=True,
+              normalize_trailing=True) -> TextMatch | None
+```
+
+Все четыре тула ходят только сюда. `Result` получает поле `normalized: str | None` — чтобы LLM видел, что матч был не byte-exact. `no_match` отдаёт кандидатов с маркерами невидимых (`␣`, `⇥`, `⏎`).
+
+**Почему отдельно от `Pattern`.** `Pattern` — регулярки/литералы для `grep`/`grep_replace`. `find_text` — byte-exact с tolerance для write-тулов. Разные задачи, разная семантика (в grep нормализация строк — вредная фича).
+
+**Не в этой сессии.** Полезно всем Windows-проектам, но переписывание четырёх тулов + тесты + документация — отдельная задача на сессию.
+
+### Внешние проекты: reconnaissance-driven workflow (2026-10-13)
+
+<!-- summary: Первый живой кейс работы с чужим проектом (RimWorld, 86 модов, 30k файлов). Что подтвердилось, что добавили, что открыто. -->
+
+**Кейс.** RimWorld как второй корень рядом с toolkit. 86 модов, 29 712 файлов, 1.5 GB. Задача — поправить поведение големов в моде «A RimWorld of Magic».
+
+**Что сработало без изменений в утилите.** `grep`, `read_file`, `run_python`, `create_file` — весь путь от разведки до патча XML. Никаких расширений формата не понадобилось.
+
+**Что добавили.** `survey_dir` — агрегат по расширениям и подкаталогам первого уровня; первый контакт с незнакомым корнем. `list_files` при >2000 файлов возвращает счётчик и подсказку вместо плоского списка. Оба — общие для любого домена, не только RimWorld.
+
+**Что узнали про домен.** RimWorld — это `Defs/*.xml` с наследованием (`ParentName`) и overlay-патчами через `<Patches>/<Operation xpath=...>`. Структура принципиально та же, что `extends` в Factorio, `m_SourcePrefab` в Unity, `inherit` в k8s. Общая модель: именованная сущность + ссылка на родителя + патч поверх.
+
+**Что открыто.**
+
+- **XML как формат** — `list_units` / `read_unit` / `replace_unit` для `.xml`. Адресация по `defName`. Файл вроде `Golem_Race_Base.xml` (3180 строк, 104 KB) сейчас читается целиком — unit-модель его не покрывает.
+- **`find_def`** — обёртка над XML-индексом. Cross-mod вопросы («кто ещё патчит этот def») требуют индекса, которого нет.
+- **C# / декомпиляция** — отложено. Для RimWorld моды распространяются как `.dll`; без `ilspycmd` не видно, что внутри. Когда появится реальная задача на логику, которой нет в XML — вернуться.
+- **Версионирование.** Моды вида `v1.0/` ... `v1.6/` — активна одна версия, остальные шум. Решение: `grep` по корню мода требует явного `directory=` на активную версию. Автоопределение — не делать, пока не увидим третий-четвёртый кейс.
+
+**Не делать сейчас.** Обобщённая «декларативная модель сущностей» для всех форматов. Один сэмпл (RimWorld XML) не даёт достаточной базы. Factorio / Unity покажут, что общего, что специфично.
+
 ## 2. Открыто
 
 <!-- summary: Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. -->
@@ -134,7 +196,7 @@
 - `replace_unit(block=N)` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python), `replace_block`, `delete_block` (пустой `new_text` = удалить) и структурные случаи `replace_between`. Кросс-форматно. `part` и `block` взаимоисключающие и обязательные (`scope_required` / `scope_conflict`).
 - `insert_block` — вставка блока: `position=start|end|before|after` + `anchor` (индекс блока или qualname соседа). Заменяет `insert_symbol` и структурные случаи `insert_at_anchor`.
 - `set_annotation` — установить docstring / summary / `--[[ ]]` одной операцией. Заменяет `set_summary` и установку docstring через `replace_symbol`.
-- `verify_annotation` — подтвердить annotation без правки файла. Заменяет `verify_section`.
+- ~~`verify_annotation`~~ — подтвердить annotation без правки файла. Заменяет `verify_section`. **Не реализован**; остаётся открытой нишей после сворачивания `verify_section`.
 
 **Правило: новый тул даёт то, чего в старых НЕТ.** Не «то же самое, но иначе». `replace_unit` параллельно с `replace_symbol` для одного формата — не делаем. `set_annotation` — да, потому что кросс-форматный annotation в старых отсутствует.
 
@@ -159,7 +221,7 @@
 - Ортогональные: файловые операции, индексы, граф (`find_symbol`, `find_usages`, `symbol_graph`), exec, Roblox-специфика, утилитарные (`read_file`, `grep`, `file_stat`).
 - `copy_unit` — уже кросс-форматный, остаётся как есть.
 
-**Что скрывается из LLM_START §7.** `list_symbols`, `read_symbol`, `read_symbol_lua`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `replace_section`, `set_summary`, `verify_section`, `insert_symbol`, `delete_symbol`, `move_symbol`. Все они остаются в `TOOL_MAP` для совместимости.
+**Что скрывается из LLM_START §7.** `list_symbols`, `read_symbol`, `read_symbol_lua`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `replace_section`, `set_summary`, `verify_section`, `insert_symbol`, `delete_symbol`, `move_symbol`. Все они **удалены из `TOOL_MAP`** (см. абзац ниже) — определения остаются только в дереве для возможной реактивации.
 
 **Итог по статистике (2026-10-11).** Metrics за 21 час работы (1030 действий): old symbol model — 16 вызовов (1.6% от всех), 6 из них с ошибками (37.5%). Unit model — 111 вызовов (10.8%). Text escape hatch — 146 (14.2%). Целевой индикатор победы модели (<15% escape hatch) достигнут. **Решение: удалены из `TOOL_MAP` 17 записей** — `list_symbols`, `read_symbol`, `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_statement`, `delete_symbol`, `insert_symbol`, `move_symbol`, `replace_function`, `replace_function_body` (алиасы), `list_symbols_lua`, `read_symbol_lua`, `replace_function_lua`, `replace_section`, `set_summary`, `verify_section`. Файлы остаются в дереве (`tools/symbols/`, `tools/code.py`, `tools/lua_code.py`, `tools/write.py`) — если понадобится вернуть, раскомментировать одну строку в `tools/__init__.py`.
 
@@ -167,7 +229,7 @@
 
 ### 2.2 Граф и анализ
 
-<!-- summary: Реализовано: маркеры (факты), suppression `# pa:`, модульный reverse, `find_usages`, source_hash в diff, `grep_replace_mcp` (rename MCP-side). Открыто: символьный reverse, diff edges, новые маркеры, FS-side `grep_replace`, `read_symbol include=callees`/`callers`, `⚠ no summary` для подсекций. -->
+<!-- summary: Реализовано: маркеры (факты), suppression `# pa:`, модульный reverse, `find_usages`, source_hash в diff (лимит 2048 снят 2026-10-14, двойной префикс в Lua-индексе исправлен), `grep_replace_mcp` (MCP-side rename), `grep_replace` (FS-side, shared matcher, симметрия с `grep`), `⚠ no summary` только на `##`. Открыто: символьный reverse, diff edges, новые маркеры. -->
 
 **Обратные зависимости (depends by) — модульный уровень готов.** Реализовано для Python (`indexers/code.py`) и Lua (`indexers/lua_runner.py`). Форма данных:
 
@@ -187,7 +249,7 @@
 
 **Символьный reverse (phase 2) — открыто.** «Где вызывается `X.foo`». Проход по телам символов: `Attribute(value=Name(...), attr=...)`, матч по квалифайд-именам импортированного. **Эвристика, не разрешение имён**: локальные переменные и параметры пропускаются; `getattr`, `from X import *`, динамические атрибуты — промахи. Уровень `pyflakes` (полное разрешение scope) вне scope. Место: только manifest (в `.md` раздуло бы). Требует замера перед реализацией: текущий rebuild 0.42 с на 115 модулей, символьный проход — второй обход уже распарсенных деревьев; если >2 с — оставить только модульный.
 
-**`read_symbol include=callees` / `include=callers` — открыто.** Обсуждалось как способ сократить навигацию: символ + список вызываемых им функций (callees) / список вызывающих его мест (callers). `include=callees` — обход `ast.Call` внутри символа, маппинг на `find_symbol`; `include=callers` — обёртка над `find_usages` (символьный уровень, см. выше). Для Lua — только если Lua-парсер даёт Call-узлы (проверить перед реализацией; иначе Python-only). **Зачем:** сейчас после чтения символа LLM не знает, что ещё важно в этом файле; тул говорит «вот соседние символы одного шага графа».
+**`read_symbol include=callees` / `include=callers` — закрыто (2026-10-13).** Идея была сократить навигацию: символ + список вызываемых / вызывающих. Вместо этого есть `symbol_graph qualname=...` — тот же ответ одним вызовом, явное имя тула под задачу. `read_symbol` как таковой удалён ещё раньше (устаревшая символьная модель); открытая ниша закрыта, дублировать не нужно.
 
 **Diff edges — открыто.** `Used by:` показывается в diff'е **только если изменилось**. Это фича: появление или исчезновение ребра = изменение blast radius, видимое сразу. Правило согласовано, реализация — TODO.
 
@@ -208,15 +270,33 @@
 
 **Разделение по стоимости.** Inline (в `.md`, дёшево, на rebuild): структурные, паттерны, `stale-docstring`. On-demand (отдельный анализ, дорого): графовые расширенные, doc↔code.
 
-**`refactor_rename` — закрыто для MCP-side как `grep_replace_mcp`.** Текстовый уровень, не AST: глобальный find-replace по идентификаторам с `word_boundary=true` и пачкой `mappings`. Двухпроходный гейт (`__EMPTY__` / `__OVERFLOW__`) до записи; Source не покидает Studio. Ограничения: не различает `local X` от глобального `X`, не покрывает табличную форму `obj["field"]`, Wally-пакеты в `_Index` защищены от случайной правки тем, что их имена с `.`/`-`/`@` не адресуются dotted-путём. **FS-side вариант `grep_replace`** (Python regex, полноценный dry-run, temp-файловый откат, работает в Rojo-mode) — отдельная задача. Семантически-точный rename на символьном уровне (нужен символьный reverse) — по-прежнему открыт как отдельная ниша.
+**`refactor_rename` — закрыто для обоих доменов.** Текстовый уровень, не AST: глобальный find-replace по идентификаторам с `word_boundary=true` и пачкой `mappings`. Двухпроходный гейт до записи; на MCP-стороне Source не покидает Studio (`grep_replace_mcp`, `__EMPTY__` / `__OVERFLOW__`); на FS-стороне — `grep_replace` с `dry_run=true` по умолчанию и per-file atomic write (без all-or-nothing отката: падение N-го файла не откатывает 1..N-1). Ограничения общие для обоих доменов: не различает `local X` от глобального `X`, не покрывает табличную форму `obj["field"]`, Wally-пакеты в `_Index` защищены от случайной правки тем, что их имена с `.`/`-`/`@` не адресуются dotted-путём.
 
-**`⚠ no summary` для подсекций — открыто.** Сейчас метка ставится на все секции без summary, включая `###` и `####`. В проекте, где summary только у `##`, это даёт 90% шума. Варианты: (a) не помечать подсекции; (b) оставить как есть — метка честно говорит, где summary нет. Открыто потому, что решение зависит от конвенции проекта.
+**Симметрия с `grep` — контракт.** FS-side: общий матчер `toolkit/matching/Pattern`, `GrepTool` и `GrepReplaceTool` дергают его; `word_boundary` добавлен в существующий FS-`grep`, чтобы не было флага, доступного одному и недоступного другому. Scope-аргументы (`paths` / `directory` / `file_glob` / `exclude_glob`) и match-аргументы (`pattern` / `regex` / `fixed_strings` / `ignore_case` / `word_boundary`) — 1-в-1 с `grep`; дефолт `regex=true` совпадает. `no_matches` — `ok` с нулевым дельта (как у `grep`), а не `error` (как в MCP-версии). MCP-side: `grep.lua` и `grep_replace.lua` делят `_match.lua` через директиву `-- include:` в `_lua_script`; оба переписаны как per-line (было: grep per-line, replace whole-source — расходились на `^`/`$`). `require` не используется: `execute_luau` работает в изолированной VM, где `require` даёт свежую копию модуля, а не shared instance.
+
+**FS vs MCP — параллельные домены, не унифицируются.** Разный язык паттернов (Python `re` vs Lua patterns), разный транспорт. Симметрия гарантируется **внутри** каждого домена, не между ними. `grep_replace` и `grep_replace_mcp` — соседи по назначению, не реализации.
+
+Семантически-точный rename на символьном уровне (нужен символьный reverse) — по-прежнему открыт как отдельная ниша.
+
+**`⚠ no summary` для подсекций — закрыто (2026-10-13).** Метка теперь ставится только на секции уровня `##` (`s.level <= 2`). Подсекции `###`/`####` наследуют контекст от родителя; шум в 90% случаев был ровно от них. Если для конкретного проекта нужна обратная политика — отдельная задача, включать при появлении реального кейса.
+
+**`source_hash` — снят лимит 2048 байт (2026-10-14).** Раньше полиномиальный хеш считался только по первым 2048 байтам и модуля, и символа (Python `formats/code.py:HASH_LIMIT_BYTES`, Lua `lua_symbols.lua` и `code_index_regen.lua`). Следствие: правка в файле длиннее 2 KB **не меняла модульный хеш**, если была за пределами первых 2048 байт. Diff не видел изменений (`[без изменений]`), хотя файл реально менялся. Observed на `tools/write.py` (37 KB): правки в `ReplaceBetweenTool` (~L270) и `_find_all` (~L770) не отражались в `CODE_INDEX.md`.
+
+**Мотивации лимита не нашли.** Ни в коде (нет использования кросс-сравнения Python↔Lua хешей — grep пуст), ни в документации (DECISIONS/ARCHITECTURE/REQUIREMENTS лимит не упоминают), ни в истории обсуждений. Докстринг говорит «matches Lua-side impl» — но это требование согласованности алгоритма, а не мотивация усечения. Считаем техническим долгом, а не осознанным решением.
+
+**Фикс:** лимит убран во всех трёх местах; хеш считается по всему источнику. Совпадение Python ↔ Lua сохраняется (один алгоритм: `h = h*31 + byte`, mod 2³¹−1, seed 17) — теперь согласованно и без усечения. Тест `test_code_parser.py` инвертирован: было `hash ignores bytes past limit`, стало `hash covers whole source`. Первый rebuild после фикса показал `~N` для всех модулей >2 KB — ожидаемое одноразовое событие.
+
+**Двойной префикс `.patch_applier/.patch_applier/` (2026-10-14).** `RebuildLuaCodeIndexTool` строил путь как `local_dir / out_name`, где `out_name` уже содержал `.patch_applier/`. Результат: файлы писались в `.patch_applier/.patch_applier/CODE_INDEX_LUA.md`, а читались из `.patch_applier/CODE_INDEX_LUA.md`. Diff видел изменение в одном файле, `get_index` читал другой — рассогласование.
+
+**Дополнительная проблема в том же туле:** индекс писался через `Path.write_text` (в обход backend), а version-файл — через `bump_seq(backend, ...)`. Два разных способа записи в одном туле. `RebuildIndexTool` и `RebuildCodeIndexTool` пишут через `backend.write(out_path, ...)` — Lua-тул был единственным исключением.
+
+**Фикс:** Lua-тул приведён к тому же способу, что и два других — `backend.write(out_path, text)` / `backend.write(manifest_path, ...)`. Прямая запись в FS убрана. Все три rebuild-тула пишут единообразно, `WorkspaceBackend._state_write_target` резолвит `.patch_applier/...` правильно. Тест `test_lua_indexer.py` проходит без изменений (аргумент `output` работает как раньше).
 
 ### 2.3 Инфраструктура
 
-<!-- summary: Passthrough MCP-инструментов, sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). -->
+<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->
 
-**Passthrough MCP-инструментов.** `insert_asset`, `generate_mesh`, `screen_capture` — регистрировать в `TOOL_MAP` при `MCPBackend.open()`, или оставить как есть (доступ через `MCPBackend.execute`)?
+**Passthrough MCP-инструментов — закрыто.** Работает через `MCPBackend.invoke_native` (`native_tools_enabled=true` в конфиге). Нативные тулы (`insert_asset`, `generate_mesh`, `screen_capture`, ...) вызываются тем же патч-форматом под их оригинальными именами; схемы — в `tools_schema.json`. Гейтится флагом `native_tools_enabled`; при выключенном флаге — `error_code="native_tools_disabled"`. См. LLM_START §Native Roblox tools.
 
 **`CompositeBackend._state` и смерть суббекенда.** `is_alive = any(sub.is_alive())` — правильный контракт (degraded = поддержанное состояние). Но `backend_state(name)` читает `_state[name]`, который обновляется только через `_set_state` (вызывается из `open` / `close` / `reopen`). Если MCP-процесс умер сам — `backend_state("mcp")` продолжает врать «ready». Сейчас это не критично: GUI опрашивает per-backend state и переоткрывает MCP сам при следующем патче. Варианты: (a) периодический sync `_state` с `sub.is_alive()`; (b) subscription — суббекенд уведомляет композит о смерти; (c) не менять — считать `is_alive` ответом на «стоит ли пробовать», а точный per-backend state получать у самого суббекенда. Скорее всего (c) достаточно.
 
@@ -261,15 +341,15 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 
 **Tooling improvements from the 3a-3d session (открыто).** Наблюдения из сессии рефактора GUI. Приоритет — по убыванию пользы.
 
-1. **`verify_syntax` как tool.** Сейчас: `run_python(script="manual/verify_syntax.py", args=[path])`. Использовался ~6 раз, поймал бы `NameError` в `MainWindow.__init__` до перезапуска GUI. Как tool — один вызов, стандартный Result, путь не помнить. `{"action": "verify_syntax", "arguments": {"path": "..."}}`.
+1. ~~`verify_syntax` как tool.~~ **Закрыто (2026-10-13).** `toolkit/tools/verify.py` — `VerifySyntaxTool`, `paths` (список `.py` файлов/каталогов) или `directory`. Компиляция через `compile(src, path, "exec")` по тексту, прочитанному через backend (работает и на Roblox `.Source`). `error_code="syntax_error"` с L:C и текстом ошибки при провале.
 
 2. **`git_*` как tools.** `_git.py` — пользовательский скрипт в `manual/`, фактически критичен для workflow (10 коммитов за сессию). Как нативные tools (`git_commit`, `git_status`, `git_diff`, `git_log`) — стандартный Result, verify-after-write, не надо помнить путь.
 
-3. **`error_code` для скрытых путей.** `file_exists`, `read_file`, `file_stat` на dot-prefix путях дают `■ Скрытая папка` **без** `error_code`. В `##RESULT` попадает только `blocked: [1]` — не отличить от `.patchignore`. Нужен `error_code="hidden_path"` (или `filter` с `reason`).
+3. ~~`error_code` для скрытых путей.~~ **Закрыто (2026-10-13).** `filter_check` сменил сигнатуру с `str | None` на `(error_code, message) | None`. `WorkspaceBackend` различает `hidden_path` (совпал `.patchignore` или dot-dir) и `filter` (per-path policy / unknown root). `Patcher._filter_paths` пробрасывает код в `Result.error_code`. Тесты `test_workspace_backend.py` обновлены.
 
 4. **`get_index` path_filter.** `kind` обязателен, но нет фильтра по путям. Когда работаешь с одним файлом — 33 KB doc-индекса избыточны. `{"kind": "docs", "path_filter": "toolkit/docs/TOOL_PRACTICE.md"}`.
 
-5. **LLM_START: `run_python module=` — предупреждение.** `module` = `python -m` = `__main__`. Импорт модуля с `if __name__ == "__main__": run()` запускает его. **Инцидент:** `module="toolkit.runner.gui.app"` поднял второй GUI, мост ушёл в невалидное состояние, `rebuild_lua_code_index` падал с `Errno 22` до перезапуска. Нужно явное предупреждение в §7 и, возможно, проверка «модуль в `runner/gui/` или имеет `__main__`» → soft-warn в ответе.
+5. ~~LLM_START: `run_python module=` — предупреждение.~~ **Закрыто (2026-10-13).** В LLM_START §Execution (ru + en) добавлено предупреждение: `module=` = `python -m` = `__main__`; импорт модуля с `if __name__ == "__main__":` запустит его; инцидент с `toolkit.runner.gui.app` упомянут явно. Для проверки синтаксиса без запуска — `verify_syntax`.
 
 6. **`settings_window.py` не вынесен.** `_menu_project_settings` всё ещё открывает `gui/settings_window.py` напрямую (581 строка Tk). В Functional-Core парадигму не завернут. Отдельная задача, если понадобится headless-доступ к настройкам проекта — сейчас это чисто GUI-операция.
 

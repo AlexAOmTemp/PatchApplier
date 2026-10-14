@@ -22,7 +22,6 @@ from ..core.models import Module, Symbol
 
 
 DOCSTRING_MAX = 200
-HASH_LIMIT_BYTES = 2048
 HASH_MODULO = 2147483647
 
 
@@ -127,16 +126,15 @@ def _parse_suppress(text: str) -> frozenset[str]:
     return frozenset(names)
 
 
-def source_hash(source: str, limit: int = HASH_LIMIT_BYTES) -> tuple[int, int]:
-    """Polynomial hash over the first `limit` bytes; matches Lua-side impl.
+def source_hash(source: str) -> tuple[int, int]:
+    """Polynomial hash over the whole source; matches Lua-side impl.
 
     Returns (hash, length_bytes). Empty input -> (17, 0).
     """
     data = source.encode("utf-8")
-    n = min(len(data), limit)
     h = 17
-    for i in range(n):
-        h = (h * 31 + data[i]) % HASH_MODULO
+    for b in data:
+        h = (h * 31 + b) % HASH_MODULO
     return h, len(data)
 
 

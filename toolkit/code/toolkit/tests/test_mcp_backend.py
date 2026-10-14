@@ -13,7 +13,6 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import MCPBackend
-from toolkit.core import FilterSpec
 
 
 PASS = "[OK]  "
@@ -391,12 +390,11 @@ def _run_all(backend, root, t):
     print("== filter_check (no-op for Roblox) ==")
     # Roblox DataModel paths are not filtered by policy: access is gated
     # at the backend level (native_tools_enabled). filter_check always
-    # returns None regardless of the spec.
-    spec_deny = FilterSpec(overrides={"ReplicatedStorage": False})
-    t.expect("deny spec ignored -> None",
-             backend.filter_check("ReplicatedStorage.Foo", spec_deny) is None)
-    t.expect("deny spec ignored (server)",
-             backend.filter_check("ServerScriptService.Bar", spec_deny) is None)
+    # returns None regardless of the op.
+    t.expect("filter_check -> None (ReplicatedStorage)",
+             backend.filter_check("ReplicatedStorage.Foo", "read") is None)
+    t.expect("filter_check -> None (ServerScriptService)",
+             backend.filter_check("ServerScriptService.Bar", "write") is None)
 
     print()
     print("== retry: transient ==")

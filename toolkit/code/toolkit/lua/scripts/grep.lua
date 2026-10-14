@@ -1,3 +1,4 @@
+-- include: _match
 -- Grep over LuaSourceContainers under a root instance.
 -- The root itself is included if it is a LuaSourceContainer.
 -- Placeholders:
@@ -41,15 +42,6 @@ local function emit(s)
     return true
 end
 
-local function ascii_lower(s)
-    return (s:gsub('%u', function(c) return string.char(string.byte(c) + 32) end))
-end
-
-local function is_word(c)
-    if c == '' then return false end
-    return c:match('[%w_]') ~= nil
-end
-
 -- Returns true if processing should stop (truncated).
 local function process(inst)
     if not inst:IsA('LuaSourceContainer') then return false end
@@ -62,20 +54,8 @@ local function process(inst)
     for i = 1, #lines do
         local hay = icase and ascii_lower(lines[i]) or lines[i]
         local needle = icase and ascii_lower(pattern) or pattern
-        local matched = false
-        local pos = 1
-        while pos <= #lines[i] do
-            local a, b = string.find(hay, needle, pos, plain)
-            if not a then break end
-            local ok_l = (a == 1) or not is_word(lines[i]:sub(a - 1, a - 1))
-            local ok_r = (b == #lines[i]) or not is_word(lines[i]:sub(b + 1, b + 1))
-            if (not wb) or (ok_l and ok_r) then
-                matched = true
-                break
-            end
-            pos = a + 1
-        end
-        if matched then
+        local a = match_from(lines[i], hay, needle, 1, plain, wb)
+        if a then
             match_count = match_count + 1
             if before_n > 0 or after_n > 0 then
                 local s = math.max(1, i - before_n)

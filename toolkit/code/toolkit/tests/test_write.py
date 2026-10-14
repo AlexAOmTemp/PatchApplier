@@ -39,7 +39,7 @@ class T:
             self.failed += 1
 
 
-def _run_patches(backend_root: Path, patches: list[dict], filter_paths: list[str] | None = None):
+def _run_patches(backend_root: Path, patches: list[dict]):
     backend = FilesystemBackend(backend_root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
@@ -162,16 +162,6 @@ def main():
         t.expect("old BBB gone", "BBB" not in content)
         t.expect("CCC gone (was in range)", "CCC" not in content)
         t.expect("DDD preserved", "DDD" in content)
-
-        # --- filter blocks ---
-        print()
-        print("== filter blocks ==")
-        r = _run_patches(root, [
-            {"action": "replace_in_file", "arguments": {
-                "file_path": "a.md", "search": "NEW", "replace": "OLD"}},
-        ], filter_paths=["sub"])[0]
-        t.expect("write blocked by filter", r.status == "blocked",
-                 f"{r.status}: {r.message}")
 
     print()
     if t.failed:

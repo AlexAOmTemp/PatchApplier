@@ -1,8 +1,5 @@
-.patch_applier/INDEX.md (файлов: 23, без summary: 188) [v476] [~1, ⇅8, +2]
-  ~ toolkit/docs/SESSION_STATE.md §Что проверить в начале следующей сессии (L206–L213, 1.0 KB, ⚠ no summary)
-  + toolkit/docs/SESSION_STATE.md §Сессия: Functional Core refactor + replace_range validation (закрыта) (L12–L50, 5.4 KB, ⚠ no summary)
-  + toolkit/docs/SESSION_STATE.md §Фиксы и улучшения тулов (L34–L41, 1.6 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 52, без summary: 219) [v566] [без изменений]
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 176, символов: 1207) [v529] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1218) [v629] [без изменений]
 
-CODE_INDEX_LUA.md + CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v349] [без изменений]
+.patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v401] [без изменений]

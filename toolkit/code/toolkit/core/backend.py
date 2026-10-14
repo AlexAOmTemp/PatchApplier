@@ -61,10 +61,16 @@ class Backend(Protocol):
 
     # --- filter -----------------------------------------------------------
 
-    def filter_check(self, path: str, op: str) -> str | None:
-        """None = ok. Otherwise — error message with block-reason prefix.
+    def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
+        """None = ok. Otherwise (error_code, message).
 
         `op` selects which policy flag to consult: read, write, or one
         of the index flags (index_docs / index_py / index_lua).
+
+        error_code distinguishes the reason for blocking:
+          "hidden_path" — matched .patchignore or a dot-dir default;
+          "filter"      — denied by per-path policy, or unknown root.
+        The two had no distinguishing signal before; the GUI/LLM saw
+        only `■ blocked` and could not tell which rule fired.
         """
         ...

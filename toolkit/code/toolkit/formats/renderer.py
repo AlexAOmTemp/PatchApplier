@@ -194,7 +194,11 @@ def _render_section(s: Section, depth: int, source: str, out: list[str]) -> None
         l_end = l_start + n_newlines
 
     markers: list[str] = []
-    if s.summary is None:
+    # `⚠ no summary` is shown only for top-level sections (`##`). In a
+    # project where the convention is "summary only on `##`", marking
+    # every `###`/`####` produced 90% noise. A subsection is expected to
+    # inherit context from its parent.
+    if s.summary is None and s.level <= 2:
         markers.append("\u26a0 no summary")
     elif s.stale:
         markers.append("\u26a0 stale")

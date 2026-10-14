@@ -303,8 +303,8 @@ class WorkspaceBackend:
 
     # --- filter ------------------------------------------------------------
 
-    def filter_check(self, path: str, op: str) -> str | None:
-        """None = ok. Otherwise a message with a block reason.
+    def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
+        """None = ok. Otherwise (error_code, message).
 
         Rules (see WORKSPACE_BACKEND.md §5):
           0. State prefix (`.patch_applier/`) is always OK.
@@ -320,11 +320,11 @@ class WorkspaceBackend:
         if name == patchignore.STATE_DIR:
             return None
         if name not in self.roots:
-            return f"root '{name}' not in workspace"
+            return ("filter", f"root '{name}' not in workspace")
         rel_norm = rel.replace("\\", "/")
         if rel_norm and patchignore.path_hidden(rel_norm, self._patterns):
-            return f"Скрытая папка: {path}"
+            return ("hidden_path", f"Скрытая папка: {path}")
         pol = self.ws.policy_for(name, rel_norm)
         if not bool(getattr(pol, op, True)):
-            return f"Запрещено политикой: {path}"
+            return ("filter", f"Запрещено политикой: {path}")
         return None

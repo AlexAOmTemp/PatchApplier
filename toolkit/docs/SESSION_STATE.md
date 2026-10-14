@@ -1,6 +1,6 @@
 # SESSION_STATE — состояние между сессиями
 
-<!-- summary: Snapshot of what was done in the last big session (Functional Core refactor) and what to pick up next. Update on session close, read on session start. -->
+<!-- summary: Snapshot of what was done in the last big session (multi-root finalization + GUI perf + first external project) and what to pick up next. Update on session close, read on session start. -->
 <!-- tags: session, state, bridge -->
 
 ## Зачем этот документ
@@ -8,6 +8,134 @@
 LLM_START — стабильная инструкция. DECISIONS — почему так решено. SESSION_STATE — **где мы прямо сейчас**: что закрыто в последней сессии, что открыто, что первым делом проверить при следующем старте.
 
 Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.
+
+## Сессия: multi-root финализация + GUI-производительность + первый внешний проект (закрыта)
+
+**Тема:** довести multi-root модель до конца; починить отзывчивость Project settings на большом корне; освоить первый внешний проект (RimWorld) как кейс reconnaissance-driven workflow; закрыть накопившееся мелкое из DECISIONS.
+
+**Ключевые решения:**
+
+- **`.patchignore` — один, в `state_dir`.** `FilesystemBackend` больше не знает про `.patchignore` и не создаёт его в корне как side-effect старого `open()`. Policy и скрытие — концерн `WorkspaceBackend`, читается из `state_dir`.
+- **`filter_check` возвращает `(error_code, message) | None`,** не `str | None`. `hidden_path` (скрыто `.patchignore` / dot-dir) отделён от `filter` (per-path policy / unknown root). В `##RESULT` теперь различимо.
+- **`survey_dir` — новый тул.** Первый контакт с незнакомым корнем: агрегат по расширениям + подкаталоги первого уровня. `list_files` при >2000 файлов отдаёт счётчик вместо плоского списка.
+- **GUI Project settings — три уровня оптимизации.** (1) `scan_subdirs_ex` с `DEFAULT_SCAN_MAX_ROWS=200` — RimWorld останавливается на depth 2, не уходит в глубину каждого мода; (2) скан всегда с `show_hidden=True` (superset), фильтр в памяти — toggle без повторного диска; (3) чанковый рендер через `after` + кэш подписи в `PolicyTree.render`. Census в корневой строке (`[RimWorld] (115 dirs, 3 hidden)`).
+- **Корневая политика отображается по эффективному значению,** не по наличию override. У корня нет родителя — точка «не задано» бессмысленна.
+- **`verify_syntax` как тул.** `compile(src, path, "exec")` по тексту из backend, без импорта. Заменяет ad-hoc `run_python(script="manual/verify_syntax.py")`.
+- **`⚠ no summary` — только на `##`.** В проектах, где summary только на верхнем уровне, метка на `###`/`####` была 90% шума.
+- **`run_python module=` = `python -m` = `__main__`.** Инцидент: `module="toolkit.runner.gui.app"` поднял второй GUI. Явное предупреждение в LLM_START §Execution (ru+en).
+
+### Что сделано
+
+**Код:**
+- `FilesystemBackend`: убраны `_patterns`, `ensure_default`, `reload_patterns` — мёртвый код с side-effect.
+- `WorkspaceBackend.filter_check` → `tuple[str, str] | None`; различает `hidden_path` и `filter`.
+- `Patcher._filter_paths` пробрасывает код в `Result.error_code`.
+- `toolkit/tools/verify.py` — `VerifySyntaxTool`, зарегистрирован в `TOOL_MAP`.
+- `toolkit/tools/read.py` — `SurveyDirTool`; `list_files` при >2000 файлов возвращает счётчик.
+- `formats/renderer.py` — `⚠ no summary` только на уровне 2.
+- `config/loader.py` — `scan_subdirs_ex` с cap `DEFAULT_SCAN_MAX_ROWS=200`; старый `scan_subdirs` как тонкая обёртка.
+- `runner/gui/settings_window.py` — lazy render, кэш скана, кэш подписи в `PolicyTree`, чанковый рендер.
+- `runner/gui/tree_view.py` — кэш подписи, `invalidate()`, корневая политика по эффективному значению.
+
+**Доки:**
+- `LLM_START.ru.md` / `.en.md`: `survey_dir` в §Чтение; `hidden_path` в §13; `verify_syntax` + `module=` warning в §Execution; cheat-sheet §11.
+- `DECISIONS.md`: §Workspace refactor актуализирован; §Единый текстовый матчинг (открыто); §Внешние проекты: reconnaissance-driven workflow; закрыты `read_symbol include=*`, Passthrough MCP, `hidden_path`, `verify_syntax`, `module=` warning, `⚠ no summary` для подсекций.
+
+**Гигиена:**
+- `toolkit/.gitignore` — runtime-scratch (`last_patch.json`, `last_output.txt`, `last_diff.txt`) и `bridge_timings.log`.
+- Удалён `RimWorld/.patchignore` (side-effect старого open); `.patch_applier/.patchignore` — авторитетный.
+- `bridge_timings.log` (663 KB) удалён.
+
+### Проверено live (RimWorld, 86 модов)
+
+- Reconnaissance: `survey_dir` показал форму дерева (29 712 файлов, 1.5 GB) за один вызов.
+- `rimworld_inventory.py` — таблица 86 модов с именами из `About.xml` (`xml.etree`, не regex — regex нашёл первый `<packageId>` в `<modDependencies>`).
+- Патч големов: `<VacuumResistance>1</VacuumResistance>` через `<Patches>` — фикс одной строкой XML, без декомпиляции DLL.
+- `test_workspace_backend.py` — 29/29 на двух корнях.
+
+### Что открыто
+
+- **`.llmscope` + три тула.** Согласовано в деталях: include-only белый список, файл в `state_dir`, `get_scope` / `set_scope` / `clear_scope`, секция `## Scope` в `get_status`, фильтрация в `list_files` / `survey_dir` / `grep`. Отдельная сессия.
+- **Единый текстовый матчинг.** `toolkit/matching/text.py` с `find_text(...)`; tier'ы (`none` / `trailing` / `eol` / `eol+trailing`), общий для `replace_in_file` / `replace_between` / `insert_at_anchor` / `replace_range`. Единый `no_match` с кандидатами. Отдельная сессия. См. `DECISIONS §Единый текстовый матчинг`.
+- **`get_index overview`.** Сжатый вид на 5 KB вместо 150 KB. Идея: единая точка входа поверх трёх файлов; не «один индекс» — «разные источники, единое представление».
+- **Rojo backend.** Третий namespace.
+- **Символьный reverse phase 2, diff edges, новые маркеры.** См. `DECISIONS §2.2`.
+- **Пороги маркеров в конфиг.** `_LARGE_FILE_LINES` / `_LARGE_FILE_KB` / `_LARGE_SYMBOL_LINES` — hard-coded в `renderer.py`.
+- **`TOOL_PRACTICE §2`** — таблица «Инвентарь» устарела после удаления символьных тулов.
+- **`Lua reverse-dep graph`** — `script.*`-формы не резолвятся в `_invert_lua_imports`.
+- **`_lua_script` кэш без mtime.** Правки Lua-скриптов видны только после рестарта GUI (для разработчика утилиты).
+- **`get_index path_filter`** — фильтр по путям для одного файла. Простое поле.
+
+### Проверить в начале следующей сессии
+
+1. `get_status` — backend `composite`, mcp/rojo состояние, версии индексов (`[vN]`), `roots: RimWorld, toolkit` (если живёт тот же проект).
+2. `run_all.py` — exit=0.
+3. Открыть Project settings на RimWorld-корне — должно быть мгновенно (lazy render + кэш).
+4. `verify_syntax(paths=[...])` — на одном файле после правок.
+
+---
+
+## Сессия: grep_replace + shared matcher (закрыта)
+
+**Тема:** реализовать FS-side `grep_replace` как аналог `grep_replace_mcp`, вынести общий матчер, синхронизировать `grep` ↔ `grep_replace` внутри каждого домена, почистить устаревшие тесты, обновить доки под новую модель.
+
+**Ключевые решения:**
+
+- **Симметрия `grep` ↔ `grep_replace` — контракт, не пожелание.** Один матчер `toolkit/matching/Pattern`, одинаковые match-параметры и дефолты внутри домена. Что `grep` нашёл — то `grep_replace` заменит. FS↔MCP не унифицируются (разный язык паттернов), симметрия гарантируется **внутри** каждого домена.
+- **`no_matches` на FS — не ошибка.** Возвращается `ok` (симметрия с `grep`), не `error` как в MCP-версии.
+- **`dry_run=true` по умолчанию.** Двухпроходный гейт: pass 1 считает, pass 2 пишет. `too_many_replacements` до записи.
+- **Без all-or-nothing отката.** Per-file atomic write: падение N-го файла не откатывает 1..N-1. Сознательный компромисс (в MCP-версии проблемы нет по построению).
+- **`word_boundary` добавлен в FS-`grep`.** Раньше был только на MCP-стороне; без него `grep_replace` имел бы флаг, недоступный парному `grep`.
+
+### Что сделано
+
+**Новый слой `toolkit/matching/`.**
+- `word.py` — `is_word` (ASCII-only, под Lua `[%w_]`).
+- `pattern.py` — `Pattern` с `search` / `finditer` / `sub`. Один объект, симметрия по построению.
+- Не в `core/` (там священный инвариант). Правило зависимостей обновлено: `tools → {backends, formats, indexers, matching} → core`.
+
+**`toolkit/tools/grep_replace.py` (FS).** Симметрия с `grep` по построению. `pattern` / `mappings`, `regex` (дефолт `true`) / `fixed_strings` / `ignore_case` / `word_boundary`, `paths` / `directory`+`file_glob` / `exclude_glob`, `max_replacements` (дефолт 1000), `dry_run` (дефолт `true`). Работает на `.md` / `.py` / `.lua` / `.luau` (Rojo).
+
+**`toolkit/tools/read.py::GrepTool`.** Рефакторинг матчера: inline `re.compile` → `Pattern`. Добавлен `word_boundary`.
+
+**Lua-side рефакторинг.**
+- `lua/scripts/_match.lua` — `ascii_lower`, `is_word`, `match_from`.
+- `grep.lua` и `grep_replace.lua` переписаны через `-- include: _match` (в `_lua_script` — препроцессинг, потому что `require` в `execute_luau` даёт свежую копию модуля, не shared instance).
+- Оба — per-line. Раньше `grep.lua` был per-line, `grep_replace.lua` — whole-source, расходились на `^` / `$`.
+
+**Регистрация.** `grep_replace` в `TOOL_MAP` и `__all__`. Оба FS-тула триггерят rebuild.
+
+**Тесты.** Удалены 8 устаревших файлов (тестировали удалённые 2026-10-11 символ-тулы и старый CLI-контракт): `test_section_tools`, `test_symbol_tools`, `test_lua_tools`, `test_lua_indent`, `test_apply_indent`, `test_code_tools`, `test_cli`, `manual/verify_grep_replace`. Починены `test_indexer` / `test_code_indexer` (устаревший `filter_spec=FilterSpec()`), `test_mcp_backend` (новая сигнатура `filter_check(path, op)`), `test_write` (мёртвый `filter_paths`). Создан `tests/test_grep_replace.py` (27 проверок). Обновлён `run_all.py`. Финальный прогон — `exit=0`.
+
+**Доки.**
+- `ARCHITECTURE.md` §1, §3 — добавлен слой `matching`, правило зависимостей, обновлён §5 (`refactor_rename` → `grep_replace_mcp`).
+- `LLM_START.ru.md` / `.en.md` — новая секция «Массовая замена по файлам (`grep_replace`)», симметрия в §7, `word_boundary` в таблице `grep`, обновлены §11 (cheat-sheet), §13 (коды ошибок), §16 (примеры `replace_unit(block=...)` вместо `replace_block`/`delete_block`).
+- `DECISIONS.md` §2.2 — `refactor_rename` закрыт для обоих доменов, симметрия с `grep` как контракт.
+- `CONFIG.md` §4, `REQUIREMENTS.md` §2/§5, `MCPBridgeRules.md` §1/§3 — убраны ссылки на удалённые тулы.
+
+### Проверено на живом Studio (AiTest, Edit mode)
+
+- Цикл ренейма `getMultiplier` → `calculateMultiplier` → обратно: симметрично, индекс возвращается к исходному состоянию (`[v357]` → `[v363]`, символы идентичны).
+- `word_boundary=true`: `Multiplier` не захватывает `getMultiplier` (0 совпадений). `word_boundary=false`: захватывает (3).
+- `mappings` (2 пары, longest-first): 5 замен за один проход, без каскада.
+- MCP overflow (`pattern="a"`, лимит 5): `too_many_replacements`, ничего не записано.
+- FS `dry_run`: 35 замен в 6 файлах по `toolkit/docs`, ничего не записано.
+- FS `noop_mapping` / `bad_input` (pattern + mappings) — отбито.
+- Lua-индекс увидел изменение символьного хеша без сдвига строк (`getNormalizedChances` помечен `(изменён)`).
+
+### Что открыто
+
+- **`dry_run=true` триггерит auto-rebuild.** Тул имеет `op=write`, router пересобирает индекс даже когда ничего не записано. Безопасно, но лишний проход. Направление фикса: `Patcher` смотрит на `[dry_run]` в сообщении и не триггерит rebuild.
+- **`verify_annotation` не реализован.** Упомянут в `DECISIONS §2.1` как замена `verify_section`, но в `TOOL_MAP` его нет. Помечен как не реализованный в DECISIONS, LLM_START, REQUIREMENTS.
+- **Старые смоуки `verify_*.py` в `manual/`** — 12 штук, не перенесены в `tests/`. Обсуждалось, не решено (было отмечено и ранее).
+- **`TOOL_PRACTICE §2`** — устарел (несколько тулов из «ни разу» реально использовались). Отдельная задача.
+- **`CONFIG.md` §4 (Policy), §6 (MCP), `README.md`, `LIFECYCLE.md`** — не перечитаны после config split / Workspace refactor. Отмечено в §2.4 ранее, в этой сессии затронуты только прямые ссылки на удалённые тулы.
+
+### Git log этой сессии
+
+См. `git log` — сессия закрыта без коммита, коммит делает человек.
+
+---
 
 ## Сессия: Functional Core refactor + replace_range validation (закрыта)
 
@@ -101,7 +229,7 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 - **`_git.py` args** — при `commit` с `word: msg` иногда `unknown subcommand`. Fallback добавлен (любой первый arg → commit), но точная причина не найдена. Не критично, работать можно.
 - **Tabs↔spaces auto в `replace_in_file`** — принципиально не делаем (indent значима).
 - **`replace_range`** — оставлен как escape hatch для module-level top region и файлов без парсера; в этой сессии не использовался.
-- **`grep_replace` на FS-стороне** — аналог `grep_replace_mcp` для файловой системы. В `TOOL_PRACTICE §8` числится как открытая идея, не делали.
+- **~~`grep_replace` на FS-стороне~~** — **реализован** (см. `DECISIONS §2.2`). Симметрия с `grep` через общий матчер `toolkit/matching/Pattern`, `word_boundary` добавлен и в FS-`grep`. Работает на `.md` / `.py` / `.luau`-на-диске. MCP-версия `grep_replace_mcp` отрефакторена: `grep.lua` и `grep_replace.lua` делят `_match.lua` через `-- include:`, оба переписаны per-line. Проверено на живом Studio (`AiTest`).
 - **Символьный reverse для Lua / Symbol Graph depth>1** — только Python, задокументировано.
 - **`Roots-line влияет на конфиг`** — не влияет: `set_context` чисто для `get_status`.
 - **`_initialize_project` / `router.plan_rebuilds`** — уже смотрят на `index_docs` / `index_python` / `index_lua`, отключённый источник не строит индекс.

@@ -280,8 +280,7 @@ end
 
 local function source_hash(source)
     local h = 17
-    local n = math.min(#source, 2048)
-    for i = 1, n do
+    for i = 1, #source do
         h = (h * 31 + string.byte(source, i)) % 2147483647
     end
     return h

@@ -433,7 +433,7 @@ class CompositeBackend:
 
     # --- filter ------------------------------------------------------------
 
-    def filter_check(self, path: str, op: str) -> str | None:
+    def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
         name, backend = self._owner(path)
         if backend is None:
             return None

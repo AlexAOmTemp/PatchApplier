@@ -123,16 +123,28 @@ The index is the map of the world: files, sections, line ranges, sizes, dependen
 ```json
 [{"id": 1, "action": "read_file", "arguments": {"file_path": "a.py"}}]
 [{"id": 2, "action": "replace_in_file", "arguments": {...}}]
-[{"id": "fix-import", "action": "replace_symbol", "arguments": {...}}]
+[{"id": "fix-import", "action": "replace_unit", "arguments": {...}}]
 ```
 
 **Format is groups.** Each action in its own `[...]`; groups go one after another. The separator (newline or comma) does not matter. A single action is also one group.
 
-**One fence for the whole patch, not per group.** Put the whole reply in one fence with all groups inside. **Do not wrap each `[...]` in its own fence** — that splits the patch into several documents on the user's side, which have to be copied one by one. Correct shape:
+**One fence for the whole patch, not per group.** This rule has no exceptions. The whole reply goes in **one** fence with all groups inside. A fence per `[...]` splits the patch into several documents on the user's side, and they copy them one by one — or lose some.
 
-- one fence, all groups inside, each group with its own `[...]`;
-- or no fence at all;
-- one fence per group is a mistake — it breaks copying.
+| How you write it | What the user sees | Result |
+|---|---|---|
+| **one** fence, all groups inside | one code block | ✓ one Ctrl+C |
+| no fence, just groups in a row | raw JSON | ✓ copies |
+| **its own fence per group** | N separate blocks | ✗ breaks copying, splits the patch |
+| one fence, but not all groups | part of the patch | ✗ silently drops actions |
+
+The same rule applies to the examples in §16 — each example there is shown as **one** fence.
+
+**Antipattern — the "broken fence".** This is the most common LLM mistake. Each group gets wrapped in its own code block:
+
+> fence → `[action 1]` → close fence
+> fence → `[action 2]` → close fence
+
+On the user's side this is N separate blocks, copied one by one. Some actions are lost. **Check before sending:** count the code-fence openings in your reply. It must be **exactly one** — or zero, if you write without a fence.
 
 **One action — one group.** Never merge several actions into a single array. Groups give independence (see below).
 
@@ -212,15 +224,20 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 | `read_file` | `file_path` + one of: `section_number` (`"4"`, `"4.1"`), `section_title` (substring), `start_line`+`end_line`; otherwise the whole file. Optional `numbered` (default `true`), `escape` (default `perline`), `max_bytes`. Legacy `raw` (`repr`/`text`/`numbered`) is accepted |
 | `file_stat` | `file_path` — size and section breakdown |
 | `file_exists` | `file_path` |
-| `list_files` | `directory`, optional `show_size` |
-| `grep` | `pattern` + (`paths`: list / `directory`+`file_glob`); `regex=true` by default, `fixed_strings` for a literal substring; optional `ignore_case`, `before`, `after`, `max_results`, `exclude_glob`. **Filesystem only.** Roblox path → `wrong_domain` error, use `grep_mcp` |
+| `list_files` | `directory`, optional `show_size`. Above 2000 files returns only a count and a hint to use `survey_dir` |
+| `survey_dir` | `path` (directory), optional `ext` (extension or list), `top` (default 20). Read-only: aggregate of "how many files and of which extensions" plus first-level subdir breakdown. For an **unfamiliar project** — first contact: see the shape of the tree without opening 30,000 paths |
+| `grep` | `pattern` + (`paths`: list / `directory`+`file_glob`); `regex=true` by default, `fixed_strings` for a literal substring; optional `ignore_case`, `word_boundary`, `before`, `after`, `max_results`, `exclude_glob`. **Filesystem only.** Roblox path → `wrong_domain` error, use `grep_mcp` |
 | `grep_mcp` | `pattern` + `directory` (Roblox path: **a module or a folder** — if it is the script itself, it is searched too); optional `fixed_strings` (default `false`), `ignore_case` (only with `fixed_strings=true`), `before`, `after`, `max_results` (default 200). **Roblox only.** Single `execute_luau` for the whole search. Pattern is **Lua patterns**, not Python regex: `%d`, `%w`, `%.`, `.-` (lazy). For `\d`, `\w`, `\b`, `|`, groups — use `grep` over exported code, or a simple literal |
 
 **`Result` fields.** `status` (`ok` / `error` / `skipped` / `blocked`), `message`, `delta` (for write tools, `None` for reads), `verified` (`bool` for write tools with read-after-write, `None` otherwise), `error_code`, `action`.
 
 `read_file` with no arguments reads the whole file — only for small ones. For a section inside a multi-file index use `section_number` (numbers are more reliable than titles: titles can repeat).
 
-**About `grep`.** `paths` is a list of **files**, not directories; a directory in `paths` silently becomes "skipped files". For recursion use `directory` + `file_glob`. By default `regex=true` — `pattern` is treated as a regular expression. For a literal substring pass `fixed_strings=true` (in that mode `regex` is ignored).
+**About `grep`.** `paths` is a list of **files**, not directories; a directory in `paths` silently becomes "skipped files". For recursion use `directory` + `file_glob`. By default `regex=true` — `pattern` is treated as a regular expression. For a literal substring pass `fixed_strings=true` (in that mode `regex` is ignored). `word_boundary=true` restricts a match to identifier boundaries (`[A-Za-z0-9_]` on both sides, ASCII — same as Lua `%w`); `Multiplier` will not capture `getMultiplier`.
+
+**`grep` ↔ `grep_replace` — symmetry.** `grep_replace` (FS) and `grep_replace_mcp` (Roblox) share the **same matcher** and the same match options as their `grep` / `grep_mcp` counterparts: `pattern`, `regex`, `fixed_strings`, `ignore_case`, `word_boundary`. **What `grep` found with those arguments, `grep_replace` will replace.** This is a contract, not a coincidence.
+
+**Reconnaissance of an unfamiliar root.** When a project root is a foreign world (a game, someone else's codebase, an archive), do not start with `list_files` or `grep`. Start with `survey_dir` over the root: you get per-extension counts and top subdirectories — the shape of the tree in 100 lines instead of 30,000. From there you decide what matters, what goes into `.patchignore`, and only then read selectively.
 
 ### Writing (text tools, escape hatch)
 
@@ -254,6 +271,30 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 **`expected_first_line`** in `replace_range` verifies the first line of the range. On mismatch → `content_mismatch`, file untouched.
 
 **`replace_range` and `replace_in_file` are unreliable.** Use them only when no structural tool exists.
+
+### Bulk replace across files (`grep_replace`)
+<!-- summary: grep_replace — bulk replace over the filesystem, symmetric with grep. Shared matcher, two-pass gate (no_matches as ok / too_many_replacements before writing), dry_run=true by default, per-file atomic write. Works on docs, Python, Luau-on-disk (Rojo). Not to be confused with grep_replace_mcp. -->
+<!-- tags: tools, bulk-replace, filesystem -->
+
+**`grep_replace`** — find-and-replace over the filesystem: `.md`, `.py`, `.lua`, `.luau` (in Rojo mode), any text file. Symmetric with `grep`: same `paths` / `directory`+`file_glob` / `exclude_glob`, same `regex`, `fixed_strings`, `ignore_case`, `word_boundary` (and the same `regex=true` default). **What `grep` found — `grep_replace` will replace.**
+
+**Contract.** Exactly one of `pattern` / `mappings`:
+
+- `pattern` + `replacement` — single replacement (Python regex, or literal when `fixed_strings=true`).
+- `mappings` — an array of `[{"from": "...", "to": "..."}]`. All pairs are applied **in a single pass, simultaneously** (longest-first, no cascade). `mappings` requires `fixed_strings=true`; `ignore_case` is not supported with `mappings`.
+
+**Two-pass gate.** Pass 1 counts replacements without writing. If `total == 0` → `ok` with a "no matches" message (symmetric with `grep`, **not an error**). If `total > max_replacements` (default 1000) → `too_many_replacements`, **nothing written**. Pass 2 writes, only when `dry_run=false`. Default `dry_run=true`.
+
+**What happens on write.** Each file is checked against policy (`write`) independently: `blocked` files land in a separate list, the rest are applied. No rollback: a failure on the N-th file does not revert 1..N-1 (the MCP version does not have this problem — it is atomic by construction). Partial state is a deliberate trade-off.
+
+**Strategy.** Same as `grep_replace_mcp`:
+
+- **A (safe, two patches).** First `grep` — see where and how many matches. Then `grep_replace(..., dry_run=true)` — see per-file counts. If they match — `dry_run=false`.
+- **B (fast, one patch).** Call `grep_replace(..., dry_run=false, max_replacements=N)` directly, where `N` is the expected number of replacements. If reality exceeds it, the tool refuses without writing.
+
+**Limits.** Text replacement, no AST: comments and string literals are included in the search by definition. Does not distinguish `local X` from a global `X`. Symmetry is guaranteed **within** a domain: FS `grep` ↔ FS `grep_replace`, MCP `grep_mcp` ↔ MCP `grep_replace_mcp`. Across domains — different pattern languages (Python `re` vs Lua patterns), which is fine.
+
+**Typical use case.** Rename an identifier across the whole project: `grep_replace(pattern="getMultiplier", replacement="calcMul", fixed_strings=true, word_boundary=true)`. Or a batch: `mappings=[{"from": "getNormalizedChances", "to": "computeChances"}, {"from": "getMultiplier", "to": "calcMul"}]`. Or a mass edit in docs: `grep_replace(pattern="quest", replacement="mission", directory="docs", fixed_strings=true)`.
 
 ### Roblox: bulk replace via bridge (`grep_replace_mcp`)
 <!-- summary: grep_replace_mcp — bulk replace over .Source of Roblox scripts via bridge. Shared matcher with grep_mcp, two-pass gate (no_matches / too_many_replacements before writing), strategies A (two patches) / B (max_replacements). Not to be confused with replace_in_file. -->
@@ -308,8 +349,7 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 |---|---|
 | `list_units` | `file_path` — map of units: qualname + kind + L-range + block count |
 | `read_unit` | `file_path`, `address` (JSON); optional `part`, `block`. Text. Block range — with `=== block N ===` markers |
-| `replace_unit` | `file_path`, `address`, `new_text`; optional `part` (`all` default — replace entirely; `"body"` — body only, head and annotation preserved) |
-_(replaced by `replace_unit` with `block=` — see above)_
+| `replace_unit` | `file_path`, `address`, `new_text`; **exactly one of `part` / `block`** (no default — otherwise `scope_required`). `part="all"` — replace entirely; `part="body"` — body only, head and annotation preserved; `part="own_body"` — body without subsections. `block` (number / `"1-4"` / list) — blocks inside body. **Empty `new_text` is a deletion:** with `block` — those blocks; with `part="all"` — the whole unit. With other `part` — empties that part in place |
 | `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — block number or qualname of a child unit (required for `before`/`after`) |
 | `set_annotation` | `file_path`, `address`, `text` — replace annotation. **Only if it already exists** (otherwise `no_annotation`). Form is chosen by the tool |
 
@@ -350,7 +390,8 @@ _(replaced by `replace_unit` with `block=` — see above)_
 
 | Action | Arguments |
 |---|---|
-| `run_python` | one of `script` (a `.py` path inside the project) / `module` (dotted name); optional `args` (list of strings), `cwd`, `timeout`, `max_bytes`, `env` |
+| `run_python` | one of `script` (a `.py` path inside the project) / `module` (dotted name); optional `args` (list of strings), `cwd`, `timeout`, `max_bytes`, `env`. **⚠ `module=` = `python -m` = `__main__`:** importing a module with `if __name__ == "__main__":` will run it. Incident: `module="toolkit.runner.gui.app"` spawned a second GUI and broke the bridge. For syntax-only verification without running — use `verify_syntax` |
+| `verify_syntax` | `paths` (list of `.py` files or directories) or `directory`; compiles via `compile(src, path, "exec")` with no imports and no side effects. Replaces the ad-hoc `run_python(script="manual/verify_syntax.py")`. Useful before a commit to confirm edits did not break the syntax |
 
 ### Native Roblox tools (when enabled)
 
@@ -361,6 +402,8 @@ Works only if `exec.enabled=true` in the config. Constraints: only `sys.executab
 **`run_python` is not under `filter.read` / `filter.write`.** It has its own gate — `exec.enabled`. Both `script` and `cwd` are checked against "inside `project_dir`", not against `FilterSpec`: `script` must be a `.py` inside the project, `cwd` must be an existing directory inside the project. So tests that write to temporary subdirectories of the project work even when the `write` policy does not allow those subdirectories.
 
 ## 8. Index versions and diffs
+
+<!-- summary: A monotonic version counter per index; after a write patch, a rebuild is triggered by the touched path's domain; three operational rules for reading the diff (check diff after every write, compare `[vN]` on unexpected results, `[no changes]` ≠ "files did not change"). -->
 
 Each index has one **monotonic version counter**: `[v1]`, `[v2]`, ..., `[v42]`. It grows on every rebuild and never resets. The counter is visible in `get_status`, `get_index`, and every `rebuild_*` output.
 
@@ -378,9 +421,13 @@ Each domain is enabled separately (`index_docs` / `index_python` / `index_lua`).
 
 **Symbol hash in the Lua index.** Each symbol in `CODE_INDEX_LUA.md` carries a hash — `- qualname [kind] (Lx–Ly) H1234567`. It is a hash of the source fragment (signature + body). It lets the diff see edits that **do not shift lines**: if a function body changes by a few characters without changing line count, the L-range stays the same but the hash changes → the symbol appears in the diff as `~ qualname ... (changed)`. `CODE_INDEX.md` (Python) has no per-symbol hash — its diff relies on the L-range.
 
-- The diff is **cumulative from what was on disk** before the current rebuild, not from what you remember.
-- If the patch did not change structure, the diff is empty: `[без изменений]` / `[no changes]`.
-- You remember `[v42]` from your last `get_index`. You see `[v45, +2]` — three rebuilds happened in between, you missed two. A small gap — trust the diff. A large or suspicious gap — call `get_index` again. Do not stack diffs from memory — overlay of several diffs is error-prone.
+**How to read the diff.** Three rules, all operational:
+
+1. **After every file-changing patch, check the index diff.** It shows the real file changes — not the patch's intent, not your memory, but what actually changed on disk. If the diff is empty (`[no changes]`), nothing on disk changed.
+
+2. **If the diff is not what you expected, compare `[vN]`.** You remember the last `[vN]` you saw. If you now see `[vN+K]` with K > 1, a missed rebuild happened in between (automatic warm-up on GUI restart, someone else's rebuild) and could have changed anything. A small gap (1–2) — trust the diff. A large or suspicious one — call `get_index` again; do not stack diffs from memory.
+
+3. **`[no changes]` ≠ "files did not change".** It means "the on-disk index matches what would be built now". A missed warm-up may have already rebuilt the index with new data, and then the next rebuild honestly reports `[no changes]`, even though files changed between your last read and now. Verify by version number: if `[vN]` grew while the diff is empty, someone (warm-up, another process) already accounted for those changes.
 
 ## 9. Markdown document format
 
@@ -408,7 +455,7 @@ Markers are **facts**, not judgements. Each comes from the AST, the import graph
 **Documents (markdown).**
 
 - `⚠ no summary` — the section has no `<!-- summary -->`. Add one via `set_annotation`.
-- `⚠ stale` — the body changed since the summary was last confirmed. Applies **only to markdown sections** (`## N.`, `### N.M`). Read the section and refresh the annotation via `set_annotation` (if the description is outdated). Confirming without touching the file is not yet available in the new model (a `verify_section` analogue).
+- `⚠ stale` — the body changed since the summary was last confirmed. Applies **only to markdown sections** (`## N.`, `### N.M`). Read the section and refresh the annotation via `set_annotation` (if the description is outdated). Confirming without touching the file (an analogue of the old `verify_section`) is not implemented in the current model.
 - `⚠ large` — leaf section >16 KB. Split it into `### N.M` subsections or leave as is.
 
 **Code (Python and Lua).** Module-level: suffix on the header line `## path  (N lines, M KB) <markers>`. Symbol-level: suffix after the L-range.
@@ -452,6 +499,8 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 | Who imports a module | `find_usages query="path/to/mod"` |
 | Replace a line (exact / with trailing) | `replace_in_file` (tier 1 / tier 2) |
 | Regex replace | `replace_in_file regex=true` |
+| First look at an unfamiliar root | `survey_dir` |
+| Bulk replace across files (docs / Python / Luau-on-disk) | `grep_replace` |
 | Bulk replace in Roblox code | `grep_replace_mcp` |
 | Rebuild index after an edit | `rebuild_*` (auto on write) |
 | Run a test / script | `run_python` |
@@ -464,7 +513,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 
 **Make an edit:**
 1. `read_file section_number="N"` — read the section.
-2. If `⚠ stale` — rewrite the annotation via `set_annotation` (if the description is outdated). Confirming without touching the file (a `verify_section` analogue) is not yet available in the new model.
+2. If `⚠ stale` — rewrite the annotation via `set_annotation` (if the description is outdated). Confirming without touching the file (an analogue of the old `verify_section`) is not implemented in the current model.
 3. Build the patch.
 4. Verify with another `read_file`.
 
@@ -500,6 +549,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 
 ## 12. What to remember
 
+- **One fence per patch.** Do not wrap each group in its own code block — the whole reply goes in **one** block (or none at all). The most common mistake is the "broken fence". See §5.
 - **Do not rely on memory.** If a fact matters for a decision — re-read it.
 - **`⚠ stale` ≠ "outdated".** It means "not verified after an edit". Refresh the annotation via `set_annotation` if the description is stale.
 - **`blocked` ≠ `error`.** `blocked` is policy or sandbox; do not retry, tell the user.
@@ -557,7 +607,8 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - `manifest_invalid` — manifest is not JSON or not a list of modules.
 
 **Policy and sandbox (`status=blocked`, do not retry):**
-- `filter` — path blocked by policy or hidden via `.patchignore`. Tell the user; opened via the GUI.
+- `hidden_path` — path hidden via `.patchignore` or as a dot-dir. Not reachable through normal tools; the user can open it via the GUI.
+- `filter` — path denied by per-path policy (read/write/index from `workspace.json`), or the root is not declared in the workspace.
 - `sandbox` — path outside the project.
 - `backend_not_ready` — MCP (Roblox) not up yet or crashed. Wait, or hit `↻` in the GUI.
 - `native_tools_disabled` — a native MCP tool was called but `mcp.native_tools.enabled=false` in config. A gate, not an error.
@@ -574,14 +625,15 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - `source_not_found` / `destination_exists` — `move_file` and `copy_file`.
 - `backend_not_supported` — `copy_file`: backend cannot `copy()` (e.g. MCP without clone semantics for this instance type).
 
-**Roblox: `grep_mcp` / `grep_replace_mcp`:**
-- `wrong_domain` — not a Roblox path (`Service.X.Y` required). For the filesystem use `grep` / `replace_in_file`.
-- `empty_pattern` — `grep_mcp`: empty `pattern`.
+**`grep` / `grep_replace` (FS), `grep_mcp` / `grep_replace_mcp` (Roblox):**
+- `wrong_domain` — path belongs to a different domain. For FS tools a Roblox path → error (use `*_mcp`); for MCP tools a filesystem path → error (use the FS version).
+- `empty_pattern` — `grep` / `grep_mcp`: empty `pattern`.
+- `bad_regex` — `grep` / `grep_replace` (FS): invalid Python regex in `pattern` when `regex=true, fixed_strings=false`.
 - `bad_options` — `ignore_case` without `fixed_strings=true`; `max_replacements <= 0`; `ignore_case` with `mappings`.
-- `bad_input` — `grep_replace_mcp`: exactly one of `pattern` / `mappings` is required.
+- `bad_input` — `grep_replace` / `grep_replace_mcp`: exactly one of `pattern` / `mappings` is required.
 - `empty_mappings` / `patterns_in_mappings_not_supported` / `bad_mapping` / `empty_mapping` / `noop_mapping` / `duplicate_mapping` — `mappings` shape problems.
-- `no_matches` — `grep_replace_mcp`: no matches. Nothing written.
-- `too_many_replacements` — total matches exceed `max_replacements`. Nothing written. Narrow the scope, add `word_boundary=true`, refine `pattern`, or raise the limit.
+- `no_matches` — on the FS side `grep_replace` returns **ok**, not error: message "no matches" (symmetric with `grep`). On `grep_replace_mcp` — `error_code=no_matches`; nothing written.
+- `too_many_replacements` — `grep_replace` / `grep_replace_mcp`: total replacements exceed `max_replacements`. Nothing written. Narrow the scope, add `word_boundary=true`, refine `pattern`, or raise the limit.
 - `backend_not_supported` — backend does not support `grep_mcp` / `grep_replace_mcp` (MCP required).
 
 **Copying structural units:**
@@ -670,14 +722,14 @@ Order matters: actions run in sequence. `replace_unit part="body"` preserves `he
                 "address": {"qualname": "Patcher._apply_one"},
                 "block": "1-5"}}]
 
-[{"id": "repl", "action": "replace_block",
+[{"id": "repl", "action": "replace_unit",
   "arguments": {"file_path": "toolkit/core/patcher.py",
                 "address": {"qualname": "Patcher._apply_one"},
                 "block": 3,
                 "new_text": "return self._short_circuit(patch)"}}]
 ```
 
-`block=3` is the third top-level statement. For several edits, replace a range (`block="3-5"`) or the **whole body** via `replace_unit part="body"` (one call instead of several `replace_block` with index shifts in between).
+`block=3` is the third top-level statement. For several edits, replace a range (`block="3-5"`) or the **whole body** via `replace_unit part="body"` (one call instead of several `replace_unit(block=...)` with index shifts in between).
 
 **Insert a block at start / end / next to an anchor:**
 
@@ -695,11 +747,14 @@ Order matters: actions run in sequence. `replace_unit part="body"` preserves `he
 **Delete a block:**
 
 ```json
-[{"id": "del", "action": "delete_block",
+[{"id": "del", "action": "replace_unit",
   "arguments": {"file_path": "toolkit/core/patcher.py",
                 "address": {"qualname": "Patcher._legacy_log"},
-                "block": 2}}]
+                "block": 2,
+                "new_text": ""}}]
 ```
+
+An empty `new_text` together with `block` deletes those blocks. An empty `new_text` with `part="all"` deletes the whole unit.
 
 **Trace a symbol's call chain:**
 

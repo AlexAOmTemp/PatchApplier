@@ -44,7 +44,7 @@ import pyperclip
 
 from ...config import patchignore as _pi
 from ...config import mcpignore as _mi
-from ...config.loader import scan_subdirs
+from ...config.loader import scan_subdirs_ex, DEFAULT_SCAN_MAX_ROWS as _SCAN_MAX_ROWS
 from ...config import workspace as ws_mod
 from ..projects import load_workspace, save_workspace
 from .tree_view import PolicyTree
@@ -321,6 +321,27 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
 
     show_hidden_var = tk.BooleanVar(value=False)
     tree_widgets: dict[str, PolicyTree] = {}
+    # Lazy render bookkeeping: which root tabs still need a first render,
+    # and the frozen column set from the last render. The column set only
+    # changes when Documentation / Python / Lua-on-disk toggles; MCP and
+    # Luau-mode toggles leave it alone, so they must not force a full
+    # tree rebuild (which on RimWorld means thousands of Tk widgets).
+    _dirty: set[str] = set()
+    _last_columns: set[str] = set()
+    # Directory scan cache. Keyed by (root_name, show_hidden); populated on
+    # first render of a root and reused for every later render that does
+    # not actually change which directories exist. Without this, switching
+    # tabs or toggling a source re-reads the disk even though the tree is
+    # the same — on a RimWorld root (~86 mods at depth 3) that is the
+    # dominant cost of the dialog feeling slow. Invalidated explicitly by
+    # _invalidate_scan() when .patchignore changes or a root is added or
+    # removed; show_hidden flip is a natural cache miss (different key).
+    # Scan cache: keyed by root_name only. The scan is always performed
+    # with show_hidden=True (hidden dirs are terminal so the result is a
+    # superset); filtering for the not-show-hidden view happens in memory.
+    # That makes the show-hidden toggle zero-disk: no cache miss, no
+    # re-walk — just a list comprehension and a re-render.
+    _scan_cache: dict[str, tuple[list, int | None]] = {}
 
     def _patterns():
         return _pi.read(state_dir)
@@ -335,27 +356,55 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             flags.add("index_lua")
         return flags
 
+    def _invalidate_scan(root_name: str | None = None) -> None:
+        """Drop cached scan results so the next render re-reads the disk.
+
+        Called after any change that can alter which directories exist or
+        are hidden: .patchignore edits, root add/remove.
+        """
+        if root_name is None:
+            _scan_cache.clear()
+        else:
+            _scan_cache.pop(root_name, None)
+
+    def _scan_dirs(name: str, root_obj) -> tuple[list, int | None]:
+        cached = _scan_cache.get(name)
+        if cached is not None:
+            return cached
+        try:
+            paths, truncated = scan_subdirs_ex(
+                Path(root_obj.path),
+                max_depth=_MAX_DEPTH,
+                patterns=_patterns(),
+                show_hidden=True,      # superset; filtered at render time
+                max_rows=_SCAN_MAX_ROWS,
+            )
+        except Exception:
+            paths, truncated = [], None
+        _scan_cache[name] = (paths, truncated)
+        return paths, truncated
+
     def _render_tab(name: str) -> None:
         pt = tree_widgets.get(name)
         root_obj = w.roots.get(name)
         if pt is None or root_obj is None:
             return
         pt.set_active_flags(_active_flags())
-        try:
-            dirs = scan_subdirs(
-                Path(root_obj.path),
-                max_depth=_MAX_DEPTH,
-                patterns=_patterns(),
-                show_hidden=bool(show_hidden_var.get()),
-            )
-        except Exception:
-            dirs = []
-        pt.render(dirs, show_hidden=bool(show_hidden_var.get()))
+        full, truncated = _scan_dirs(name, root_obj)
+        show_h = bool(show_hidden_var.get())
+        paths = full if show_h else [p for p in full if not p[1]]
+        pt.render(paths, show_hidden=show_h, truncated_at=truncated)
 
     def _rebuild_tabs() -> None:
+        nonlocal _last_columns
+        # Cache is keyed by (root_name, show_hidden) and remains valid
+        # across tab rebuilds as long as the set of roots and their
+        # contents did not change; only the set of roots being iterated
+        # differs. Dropped only when we know content may have changed.
         for tab_id in nb.tabs():
             nb.forget(tab_id)
         tree_widgets.clear()
+        _dirty.clear()
         for name in w.root_names():
             root_obj = w.roots[name]
             tab = tk.Frame(nb)
@@ -363,15 +412,46 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             pt.pack(fill="both", expand=True)
             tree_widgets[name] = pt
             nb.add(tab, text=name)
-        for name in w.root_names():
+            _dirty.add(name)
+        # Render only the selected tab now; the rest render on first switch
+        # (see _on_tab_changed). On a project with a large root this is the
+        # difference between "wait 10s on open" and "wait under 1s":
+        # policy rows are one Tk widget per cell, thousands of them at
+        # depth 3, and the previous code rendered every root twice.
+        try:
+            idx = nb.index(nb.select())
+            current = nb.tab(idx, "text")
+        except Exception:
+            current = None
+        if current in tree_widgets:
+            _render_tab(current)
+            _dirty.discard(current)
+        _last_columns = _active_flags()
+
+    def _on_tab_changed(_event=None) -> None:
+        try:
+            idx = nb.index(nb.select())
+            name = nb.tab(idx, "text")
+        except Exception:
+            return
+        if name in _dirty:
             _render_tab(name)
+            _dirty.discard(name)
 
     def _on_show_hidden():
-        for name in w.root_names():
-            _render_tab(name)
-    show_hidden_var.trace_add("write", lambda *_: _on_show_hidden())
+        # Visibility of hidden rows changed: input to render() changes, so
+        # bypass the signature cache. The scan cache is keyed by
+        # show_hidden, so a flip is a natural cache miss — no explicit
+        # invalidation needed.
+        for pt in tree_widgets.values():
+            pt.invalidate()
+        _dirty.update(w.root_names())
+        _on_tab_changed()
+    show_hidden_var.trace_add(
+        "write", lambda *_: dlg.after_idle(_on_show_hidden))
 
     _rebuild_tabs()
+    nb.bind("<<NotebookTabChanged>>", _on_tab_changed)
 
     roots_ctrl = tk.Frame(roots_frame)
     roots_ctrl.pack(fill="x", pady=(6, 0))
@@ -385,6 +465,8 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         except ValueError as e:
             messagebox.showerror("Cannot add root", str(e), parent=dlg)
             return
+        # A newly added root has no cache entry yet, so no explicit
+        # invalidation is required — its first render scans fresh.
         _rebuild_tabs()
         try:
             nb.select(len(nb.tabs()) - 1)
@@ -406,6 +488,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
                 parent=dlg):
             return
         w.roots.pop(name, None)
+        _invalidate_scan(name)
         _rebuild_tabs()
 
     add_btn = tk.Button(roots_ctrl, text="Add root\u2026", command=_add_root)
@@ -421,11 +504,28 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     # --- ignore editor openers (defined after paths)
 
     def _open_pi():
+        def _after_edit():
+            # .patchignore changed on disk: any cached scan for any root
+            # is now potentially stale, because hidden paths may have
+            # moved. Drop everything, then rebuild the visible tab.
+            _invalidate_scan()
+            pi_label_var.set(_count_label(pi_path))
+            _on_show_hidden()
         _open_ignore_editor(dlg, pi_path, "Hide filesystem paths",
                             _pi.DEFAULT_PATCHIGNORE,
-                            on_saved=lambda: (
-                                pi_label_var.set(_count_label(pi_path)),
-                                _on_show_hidden()))
+                            on_saved=_after_edit)
+
+    def _on_scan_cache_dirty():
+        """Called after any change that alters which dirs exist or are hidden.
+
+        Invalidates the signature caches on every tree and rebuilds only
+        the visible tab. Kept separate from _on_show_hidden because the
+        two have different reasons but the same effect on trees.
+        """
+        for pt in tree_widgets.values():
+            pt.invalidate()
+        _dirty.update(w.root_names())
+        _on_tab_changed()
 
     def _open_mi():
         _open_ignore_editor(dlg, mi_path, "Hide Roblox modules",
@@ -494,9 +594,17 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         rm_btn.config(state=st)
 
     def _sync_tree_columns():
-        # Column set changed: re-render all tabs.
-        for name in w.root_names():
-            _render_tab(name)
+        # Only re-render when the visible column set actually changed.
+        # mcp_var and luau_var changes flow through _sync_all too, but they
+        # do not affect columns — skipping them avoids a full tree rebuild
+        # on every unrelated checkbox toggle.
+        nonlocal _last_columns
+        cur = _active_flags()
+        if cur == _last_columns:
+            return
+        _last_columns = cur
+        _dirty.update(w.root_names())
+        _on_tab_changed()
 
     def _sync_mcp_label():
         mcp = bool(mcp_var.get())
@@ -518,11 +626,25 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         _sync_tree_columns()
         _sync_mcp_label()
 
-    docs_var.trace_add("write", lambda *_: _sync_all())
-    py_var.trace_add("write", lambda *_: _sync_all())
-    mcp_var.trace_add("write", lambda *_: _sync_all())
-    rojo_var.trace_add("write", lambda *_: _sync_all())
-    luau_var.trace_add("write", lambda *_: _sync_all())
+    def _defer(fn):
+        """Run fn after the current event finishes.
+
+        A trace_add callback runs inside Tk's variable-update path, before
+        the checkbox has been redrawn. Rebuilding the policy tree there
+        keeps the checkbox visually stuck mid-flip. after_idle defers the
+        work until Tk has caught up on drawing, so the toggle visibly
+        lands first.
+        """
+        try:
+            dlg.after_idle(fn)
+        except Exception:
+            fn()
+
+    docs_var.trace_add("write", lambda *_: _defer(_sync_all))
+    py_var.trace_add("write", lambda *_: _defer(_sync_all))
+    mcp_var.trace_add("write", lambda *_: _defer(_sync_all))
+    rojo_var.trace_add("write", lambda *_: _defer(_sync_all))
+    luau_var.trace_add("write", lambda *_: _defer(_sync_all))
     _sync_all()
 
     # --- buttons ------------------------------------------------------

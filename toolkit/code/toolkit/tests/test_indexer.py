@@ -13,7 +13,6 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import FilterSpec
 from toolkit.formats import Format
 from toolkit.indexers.doc import build_index
 from toolkit.indexers.diff import diff_index, parse_index_text
@@ -48,7 +47,6 @@ def main():
     result = build_index(
         backend, fmt,
         docs_dir="tests/fixtures",
-        filter_spec=FilterSpec(),
         skip_files={"INDEX.md", "INDEX_TEST.md"},
     )
     text = result.text

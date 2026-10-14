@@ -60,14 +60,36 @@ STUDIO_TRANSIENT_MARKERS = (
 _LUA_SCRIPTS_DIR = Path(__file__).resolve().parent.parent / "lua" / "scripts"
 _LUA_SCRIPTS_CACHE: dict[str, str] = {}
 _PLACEHOLDER_RE = re.compile(r"%([A-Z][A-Z0-9_]*)%")
+_INCLUDE_RE = re.compile(r"^--\s*include:\s*(\S+)\s*$", re.MULTILINE)
+
+
+def _read_lua(name: str) -> str:
+    """Read a .lua file with EOL normalization. No caching."""
+    path = _LUA_SCRIPTS_DIR / f"{name}.lua"
+    text = path.read_text(encoding="utf-8")
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _expand_includes(text: str) -> str:
+    """Replace `-- include: <name>` directives with the file contents.
+
+    Used so `grep.lua` and `grep_replace.lua` can share `_match.lua`
+    without relying on `require` — `execute_luau` runs in an isolated
+    VM where `require` resolves to a fresh copy of the module, not a
+    shared instance.
+    """
+    def _rep(m):
+        return _read_lua(m.group(1))
+    return _INCLUDE_RE.sub(_rep, text)
 
 
 def _lua_script(name: str, **params: str) -> str:
     """Load toolkit/lua/scripts/<name>.lua and substitute %KEY% placeholders.
 
-    Line endings are normalized to \n so scripts behave identically on
-    Windows and POSIX. Result is cached per name; parameters are applied
-    on every call.
+    `-- include: <lib>` directives are expanded first (see
+    `_expand_includes`). Line endings are normalized to \n so scripts
+    behave identically on Windows and POSIX. Result is cached per name;
+    parameters are applied on every call.
 
     Substitution is single-pass: a value containing a literal `%MAX%` is
     not re-scanned, so user-supplied patterns cannot inject placeholder
@@ -75,9 +97,8 @@ def _lua_script(name: str, **params: str) -> str:
     """
     src = _LUA_SCRIPTS_CACHE.get(name)
     if src is None:
-        path = _LUA_SCRIPTS_DIR / f"{name}.lua"
-        text = path.read_text(encoding="utf-8")
-        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        text = _read_lua(name)
+        text = _expand_includes(text)
         _LUA_SCRIPTS_CACHE[name] = text
         src = text
     upper = {k.upper(): str(v) for k, v in params.items()}
@@ -1031,7 +1052,7 @@ class MCPBackend:
         )
 
 
-    def filter_check(self, path: str, op: str) -> str | None:
+    def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
         """No path-level filtering for Roblox DataModel.
 
         Roblox paths are not filesystem paths and cannot be enforced the same

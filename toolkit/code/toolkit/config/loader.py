@@ -335,65 +335,94 @@ _SKIP_DIRS = {
 }
 
 
+# Default row cap for the policy tree. Chosen so that RimWorld's
+# Mods/<86 mods> stops at depth 2 (~115 rows) instead of descending into
+# each mod's Defs/Assemblies at depth 3 (thousands). Set higher for a
+# deeper view; the trade-off is how many Tk widgets get created.
+DEFAULT_SCAN_MAX_ROWS = 200
+
+
+def scan_subdirs_ex(
+    root: Path,
+    max_depth: int = 2,
+    patterns: list | None = None,
+    show_hidden: bool = False,
+    max_rows: int = DEFAULT_SCAN_MAX_ROWS,
+) -> tuple[list[tuple[str, bool]], int | None]:
+    """Return [(relative_path, is_hidden), ...] up to max_depth, capped.
+
+    `patterns` is a list of (glob, negated) pairs from `.patchignore`. A
+    directory is hidden if any of its segments matches a hiding pattern
+    (see `patchignore.path_hidden`).
+
+    Hidden dirs are **terminal**: they are included when
+    `show_hidden=True` (marked hidden), but their contents are never
+    walked. This makes the `show_hidden=True` result a superset of the
+    `show_hidden=False` result -- callers can scan once with hidden on and
+    filter in memory, avoiding a disk round-trip on every toggle.
+
+    Expansion is level by level. If adding the next level would push the
+    total over `max_rows`, that whole level is skipped. `max_rows=0`
+    disables the cap. Returns (paths, truncated_at_depth); depth is None
+    when nothing was truncated.
+    """
+    if not root or not Path(root).is_dir():
+        return [], None
+    root = Path(root).resolve()
+    from .patchignore import path_hidden, is_state_path
+    pats = list(patterns or [])
+    out: list[tuple[str, bool]] = []
+    truncated_at: int | None = None
+
+    current: list[Path] = [root]
+    for depth in range(1, max_depth + 1):
+        level: list[tuple[str, bool, Path]] = []
+        cancelled = False
+        for parent in current:
+            try:
+                entries = sorted(parent.iterdir())
+            except (PermissionError, OSError):
+                continue
+            for e in entries:
+                if not e.is_dir():
+                    continue
+                try:
+                    rel = str(e.relative_to(root)).replace("\\", "/")
+                except ValueError:
+                    continue
+                hidden = path_hidden(rel, pats) or is_state_path(rel)
+                if hidden and not show_hidden:
+                    continue
+                level.append((rel, hidden, e))
+            if max_rows > 0 and len(out) + len(level) > max_rows:
+                cancelled = True
+                break
+
+        if not level:
+            break
+        if cancelled:
+            truncated_at = depth
+            break
+
+        for rel, hidden, _e in level:
+            out.append((rel, hidden))
+        current = [e for (_rel, hid, e) in level if not hid]
+
+    return out, truncated_at
+
+
+# Thin backwards-compatible wrapper: callers that do not want the cap pass
+# max_rows explicitly through scan_subdirs_ex; this one keeps the old
+# signature (no cap).
 def scan_subdirs(
     root: Path,
     max_depth: int = 2,
     patterns: list | None = None,
     show_hidden: bool = False,
 ) -> list[tuple[str, bool]]:
-    """Return [(relative_path, is_hidden), ...] for every subdirectory
-    up to max_depth.
-
-    `patterns` is a list of (glob, negated) pairs from `.patchignore`. A
-    directory is hidden if any of its segments matches a hiding pattern
-    (see `patchignore.path_hidden`).
-
-    When `show_hidden=False` (default) hidden directories are omitted
-    entirely. When `show_hidden=True` they are included, marked hidden,
-    and their contents are **not** traversed — a hidden dir is a
-    terminal entry, so `.git` or `node_modules` do not flood the tree
-    with thousands of paths.
-    """
-    if not root or not Path(root).is_dir():
-        return []
-    root = Path(root).resolve()
-    from .patchignore import path_hidden
-    pats = list(patterns or [])
-    out: list[tuple[str, bool]] = []
-
-    def walk(p: Path, depth: int) -> None:
-        if depth > max_depth:
-            return
-        try:
-            entries = sorted(p.iterdir())
-        except (PermissionError, OSError):
-            return
-        for e in entries:
-            if not e.is_dir():
-                continue
-            try:
-                rel = str(e.relative_to(root)).replace("\\", "/")
-            except ValueError:
-                continue
-            # `.patch_applier` (toolkit state) is always hidden from the
-            # tree, even if a .patchignore rule would un-hide it: the
-            # backend grants access unconditionally, but the tree must
-            # not show it without the "show hidden" toggle.
-            from .patchignore import is_state_path
-            hidden = path_hidden(rel, pats) or is_state_path(rel)
-            if hidden and not show_hidden:
-                continue
-            out.append((rel, hidden))
-            if hidden:
-                continue
-            if depth < max_depth:
-                walk(e, depth + 1)
-
-    walk(root, 1)
-    return out
-
-
-
+    paths, _ = scan_subdirs_ex(root, max_depth, patterns, show_hidden,
+                               max_rows=0)
+    return paths
 
 
 def load_workspace(cfg: dict):

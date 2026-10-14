@@ -352,6 +352,9 @@ class RebuildLuaCodeIndexTool:
         # Luau bulk index runs inside Studio via the bridge. Filesystem
         # backends have no `execute` — refuse instead of silently
         # falling back to a slower Python path.
+        # Luau bulk index runs inside Studio via the bridge. Filesystem
+        # backends have no `execute` — refuse instead of silently
+        # falling back to a slower Python path.
         if not hasattr(backend, "execute"):
             return Result(
                 status="error",
@@ -361,24 +364,34 @@ class RebuildLuaCodeIndexTool:
                 error_code="requires_mcp",
             )
 
-        # Where to write the local index file(s).
+        # Output paths are backend-relative, like the Python and docs
+        # rebuilds. The tool must NOT stitch them to a local filesystem
+        # directory: `backend.write` already resolves them, and double-
+        # prefixing (".patch_applier/.patch_applier/...") was the bug.
+        out_path = output or self._default_output or "CODE_INDEX_LUA.md"
+        manifest_path = (
+            manifest_output or self._default_manifest
+            or out_path.replace(".md", ".manifest.json")
+        )
+
+        # Where the project tree lives on disk, for `.mcpignore` bookkeeping.
+        # `local_root` is an override for tests; production uses the backend
+        # root (workspace state dir).
         if local_root:
             local_dir = Path(local_root)
         else:
-            local_dir = Path(getattr(backend, "_root", None) or getattr(backend, "working_dir", None) or ".")
-
-        out_name = output or self._default_output or "CODE_INDEX_LUA.md"
-        manifest_name = (manifest_output or self._default_manifest
-                         or out_name.replace(".md", ".manifest.json"))
-        out_path = local_dir / out_name
-        manifest_path = local_dir / manifest_name
+            local_dir = Path(
+                getattr(backend, "_root", None)
+                or getattr(backend, "working_dir", None)
+                or "."
+            )
 
         prev_text = ""
-        if out_path.exists():
-            try:
-                prev_text = out_path.read_text(encoding="utf-8")
-            except Exception:
-                prev_text = ""
+        try:
+            if backend.exists(out_path):
+                prev_text = backend.read(out_path)
+        except Exception:
+            prev_text = ""
 
         try:
             from ..config import mcpignore
@@ -396,9 +409,15 @@ class RebuildLuaCodeIndexTool:
             )
 
         try:
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(result.text, encoding="utf-8")
-            manifest_path.write_text(result.manifest_json, encoding="utf-8")
+            backend.write(out_path, result.text)
+            backend.write(manifest_path, result.manifest_json)
+        except PermissionError as e:
+            return Result(
+                status="blocked",
+                message=str(e),
+                action="rebuild_lua_code_index",
+                error_code="sandbox",
+            )
         except Exception as e:
             return Result(
                 status="error",
@@ -407,9 +426,9 @@ class RebuildLuaCodeIndexTool:
             )
 
         from ..indexers.state import bump_seq
-        seq = bump_seq(backend, str(out_name) + ".version")
+        seq = bump_seq(backend, out_path + ".version")
         dr = diff_code_index(prev_text, result.text)
-        msg = (f"{out_path.name} + {manifest_path.name} "
+        msg = (f"{out_path} + {manifest_path} "
                f"(модулей: {result.modules_count}, "
                f"символов: {result.symbols_count}) [v{seq}]{dr.render()}")
         return Result(status="ok", message=msg, action="rebuild_lua_code_index")

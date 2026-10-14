@@ -14,7 +14,6 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from toolkit.backends import FilesystemBackend
-from toolkit.core import FilterSpec
 from toolkit.indexers.code import build_code_index
 
 
@@ -131,16 +130,6 @@ def main():
             t.expect("manifest has imports", "os" in a_entry["imports"])
             t.expect("manifest has hash", isinstance(a_entry["hash"], int))
             t.expect("manifest has len", isinstance(a_entry["len"], int))
-
-        # Filter check: white=["nested"] should exclude a.py and b.py
-        print()
-        print("== filter white=[nested] ==")
-        spec = FilterSpec.from_legacy("white", ["nested"])
-        result2 = build_code_index(tmp_backend, filter_spec=spec)
-        paths2 = [m.path for m in result2.modules]
-        t.expect("only nested/c.py", paths2 == ["nested/c.py"], paths2)
-        t.expect("symbols_count == 1", result2.symbols_count == 1,
-                 result2.symbols_count)
 
         tmp_backend.close()
 

@@ -75,6 +75,22 @@ class PolicyTree(tk.Frame):
         self._root_label = Path(root.path).name or "[root]"
         self._active_flags = (set(active_flags) if active_flags is not None
                               else _all_flags())
+        # Signature of the last successful render. Used to skip the
+        # destroy-and-rebuild path when the caller asks to render the
+        # same data twice — Tk's <<NotebookTabChanged>> can fire more
+        # than once per user switch, and callers that flip unrelated
+        # checkboxes re-enter _render_tab even when nothing changed.
+        # For a root with ~1000 visible rows (RimWorld) the rebuild is
+        # the difference between instant and multi-second.
+        self._last_sig: tuple | None = None
+        # Incremental render bookkeeping. Rows are queued and created in
+        # chunks between Tk event-loop iterations, so the dialog stays
+        # responsive while a large root (~1000 rows x ~7 widgets each)
+        # fills in. Tk widgets are main-thread-only; this is the standard
+        # Tk pattern for staying non-blocking during heavy widget work.
+        self._pending_rows: list = []
+        self._render_job = None
+        self._pending_sig: tuple | None = None
 
         self._container = tk.Frame(self, bd=1, relief="sunken")
         self._container.pack(fill="both", expand=True)
@@ -104,8 +120,35 @@ class PolicyTree(tk.Frame):
         self._active_flags = set(flags)
 
     def render(self, paths: list[tuple[str, bool]],
-               show_hidden: bool = False) -> None:
-        """(Re)build the visual rows from a flat [(rel, hidden)] list."""
+               show_hidden: bool = False,
+               truncated_at: int | None = None) -> None:
+        """(Re)build the visual rows from a flat [(rel, hidden)] list.
+
+        No-op when called with the same input as the previous call, the
+        same active column set, and no pending chunked render. Callers
+        that need a forced rebuild (e.g. after a .patchignore edit) must
+        first invalidate via `invalidate()`.
+
+        Rows are created in chunks scheduled with `after`; between chunks
+        Tk processes events, so the dialog stays responsive while a large
+        root fills in. The header and root row are created synchronously
+        so the user sees where the tree is headed immediately.
+        """
+        sig = (tuple(paths), bool(show_hidden), frozenset(self._active_flags),
+               truncated_at)
+        if sig == self._last_sig and self._render_job is None:
+            return
+
+        # Cancel any render in progress from a previous call.
+        if self._render_job is not None:
+            try:
+                self.after_cancel(self._render_job)
+            except Exception:
+                pass
+            self._render_job = None
+        self._pending_rows = []
+        self._pending_sig = None
+
         for w in self._inner.winfo_children():
             w.destroy()
         self._row_widgets.clear()
@@ -115,12 +158,81 @@ class PolicyTree(tk.Frame):
         if not show_hidden:
             tree = filter_hidden(tree)
 
+        # Root row carries a short census so the user can tell at a
+        # glance that a big root is a big root — otherwise the tree just
+        # scrolls and it is hard to size what you are looking at.
+        shown_n = len(paths)
+        total_dirs = sum(1 for _, h in paths if not h) + sum(
+            1 for _, h in paths if h)
+        hidden_n = sum(1 for _, h in paths if h)
+        census = f"{shown_n} dirs"
+        if hidden_n:
+            census += f", {hidden_n} hidden"
+        if truncated_at is not None:
+            census += f" (truncated at depth {truncated_at})"
+        root_label = f"[{self._root_label}]  ({census})"
+
         active = [(k, l) for k, l in FLAG_COLUMNS if k in self._active_flags]
         self._make_header_row(active)
-        self._make_row(".", display_text=f"[{self._root_label}]",
+        self._make_row(".", display_text=root_label,
                        hidden=False, root_row=True, active_columns=active)
-        self._render_children(tree, prefix="", path_prefix="",
-                              active_columns=active)
+
+        # Queue child rows for incremental creation. Keep the header and
+        # root row on screen immediately so the dialog does not look empty
+        # while the rest trickles in.
+        self._pending_rows = list(self._iter_rows(tree, prefix="",
+                                                  path_prefix=""))
+        self._pending_sig = sig
+        self._render_chunk()
+
+    def _iter_rows(self, nodes: list[dict], prefix: str, path_prefix: str):
+        """Yield (rel_path, display_text, hidden) in tree order."""
+        last = len(nodes) - 1
+        for i, node in enumerate(nodes):
+            is_last = (i == last)
+            connector = _ELBOW if is_last else _TEE
+            display = prefix + connector + node["name"]
+            path = (f"{path_prefix}/{node['name']}"
+                    if path_prefix else node["name"])
+            yield (path, display, bool(node.get("hidden")))
+            if node.get("children"):
+                cont = prefix + (_SPACE if is_last else _PIPE)
+                yield from self._iter_rows(node["children"], cont, path)
+
+    def _render_chunk(self) -> None:
+        """Create a fixed number of rows, then reschedule until done.
+
+        The chunk size trades scheduling overhead against how often the
+        event loop gets a chance to run. 50 rows is roughly 20ms of widget
+        work: fast enough to not starve the queue, small enough that a
+        click is handled within one chunk.
+        """
+        CHUNK = 50
+        pending = self._pending_rows
+        n = 0
+        while pending and n < CHUNK:
+            rel_path, display, hidden = pending.pop(0)
+            self._make_row(rel_path, display_text=display, hidden=hidden)
+            n += 1
+        if pending:
+            self._render_job = self.after(1, self._render_chunk)
+        else:
+            self._render_job = None
+            if self._pending_sig is not None:
+                self._last_sig = self._pending_sig
+            self._pending_sig = None
+
+    def invalidate(self) -> None:
+        """Force the next render() to rebuild, even with the same input."""
+        if self._render_job is not None:
+            try:
+                self.after_cancel(self._render_job)
+            except Exception:
+                pass
+            self._render_job = None
+        self._pending_rows = []
+        self._pending_sig = None
+        self._last_sig = None
 
     def overrides(self) -> dict[str, PathPolicy]:
         return self._overrides
@@ -211,6 +323,14 @@ class PolicyTree(tk.Frame):
     def _flag_state(self, rel_path: str, flag_key: str) -> bool | None:
         if rel_path in self._hidden_paths:
             return False
+        # Root row: no parent to inherit from, so the "no override" dot is
+        # meaningless — the effective policy is either the root default
+        # (overrides["."]) or the model default (all True). Showing the
+        # dot here made two roots with identical policy look different
+        # depending on whether overrides["."] happened to be populated.
+        if rel_path == ".":
+            eff = self._root.policy_for(".")
+            return bool(getattr(eff, flag_key))
         pol = self._overrides.get(rel_path)
         if pol is None:
             return None

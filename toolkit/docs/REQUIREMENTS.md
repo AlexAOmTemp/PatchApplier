@@ -28,8 +28,8 @@ remembers to ask.
 
 Every write targets a structural unit:
 
-- a markdown section (`replace_section`),
-- a code symbol by qualname (`replace_symbol*`),
+- a unit — markdown section, function, method, class — by qualname (`replace_unit`),
+- a numbered block inside a unit's body (`replace_unit(block=...)`, `insert_block`),
 - a delimited block between two anchors (`replace_between`),
 - a position relative to an anchor (`insert_at_anchor`).
 
@@ -74,10 +74,10 @@ summary was last verified. The check runs on rebuild, using content
 hashes in a sidecar (`.index_meta.json`), so it does not depend on any
 write tool remembering to update state.
 
-- `set_summary` clears it by changing the summary text (new
+- `set_annotation` clears it by changing the summary text (new
   `summary_hash`).
-- `verify_section` clears it without touching the file (the summary is
-  confirmed correct as-is; only `summary_changed_at` moves forward).
+- Clearing it without touching the file (the old `verify_section`) is
+  **not implemented** in the current unit model — an open task.
 
 ## 6. Extension seams hold without architectural breakage
 <!-- summary: Six extension points the architecture must support without breaking: Rojo, new indexes, Unity bridge, new tools, headless, agent mode. -->

@@ -13,6 +13,7 @@ from ..core.backend import Backend
 from ..core.models import Delta, Result
 from ..formats import Format
 from ..formats.model import ParsedDoc
+from ..matching.text import find_all_text, similar_lines
 
 
 # --- replace_in_file -------------------------------------------------------
@@ -65,21 +66,17 @@ class ReplaceInFileTool:
         if "\r\n" in repl:
             repl = repl.replace("\r\n", "\n")
 
-        # --- Tier 1: byte-exact ------------------------------------------
-        tier = 1
-        total = before.count(needle)
-        ranges: list[tuple[int, int]] | None = None
-        if total == 0:
-            # --- Tier 2: trailing-whitespace-normalised -------------------
-            norm = _find_normalised(before, needle)
-            if norm:
-                tier = 2
-                ranges = norm
-                total = len(norm)
+        # --- match via shared matcher ------------------------------------
+        # find_all_text tries byte-exact first; only when nothing matches
+        # does it fall back to trailing-whitespace tolerance. That gives
+        # us tier 1 / tier 2 in one call, with the same semantics for all
+        # write-side tools.
+        matches = find_all_text(before, needle)
+        total = len(matches)
 
         if total == 0:
             # --- Tier 3: no match, show similar --------------------------
-            similar = _similar_lines(before, needle, n=3)
+            similar = similar_lines(before, needle, n=3)
             extra = ""
             if similar:
                 extra = "\n  Similar lines (invisible chars shown):\n" + "\n".join(
@@ -87,62 +84,55 @@ class ReplaceInFileTool:
                 )
             return Result(
                 status="error",
-                message=(f"Строка не найдена в {file_path}"
+                message=(f"\u0421\u0442\u0440\u043e\u043a\u0430 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430 \u0432 {file_path}"
                          f"\n  Searched: {needle!r}"
                          f"{extra}"),
                 action="replace_in_file",
                 error_code="no_match",
             )
 
+        # Tier is decided by the matcher: if any exact match exists, only
+        # exact matches are returned; otherwise the list is all tier 2.
+        tier = 1 if matches[0].is_exact else 2
+
         # --- apply by occurrence ------------------------------------------
         n_occurrences = 0
         if occurrence == "all" or occurrence == -1:
-            if tier == 1:
-                after = before.replace(needle, repl)
-                n_occurrences = total
-            else:
-                # Tier 2 all: replace every matched range.
-                chunks = []
-                prev = 0
-                for s, e in ranges or []:
-                    chunks.append(before[prev:s])
-                    chunks.append(repl)
-                    prev = e
-                chunks.append(before[prev:])
-                after = "".join(chunks)
-                n_occurrences = len(ranges or [])
+            chunks: list[str] = []
+            prev = 0
+            for m in matches:
+                chunks.append(before[prev:m.start])
+                chunks.append(repl)
+                prev = m.end
+            chunks.append(before[prev:])
+            after = "".join(chunks)
+            n_occurrences = total
         else:
             try:
                 occ_num = int(occurrence)
             except (ValueError, TypeError):
                 return Result(
                     status="error",
-                    message=f"Некорректное occurrence: {occurrence!r}",
+                    message=f"\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u043e\u0435 occurrence: {occurrence!r}",
                     action="replace_in_file",
                     error_code="bad_occurrence",
                 )
             if occ_num < 1:
                 return Result(
                     status="error",
-                    message=f"occurrence должен быть >= 1, получено {occ_num}",
+                    message=f"occurrence \u0434\u043e\u043b\u0436\u0435\u043d \u0431\u044b\u0442\u044c >= 1, \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u043e {occ_num}",
                     action="replace_in_file",
                     error_code="bad_occurrence",
                 )
             if occ_num > total:
                 return Result(
                     status="error",
-                    message=f"Найдено {total} вхождений, нельзя заменить #{occ_num}",
+                    message=f"\u041d\u0430\u0439\u0434\u0435\u043d\u043e {total} \u0432\u0445\u043e\u0436\u0434\u0435\u043d\u0438\u0439, \u043d\u0435\u043b\u044c\u0437\u044f \u0437\u0430\u043c\u0435\u043d\u0438\u0442\u044c #{occ_num}",
                     action="replace_in_file",
                     error_code="bad_occurrence",
                 )
-            if tier == 1:
-                pos = -1
-                for _ in range(occ_num):
-                    pos = before.find(needle, pos + 1)
-                after = before[:pos] + repl + before[pos + len(needle):]
-            else:
-                s, e = (ranges or [])[occ_num - 1]
-                after = before[:s] + repl + before[e:]
+            m = matches[occ_num - 1]
+            after = before[:m.start] + repl + before[m.end:]
             n_occurrences = 1
 
         after_out = after.replace("\n", "\r\n") if had_crlf else after
@@ -204,16 +194,23 @@ class ReplaceRangeTool:
                     error_code="bad_range",
                 )
 
+            expected_note = ""
             if expected_first_line is not None:
                 actual = lines[s].rstrip("\n").rstrip("\r")
                 if actual != expected_first_line:
-                    return Result(
-                        status="error",
-                        message=(f"content_mismatch: L{s + 1} = {actual!r}, "
-                                 f"expected {expected_first_line!r}"),
-                        action="replace_range",
-                        error_code="content_mismatch",
-                    )
+                    # Tier 2: trailing-whitespace tolerance, same as
+                    # replace_in_file. Leading whitespace is kept — it is
+                    # meaningful. On a rstrip-level match we proceed and
+                    # note it in the message.
+                    if actual.rstrip() != expected_first_line.rstrip():
+                        return Result(
+                            status="error",
+                            message=(f"content_mismatch: L{s + 1} = {actual!r}, "
+                                     f"expected {expected_first_line!r}"),
+                            action="replace_range",
+                            error_code="content_mismatch",
+                        )
+                    expected_note = "  (expected_first_line matched with trailing-whitespace normalisation)"
 
             block = "".join(lines[s:e])
             new = new_content
@@ -228,6 +225,7 @@ class ReplaceRangeTool:
             delta = _delta(block, new, 1)
             msg = (f"L{start_line}–L{end_line} → L{start_line}–L{start_line + _count_lines(new) - 1} "
                    f"в {file_path} — {_sign_str(delta.lines)} стр., {_sign_str(delta.bytes)} Б")
+            msg += expected_note
             return Result(
                 status="ok",
                 message=msg,
@@ -274,13 +272,21 @@ class ReplaceBetweenTool:
 
         start_anchor = _norm_anchor(start_anchor)
         end_anchor = _norm_anchor(end_anchor)
-        starts = _find_all(before, start_anchor)
-        ends = _find_all(before, end_anchor)
-        if not starts:
+
+        # Shared matcher: byte-exact first (tier 1), then trailing-whitespace
+        # tolerance (tier 2). Same semantics as replace_in_file.
+        start_matches = find_all_text(before, start_anchor)
+        end_matches = find_all_text(before, end_anchor)
+        if not start_matches:
             return Result(status="error", message=f"start_anchor не найден: {start_anchor!r}", action="replace_between", error_code="no_match")
-        if not ends:
+        if not end_matches:
             return Result(status="error", message=f"end_anchor не найден: {end_anchor!r}", action="replace_between", error_code="no_match")
-        pairs = [(s, e) for s in starts for e in ends if e > s]
+        pairs = [
+            (sm, em)
+            for sm in start_matches
+            for em in end_matches
+            if em.start > sm.start
+        ]
         if not pairs:
             return Result(status="error", message="end_anchor не следует за start_anchor ни в одном вхождении", action="replace_between", error_code="anchor_order")
         try:
@@ -289,19 +295,20 @@ class ReplaceBetweenTool:
             return Result(status="error", message=f"Некорректное occurrence: {occurrence!r}", action="replace_between", error_code="bad_occurrence")
         if occ_num < 1 or occ_num > len(pairs):
             return Result(status="error", message=f"Найдено {len(pairs)} пар (start<end), нельзя взять #{occ_num}", action="replace_between", error_code="occurrence_out_of_range")
-        s, e = pairs[occ_num - 1]
-        prefix = before[:s] if include_start else before[:s + len(start_anchor)]
-        suffix = before[e + len(end_anchor):] if include_end else before[e:]
+        sm, em = pairs[occ_num - 1]
+        prefix = before[:sm.start] if include_start else before[:sm.end]
+        suffix = before[em.end:] if include_end else before[em.start:]
         after = prefix + new_content + suffix
         backend.write(file_path, after)
-        s_line = before.count("\n", 0, s) + 1
-        e_full = e + len(end_anchor)
-        e_line = before.count("\n", 0, e_full) + 1
+        s_line = before.count("\n", 0, sm.start) + 1
+        e_line = before.count("\n", 0, em.end) + 1
         new_lines = _count_lines(new_content)
-        old_block = before[s:e_full]
+        old_block = before[sm.start:em.end]
         delta = _delta(old_block, new_content, 1)
         msg = (f"L{s_line}\u2013L{e_line} \u2192 L{s_line}\u2013L{s_line + new_lines - 1} "
                f"\u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411")
+        if not sm.is_exact or not em.is_exact:
+            msg += "  (anchor matched with trailing-whitespace normalisation)"
         return Result(
             status="ok",
             message=msg,
@@ -333,17 +340,17 @@ class InsertAtAnchorTool:
         if position not in ("before", "after"):
             return Result(status="error", message=f"position должен быть before|after, получено {position!r}", action="insert_at_anchor", error_code="bad_position")
         before = backend.read(file_path)
-        anchors = _find_all(before, anchor)
-        if not anchors:
+        matches = find_all_text(before, anchor)
+        if not matches:
             return Result(status="error", message=f"anchor не найден: {anchor!r}", action="insert_at_anchor", error_code="no_match")
         try:
             occ_num = int(occurrence)
         except (ValueError, TypeError):
             return Result(status="error", message=f"Некорректное occurrence: {occurrence!r}", action="insert_at_anchor", error_code="bad_occurrence")
-        if occ_num < 1 or occ_num > len(anchors):
-            return Result(status="error", message=f"Найдено {len(anchors)} вхождений, нельзя взять #{occ_num}", action="insert_at_anchor", error_code="occurrence_out_of_range")
-        pos = anchors[occ_num - 1]
-        insert_at = pos if position == "before" else pos + len(anchor)
+        if occ_num < 1 or occ_num > len(matches):
+            return Result(status="error", message=f"Найдено {len(matches)} вхождений, нельзя взять #{occ_num}", action="insert_at_anchor", error_code="occurrence_out_of_range")
+        m = matches[occ_num - 1]
+        insert_at = m.start if position == "before" else m.end
         # Guard against line-gluing: if the inserted text would touch a non-newline
         # neighbour without its own newline boundary, add one. This catches the
         # common footgun "from X import Y" inserted right after an import line.
@@ -362,6 +369,8 @@ class InsertAtAnchorTool:
         s_line = before.count("\n", 0, insert_at) + 1
         where = "\u043f\u0435\u0440\u0435\u0434" if position == "before" else "\u043f\u043e\u0441\u043b\u0435"
         msg = f"{where} L{s_line} \u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411"
+        if not m.is_exact:
+            msg += "  (anchor matched with trailing-whitespace normalisation)"
         return Result(
             status="ok",
             message=msg,
@@ -701,7 +710,7 @@ def _replace_regex(backend: Backend, file_path: str,
     matches = list(rx.finditer(before))
     total = len(matches)
     if total == 0:
-        similar = _similar_lines(before, pattern, n=3)
+        similar = similar_lines(before, pattern, n=3)
         extra = ""
         if similar:
             extra = "\n  Similar lines:\n" + "\n".join(
@@ -761,20 +770,6 @@ def _replace_regex(backend: Backend, file_path: str,
     )
 
 
-def _find_all(text: str, needle: str) -> list[int]:
-    """All start offsets of non-overlapping occurrences of `needle`."""
-    if not needle:
-        return []
-    out: list[int] = []
-    pos = 0
-    while True:
-        i = text.find(needle, pos)
-        if i < 0:
-            return out
-        out.append(i)
-        pos = i + len(needle)
-
-
 def _count_lines(text: str) -> int:
     if not text:
         return 0
@@ -782,82 +777,6 @@ def _count_lines(text: str) -> int:
     if not text.endswith("\n"):
         n += 1
     return n
-
-
-def _rstrip_lines(s: str) -> str:
-    """Drop trailing whitespace on every line, keep EOL and leading as-is."""
-    return "\n".join(line.rstrip() for line in s.split("\n"))
-
-
-def _find_normalised(before: str, needle: str) -> list[tuple[int, int]]:
-    """Ranges [start, end) in `before` matching `needle` after stripping
-    trailing whitespace on every line of both. Leading whitespace is kept
-    (indent is meaningful); only trailing is treated as file noise.
-
-    Both inputs must already be LF-normalised (see caller). Returns
-    non-overlapping ranges in source order.
-    """
-    if not needle:
-        return []
-    needle_lines = needle.split("\n")
-    file_lines = before.split("\n")
-    k = len(needle_lines)
-    if k > len(file_lines):
-        return []
-    needle_norm = [ln.rstrip() for ln in needle_lines]
-    # Precompute start offsets of every file line.
-    line_starts: list[int] = [0]
-    off = 0
-    for ln in file_lines[:-1]:
-        off += len(ln) + 1
-        line_starts.append(off)
-
-    matches: list[tuple[int, int]] = []
-    for j in range(len(file_lines) - k + 1):
-        ok = True
-        for i in range(k):
-            if file_lines[j + i].rstrip() != needle_norm[i]:
-                ok = False
-                break
-        if not ok:
-            continue
-        start_off = line_starts[j]
-        end_off = line_starts[j + k - 1] + len(file_lines[j + k - 1])
-        if matches and start_off < matches[-1][1]:
-            continue
-        matches.append((start_off, end_off))
-    return matches
-
-
-def _mark_invisible(s: str) -> str:
-    """Render a line with invisible characters made visible.
-
-    Trailing whitespace becomes \u2423 (space) / \u21e5 (tab). Tabs
-    anywhere else also become \u21e5. Internal spaces stay as spaces.
-    """
-    stripped = s.rstrip()
-    tail = s[len(stripped):]
-    out = stripped.replace("\t", "\u21e5")
-    if tail:
-        out += tail.replace(" ", "\u2423").replace("\t", "\u21e5")
-    return out
-
-
-def _similar_lines(before: str, needle: str, n: int = 3) -> list[tuple[int, str, float]]:
-    """Top-n file lines (1-based) most similar to the first needle line.
-
-    Returns [(line_no, marked_text, ratio), ...], sorted by ratio desc.
-    Used when both exact and normalised matching fail.
-    """
-    import difflib
-    needle_first = needle.split("\n", 1)[0]
-    out: list[tuple[int, str, float]] = []
-    for i, line in enumerate(before.split("\n"), start=1):
-        r = difflib.SequenceMatcher(None, line, needle_first).ratio()
-        if r > 0.5:
-            out.append((i, _mark_invisible(line), r))
-    out.sort(key=lambda x: -x[2])
-    return out[:n]
 
 
 def _delta(before_text: str, after_text: str, occurrences: int) -> Delta:

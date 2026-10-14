@@ -268,8 +268,9 @@ class Patcher:
         if not op.startswith("index"):
             block = self._filter_paths(tool_cls, args, op)
             if block is not None:
-                return Result(status="blocked", message=block, action=action,
-                              error_code="filter")
+                code, msg = block
+                return Result(status="blocked", message=msg, action=action,
+                              error_code=code)
 
         try:
             return tool_cls().execute(backend=self.backend, fmt=self.fmt, **dict(args))
@@ -289,7 +290,8 @@ class Patcher:
                           message=f"\u0418\u0421\u041a\u041b\u042e\u0427\u0415\u041d\u0418\u0415: {type(e).__name__}: {e}",
                           action=action)
 
-    def _filter_paths(self, tool_cls: type[Tool], args: dict, op: str) -> str | None:
+    def _filter_paths(self, tool_cls: type[Tool], args: dict,
+                      op: str) -> tuple[str, str] | None:
         for key in getattr(tool_cls, "path_args", []) or []:
             val = args.get(key)
             if isinstance(val, str) and val:

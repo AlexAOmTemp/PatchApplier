@@ -1,21 +1,69 @@
-[head] ✓ read_file: toolkit/docs/DECISIONS.md L240–L250
-240: '- `rebuild_lua_code_index` в Rojo-mode строит индекс с диска через AST (не через MCP).\r\n'
-241: '- Возможность использовать Python AST и regex на диске, что даёт более сильный инструментарий, чем MCP-путь (у которого `execute_luau` с песочницей).\r\n'
-242: '\r\n'
-243: 'Сцена (Parts, GUI, Folders) в обоих режимах идёт через MCP — ортогонально режиму Luau-кода. **Открыто** потому, что это большая задача (третий backend + переключение в GUI + параллельная логика в индексере), и делать её имеет смысл после того, как стабилизируется текущий Rojo-независимый контур.\r\n'
-244: '\r\n'
-245: '**Ремастер GUI — закрыт (3a-3d).** Шаг 1 (разрезание монолита) сделан: `runner/gui/` — пакет из `state.py`, `formatting.py`, `widgets.py`, `starter_text.py`, `policy_io.py`, `app.py` (остаток Tk-оболочки). Шаг 2 (вынос мёртвого subprocess-пути) сделан. Шаг 3 (парадигма) закрыт.\r'
-246: '\r\n'
-247: '\r'
-248: '\r\n'
-249: "**Парадигма — Functional Core / Imperative Shell**, не MVP и не MVC. Изначально планировался MVP (Model-View-Presenter), но на реальном коде Tk-приложения он выродился в другую форму: ядро — модуль чистых функций, оболочка — Tk-виджеты и callback'и, связь односторонняя View → Core. Обратных ссылок нет.\r"
-250: '\r\n'
+[status] ✓ run_python: exit=0  duration=58ms
+--- stdout ---
+## master
+ D toolkit/.patchignore
+ M toolkit/code/bridge/bridge_timings.log
+ M toolkit/code/toolkit/backends/composite.py
+ M toolkit/code/toolkit/backends/filesystem.py
+ M toolkit/code/toolkit/backends/mcp.py
+ M toolkit/code/toolkit/backends/workspace.py
+ M toolkit/code/toolkit/config/loader.py
+ M toolkit/code/toolkit/core/backend.py
+ M toolkit/code/toolkit/core/patcher.py
+ M toolkit/code/toolkit/formats/code.py
+ M toolkit/code/toolkit/formats/renderer.py
+ M toolkit/code/toolkit/lua/code_index_regen.lua
+ M toolkit/code/toolkit/lua/lua_symbols.lua
+ M toolkit/code/toolkit/lua/scripts/grep.lua
+ M toolkit/code/toolkit/lua/scripts/grep_replace.lua
+ M toolkit/code/toolkit/runner/gui/settings_window.py
+ M toolkit/code/toolkit/runner/gui/tree_view.py
+ M toolkit/code/toolkit/runner/last_diff.txt
+ M toolkit/code/toolkit/runner/last_output.txt
+ M toolkit/code/toolkit/runner/last_patch.json
+ M toolkit/code/toolkit/tests/run_all.py
+ D toolkit/code/toolkit/tests/test_apply_indent.py
+ D toolkit/code/toolkit/tests/test_cli.py
+ M toolkit/code/toolkit/tests/test_code_indexer.py
+ M toolkit/code/toolkit/tests/test_code_parser.py
+ D toolkit/code/toolkit/tests/test_code_tools.py
+ M toolkit/code/toolkit/tests/test_indexer.py
+ D toolkit/code/toolkit/tests/test_lua_indent.py
+ D toolkit/code/toolkit/tests/test_lua_tools.py
+ M toolkit/code/toolkit/tests/test_mcp_backend.py
+ D toolkit/code/toolkit/tests/test_section_tools.py
+ D toolkit/code/toolkit/tests/test_symbol_tools.py
+ M toolkit/code/toolkit/tests/test_write.py
+ M toolkit/code/toolkit/tools/__init__.py
+ M toolkit/code/toolkit/tools/index.py
+ M toolkit/code/toolkit/tools/read.py
+ M toolkit/code/toolkit/tools/unit/__init__.py
+ M toolkit/code/toolkit/tools/write.py
+ M toolkit/docs/ARCHITECTURE.md
+ M toolkit/docs/CONFIG.md
+ M toolkit/docs/DECISIONS.md
+ M toolkit/docs/LLM_START.en.md
+ M toolkit/docs/LLM_START.ru.md
+ M toolkit/docs/MCPBridgeRules.md
+ M toolkit/docs/REQUIREMENTS.md
+ M toolkit/docs/SESSION_STATE.md
+?? toolkit/code/manual/rimworld_inventory.py
+?? toolkit/code/manual/smoke_survey_dir.py
+?? toolkit/code/manual/survey_dir.py
+?? toolkit/code/toolkit/lua/scripts/_match.lua
+?? toolkit/code/toolkit/matching/
+?? toolkit/code/toolkit/tests/test_grep_replace.py
+?? toolkit/code/toolkit/tests/test_matching_text.py
+?? toolkit/code/toolkit/tools/grep_replace.py
+?? toolkit/code/toolkit/tools/verify.py
+[timing] user (1 actions): 0.06s
 
-[tail] ✓ read_file: toolkit/docs/DECISIONS.md L330–L332
-330: '**`.gitignore`:**\r\n'
-331: '\r\n'
-332: '- `.patch_applier/` — служебный каталог проекта (индексы, sidecar, рантайм MCP). Решение о коммите/игноре не принято. Возможный вариант: игнорировать всё, кроме `config.json` (он описывает проект). Или наоборот — коммитить индексы, игнорировать рантайм (`patch.json`, `outputs.json`, `bridge_log.jsonl`).\r\n'
-[timing] user (2 actions): 0.00s
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 52, без summary: 219) [v566] [без изменений]
 
-##RESULT:{"ok": 2, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.00s
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1218) [v629] [без изменений]
+
+[auto-lua] ✓ rebuild_lua_code_index: .patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 22, символов: 21) [v401] [без изменений]
+[timing] auto-rebuild (3 actions): 1.99s
+
+##RESULT:{"ok": 4, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 2.05s

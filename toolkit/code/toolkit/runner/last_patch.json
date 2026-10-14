@@ -1,15 +1,2 @@
-[{"id": "clean", "action": "replace_range",
-  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
-                "start_line": 246, "end_line": 248,
-                "new_content": "\r\n",
-                "expected_first_line": ""}}]
-
-[{"id": "add", "action": "insert_at_anchor",
-  "arguments": {"file_path": "toolkit/docs/DECISIONS.md",
-                "anchor": "**Unused tools — inventory from the session.**",
-                "position": "before",
-                "new_content": "6. **`settings_window.py` не вынесен.** `_menu_project_settings` всё ещё открывает `gui/settings_window.py` напрямую (581 строка Tk). В Functional-Core парадигму не завернут. Отдельная задача, если понадобится headless-доступ к настройкам проекта — сейчас это чисто GUI-операция.\r\n\r\n7. **`.gitignore` для runtime-логов.** `toolkit/code/bridge/bridge_timings.log` (547 KB на момент сессии) и `toolkit/code/toolkit/runner/last_*.{json,txt}` ездят в каждом коммите. Кандидаты: `runtime/logs/`, `last_*.{json,txt}`, `*.log`. Решение: добавить в `toolkit/.gitignore` (или `.patchignore`, если это runtime, не история).\r\n\r\n8. **`TOOL_PRACTICE §2` устарел.** Таблица «Инвентарь: что использовалось» — снимок прошлой сессии. Три тула из «ни разу» реально использовались: `replace_range` (11 раз), `insert_block` (21), `move_file` + `copy_file` (5). Обновить таблицу реальными цифрами из `metrics.json`, пометить, что «не использовался» ≠ «не рекомендован». Отдельная задача.\r\n\r\n"}}]
-
 [{"id": "commit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "DECISIONS: move remaining open items from SESSION_STATE"]}}]
+  "arguments": {"script": "toolkit/code/manual/_git.py", "args": ["commit", "session: unified text matcher, full-source hash, lua index write fix, verify_syntax fix, LLM_START §5/§8/§16"]}}]

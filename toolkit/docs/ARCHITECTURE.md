@@ -6,11 +6,11 @@
 
 ## 1. Слои
 
-<!-- summary: Патч → Patcher → Tools → {Backend, Format, Indexer} → core models. -->
+<!-- summary: Патч → Patcher → Tools → {Backend, Format, Indexer, Matching} → core models. -->
 <!-- tags: architecture, layers -->
 
 ```
-Патч (JSON) → Patcher → Tools → { Backend, Format, Indexer } → core models
+Патч (JSON) → Patcher → Tools → { Backend, Format, Indexer, Matching } → core models
 ```
 
 - **Patcher** — dispatch, фильтрация по `op`, агрегация Result, `##RESULT:` для GUI.
@@ -18,6 +18,7 @@
 - **Backend** — транспорт: `FilesystemBackend`, `MCPBackend`, `CompositeBackend`.
 - **Format** — канонизация текста в `Section[]` (markdown) или `Module` (Python / Lua).
 - **Indexer** — структуры → текст (`INDEX.md`, `CODE_INDEX.md`).
+- **Matching** — чистый матчер строк, разделяемый между `grep` и `grep_replace` (`Pattern`, `is_word`). Не знает ни о backend, ни о формате, ни о патчах.
 
 Tool — чистая функция над `(Backend, Format, **kwargs)`, возвращает `Result`.
 
@@ -111,10 +112,12 @@ class Policy:
 
 ## 3. Правила зависимостей
 
-<!-- summary: tools → backends/formats/indexers → core. Обратных импортов нет. -->
+<!-- summary: tools → backends/formats/indexers/matching → core. Обратных импортов нет. -->
 <!-- tags: architecture, dependencies -->
 
-`tools → {backends, formats, indexers} → core`. Обратных импортов нет. `runner` знает обо всём, но не наоборот.
+`tools → {backends, formats, indexers, matching} → core`. Обратных импортов нет. `runner` знает обо всём, но не наоборот.
+
+`matching/` — единственный слой, который импортируют два тула, чтобы иметь **общую** семантику матчинга. Он не должен зависеть ни от `backends`, ни от `formats`, ни от `tools`: только чистые функции над строкой. Если завтра ещё один тул захочет тот же матчер — он импортирует `matching`, а не копирует логику.
 
 ## 4. Инварианты
 
@@ -138,10 +141,10 @@ class Policy:
 
 **На Lua (в Studio):**
 - Обход DataModel для `rebuild_lua_code_index` — один `execute_luau` с циклом.
-- Cross-module операции — когда появятся (`refactor_rename`, marker scan).
+- Cross-module операции — `refactor_rename` теперь `grep_replace_mcp` (текстовый, не AST, per-line на Lua-стороне); marker scan по-прежнему открыт.
 
 **На Python (локально):**
-- Одиночные операции над модулем (`read_symbol_lua`, `replace_function_lua`) — round trip всё равно один; оверхед Lua не окупается.
+- Одиночные операции над модулем (`read_unit`, `replace_unit` на Luau-пути) — round trip всё равно один; оверхед Lua не окупается.
 - Docs, Python-код, policy, sandbox, verify — ядро toolkit'а.
 
 **Следствие.** `toolkit/formats/lua.py` (Python-парсер Lua) остаётся для одиночных операций и parity-тестов. Bulk-путь для Roblox-индекса — на Lua.
