@@ -1,6 +1,6 @@
 # SESSION_STATE — состояние между сессиями
 
-<!-- summary: Snapshot of what was done in the last big session (multi-root finalization + GUI perf + first external project) and what to pick up next. Update on session close, read on session start. -->
+<!-- summary: Snapshot of what was done in the last big session (unified text matcher + source_hash full-source + Lua index write fix + verify_syntax fix + GUI settings UX + scope design) and what to pick up next. Update on session close, read on session start. -->
 <!-- tags: session, state, bridge -->
 
 ## Зачем этот документ
@@ -8,6 +8,79 @@
 LLM_START — стабильная инструкция. DECISIONS — почему так решено. SESSION_STATE — **где мы прямо сейчас**: что закрыто в последней сессии, что открыто, что первым делом проверить при следующем старте.
 
 Обновляется **в конце каждой большой сессии** (или при смене контекста). Читается **первым делом** в новой сессии, вместе с `get_status`.
+
+## Сессия: единый текстовый матчер + фиксы индекса + GUI settings UX (закрыта)
+
+**Тема:** снять накопившийся долг по текстовому матчингу, найти и починить баги индекса (лимит 2048, двойной префикс), привести в порядок GUI settings, зафиксировать дизайн `.llmscope` в DECISIONS.
+
+**Git log:** `fba696c` (матчер + индекс + LLM_START) → `94c5dd1` (GUI settings UX) → `255bdc2` (scope design + session state).
+
+### Ключевые решения
+
+- **Формат патча — один фенс на весь ответ.** Формулировка «один фенс на патч» была слабее: оставляла дыру «а если в ответе два патча». Упростили до одной строки + проверка «посчитай фенсы перед отправкой».
+- **`source_hash` без лимита.** Лимит 2048 байт убран во всех трёх местах (Python `formats/code.py`, Lua `lua_symbols.lua`, `code_index_regen.lua`). **Мотивации лимита не нашли** ни в коде, ни в доках — считаем техническим долгом. Кросс-сравнение Python↔Lua хешей нигде не используется (grep пуст).
+- **Lua-индекс и `backend.write`.** `RebuildLuaCodeIndexTool` писал через `Path.write_text` в обход backend (двойной префикс `.patch_applier/.patch_applier/`). Приведён к тому же способу, что `RebuildIndexTool` и `RebuildCodeIndexTool` — все три через `backend.write`. Унификация достигнута без отдельного хелпера.
+- **Scope — отложен.** Дизайн зафиксирован в `DECISIONS §2.2`. Два варианта: A (scope режет build индекса) и B (фильтруется только представление). Три мотивации: handoff через контекстные окна, индекс на больших корнях, повторение `directory=`. Метрика готовности: 3+ случая за сессию, когда нужна «записка себе». Сейчас — 0.
+- **GUI settings — простота важнее структуры.** Пробовали три вложенных LabelFrame в Sources — оказалось громоздко. Вернулись к плоскому списку, переименовали кнопки: `Hide paths` → `FS ignore`, `Hide modules` → `MCP ignore`. Описания — внутри диалогов.
+
+### Что сделано
+
+**LLM_START (ru + en):**
+- §5 — упрощён до одного правила про фенс + проверки. Антипаттерн «разорванный фенс» удалён (не понадобился).
+- §8 — переписан в три операциональных правила чтения diff: (1) проверяй diff после каждого write, (2) сверяй `[vN]` при неожиданном, (3) `[без изменений]` ≠ «файлы не менялись» (warm-up мог уже собрать).
+- §16 — шапка «один пример = один патч = один фенс».
+- §12 — короткое напоминание про фенс.
+- §7 EN — `replace_unit` синхронизирован с RU (был устаревший + осиротевшая строка).
+
+**Единый текстовый матчер (`toolkit/matching/text.py`):**
+- `find_all_text` / `find_text` / `similar_lines` / `mark_invisible` / `TextMatch` / `Rule`.
+- Tier 1 (byte-exact) и tier 2 (trailing-whitespace tolerance) — общие для всех write-тулов.
+- Переведены: `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range` (tier-2 tolerance для `expected_first_line`).
+- Удалено 92 строки дублирующих хелперов (`_find_all`, `_find_normalised`, `_similar_lines`, `_mark_invisible`, `_rstrip_lines`).
+- 27 тестов в `tests/test_matching_text.py`. `run_all.py` расширен (заодно вернул забытые `test_replace_in_file`, `test_range_order`).
+
+**Индекс и диффы:**
+- `source_hash` без лимита (см. выше). Тест `test_code_parser.py` инвертирован.
+- Lua-индекс пишется через `backend.write`, двойной префикс убран.
+- `verify_syntax` — починен баг: `compile(src, path, "exec", doraise=True)` — у builtin `compile()` нет `doraise`.
+- `tools/__init__.py` — выпил 13 мёртвых импортов; `__all__` больше не врёт. `unit/__init__.py` — убраны `ReplaceBlockTool` / `DeleteBlockTool`.
+
+**GUI settings (`settings_window.py`):**
+- `Sources` — плоский список, кнопки `FS ignore` / `MCP ignore` справа на своих строках.
+- Окна редакторов `.patchignore` / `.mcpignore` — заголовок, описание (что делают, куда применяются), список **только правил** (без комментариев и пустых строк).
+- Кнопка `Disable` / `Enable` — правило с префиксом `@` серое, не работает. Формат: `@pattern`, `@!pattern` (disabled negation). `Rule` dataclass + `serialize()` в конфигах.
+- Крестик окна: если были изменения — `askyesnocancel` «Save changes?» (Yes / No / Cancel). Раньше крестик = молчаливая отмена.
+- Окна центрируются на родителе (`_center_on_parent`, `Tk` на Windows сам не центрирует).
+- Главное окно: `format_project_label` показывает **имя проекта** без пути и без `[composite]`.
+- Путь в настройках — readonly, копируется.
+- Дефолтные `.patchignore` / `.mcpignore` — только правила, без комментариев.
+
+**Docs:**
+- `DECISIONS §2.2` — снятие лимита 2048 и двойной префикс.
+- `DECISIONS §2.2` — scope design (мотивации, варианты A/B, статус «отложено»).
+- `SESSION_STATE` — обновлён.
+
+### Что открыто
+
+- **`.llmscope`** — обсуждено, отложено. Дизайн в `DECISIONS §2.2`. Метрика возврата: 3+ реальных случая за сессию.
+- **`.lua` / `.luau` не триггерит auto-lua** в `router._classify_path` — дыра для Rojo-backend. Для текущего `luau: mcp` не критично.
+- **`_lua_script` кэш без mtime.** Правки Lua-скриптов видны только после рестарта GUI (для разработчика утилиты). Задокументировано, ничего не делаем.
+- **Единый текстовый матчинг — этап 2.** EOL tier (`eol` / `eol+trailing`) — нормализация `\r\n` ↔ `\n` в матчере. Сейчас CRLF обрабатывается в каждом туле отдельно.
+- **`get_index overview` / `path_filter`.** Сжатый вид на 5 KB; фильтр по путям для одного файла.
+- **Rojo backend.** Третий namespace.
+- **Символьный reverse phase 2, diff edges, новые маркеры.** См. `DECISIONS §2.2`.
+- **Пороги маркеров в конфиг.** `_LARGE_FILE_LINES` / `_LARGE_FILE_KB` / `_LARGE_SYMBOL_LINES` — hard-coded в `renderer.py`.
+- **`TOOL_PRACTICE §2`** — таблица «Инвентарь» устарела после удаления символьных тулов.
+- **Lua reverse-dep graph** — `script.*`-формы не резолвятся в `_invert_lua_imports`.
+
+### Проверить в начале следующей сессии
+
+1. `get_status` — backend, версии индексов (`[vN]`), корни.
+2. `run_all.py` — exit=0.
+3. Открыть Project settings — визуально проверить: кнопки `FS ignore` / `MCP ignore`, редакторы с описанием и disable/enable, центрирование окон, крестик с подтверждением.
+4. `verify_syntax(paths=[...])` — на одном файле после правок.
+
+---
 
 ## Сессия: multi-root финализация + GUI-производительность + первый внешний проект (закрыта)
 

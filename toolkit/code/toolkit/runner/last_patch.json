@@ -1,3 +1,3 @@
 [{"id": "commit", "action": "run_python",
   "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "docs: scope design (variants A/B, motivation, deferred status) + session state update"]}}]
+                "args": ["commit", "SESSION_STATE: close matcher + index fixes + GUI settings session"]}}]

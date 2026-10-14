@@ -1,45 +1,24 @@
-[fix-a] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — +0 стр., +107 Б
+[read] ✓ read_file: PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md L12–L30
+12: '## Сессия: единый текстовый матчер + фиксы индекса + GUI settings UX (закрыта)\n'
+13: '\n'
+14: '**Тема:** снять накопившийся долг по текстовому матчингу, найти и починить баги индекса (лимит 2048, двойной префикс), привести в порядок GUI settings, зафиксировать дизайн `.llmscope` в DECISIONS.\n'
+15: '\n'
+16: '**Git log:** `fba696c` (матчер + индекс + LLM_START) → `94c5dd1` (GUI settings UX) → `255bdc2` (scope design + session state).\n'
+17: '\n'
+18: '### Ключевые решения\n'
+19: '\n'
+20: '- **Формат патча — один фенс на весь ответ.** Формулировка «один фенс на патч» была слабее: оставляла дыру «а если в ответе два патча». Упростили до одной строки + проверка «посчитай фенсы перед отправкой».\n'
+21: '- **`source_hash` без лимита.** Лимит 2048 байт убран во всех трёх местах (Python `formats/code.py`, Lua `lua_symbols.lua`, `code_index_regen.lua`). **Мотивации лимита не нашли** ни в коде, ни в доках — считаем техническим долгом. Кросс-сравнение Python↔Lua хешей нигде не используется (grep пуст).\n'
+22: '- **Lua-индекс и `backend.write`.** `RebuildLuaCodeIndexTool` писал через `Path.write_text` в обход backend (двойной префикс `.patch_applier/.patch_applier/`). Приведён к тому же способу, что `RebuildIndexTool` и `RebuildCodeIndexTool` — все три через `backend.write`. Унификация достигнута без отдельного хелпера.\n'
+23: '- **Scope — отложен.** Дизайн зафиксирован в `DECISIONS §2.2`. Два варианта: A (scope режет build индекса) и B (фильтруется только представление). Три мотивации: handoff через контекстные окна, индекс на больших корнях, повторение `directory=`. Метрика готовности: 3+ случая за сессию, когда нужна «записка себе». Сейчас — 0.\n'
+24: '- **GUI settings — простота важнее структуры.** Пробовали три вложенных LabelFrame в Sources — оказалось громоздко. Вернулись к плоскому списку, переименовали кнопки: `Hide paths` → `FS ignore`, `Hide modules` → `MCP ignore`. Описания — внутри диалогов.\n'
+25: '\n'
+26: '### Что сделано\n'
+27: '\n'
+28: '**LLM_START (ru + en):**\n'
+29: '- §5 — упрощён до одного правила про фенс + проверки. Антипаттерн «разорванный фенс» удалён (не понадобился).\n'
+30: '- §8 — переписан в три операциональных правила чтения diff: (1) проверяй diff после каждого write, (2) сверяй `[vN]` при неожиданном, (3) `[без изменений]` ≠ «файлы не менялись» (warm-up мог уже собрать).\n'
+[timing] user (1 actions): 0.00s
 
-[fix-b] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — +0 стр., +2 Б
-
-[fix-s] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md: заменено 1 вхожд. (последнее) — +0 стр., +2 Б
-
-[check] ✓ read_file: PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md L370–L395
-370: '**Статус: отложено.**\r\n'
-371: '\r\n'
-372: '**Почему не делаем сейчас.**\r\n'
-373: '\r\n'
-374: '- Дизайн нетривиален (персистентность, комментарии, связь с build-логикой).\r\n'
-375: '- Реального кейса в текущих сессиях не было — мы обошлись `directory=`.\r\n'
-376: '- Метрика готовности: **сколько раз за сессию LLM была бы рада «записке себе» в `.llmscope`?** Если 3+ раза — делаем. Пока — 0.\r\n'
-377: '\r\n'
-378: '**Когда возвращаться.** При первых признаках одного из трёх:\r\n'
-379: '- Пользователь жалуется, что индекс не влезает в контекст.\r\n'
-380: '- Rebuild большого кодового проекта (не 181 модуль, а 2000+) идёт минутами.\r\n'
-381: '- Задача переживает контекстное окно чаще одного раза за сессию (реальный handoff).\r\n'
-382: '\r\n'
-383: '**Что решать при реализации:**\r\n'
-384: '- Как именно индексируется scope в A — отфильтровать вход или отфильтровать выход? Вход (не скармливать файлы вне scope в parser) — быстрее, но требует правки walk-логики в 3 индексаторах. Выход (собрать всё, отфильтровать при рендере) — проще, но не решает rebuild-время.\r\n'
-385: '- B vs A: тестировать на реальном большом проекте.\r\n'
-386: '- Union vs один путь. Для MVP — union, как `.patchignore`.\r\n'
-387: '\r\n'
-388: '**`source_hash` — снят лимит 2048 байт (2026-10-14).** Раньше полиномиальный хеш считался только по первым 2048 байтам и модуля, и символа (Python `formats/code.py:HASH_LIMIT_BYTES`, Lua `lua_symbols.lua` и `code_index_regen.lua`). Следствие: правка в файле длиннее 2 KB **не меняла модульный хеш**, если была за пределами первых 2048 байт. Diff не видел изменений (`[без изменений]`), хотя файл реально менялся. Observed на `tools/write.py` (37 KB): правки в `ReplaceBetweenTool` (~L270) и `_find_all` (~L770) не отражались в `CODE_INDEX.md`.\r\n'
-389: '\r\n'
-390: '**Мотивации лимита не нашли.** Ни в коде (нет использования кросс-сравнения Python↔Lua хешей — grep пуст), ни в документации (DECISIONS/ARCHITECTURE/REQUIREMENTS лимит не упоминают), ни в истории обсуждений. Докстринг говорит «matches Lua-side impl» — но это требование согласованности алгоритма, а не мотивация усечения. Считаем техническим долгом, а не осознанным решением.\r\n'
-391: '\r\n'
-392: '**Фикс:** лимит убран во всех трёх местах; хеш считается по всему источнику. Совпадение Python ↔ Lua сохраняется (один алгоритм: `h = h*31 + byte`, mod 2³¹−1, seed 17) — теперь согласованно и без усечения. Тест `test_code_parser.py` инвертирован: было `hash ignores bytes past limit`, стало `hash covers whole source`. Первый rebuild после фикса показал `~N` для всех модулей >2 KB — ожидаемое одноразовое событие.\r\n'
-393: '\r\n'
-394: '**Двойной префикс `.patch_applier/.patch_applier/` (2026-10-14).** `RebuildLuaCodeIndexTool` строил путь как `local_dir / out_name`, где `out_name` уже содержал `.patch_applier/`. Результат: файлы писались в `.patch_applier/.patch_applier/CODE_INDEX_LUA.md`, а читались из `.patch_applier/CODE_INDEX_LUA.md`. Diff видел изменение в одном файле, `get_index` читал другой — рассогласование.\r\n'
-395: '\r\n'
-[timing] user (4 actions): 0.01s
-
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 52, без summary: 219) [v576] [~2, -3] ⚠
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2. Открыто (L161–L505, 55.1 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2.2 Граф и анализ (L230–L399, 27.1 KB, ⚠ stale, ⚠ large) — Реализовано: маркеры (факты), suppression `# pa:`, модульный reverse, `find_usages`, source_hash в diff (лимит 2048 снят 2026-10-14, двойной префикс в Lua-индексе исправлен), `grep_replace_mcp` (MCP-side rename), `grep_replace` (FS-side, shared matcher, симметрия с `grep`), `⚠ no summary` только на `##`. Открыто: символьный reverse, diff edges, новые маркеры.
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант A: scope режет и build индекса, и read-тулы (L310–L351, 4.7 KB, ⚠ no summary)
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант B (альтернатива): индекс строится полностью, фильтруется только отображение (L352–L369, 1.6 KB, ⚠ no summary)
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Статус: отложено (L370–L505, 22.7 KB, ⚠ no summary)
-[timing] auto-rebuild (1 actions): 0.49s
-
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 0.49s
+##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.00s

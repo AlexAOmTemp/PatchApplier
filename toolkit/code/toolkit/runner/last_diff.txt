@@ -1,6 +1,3 @@
-.patch_applier/INDEX.md (файлов: 52, без summary: 219) [v576] [~2, -3] ⚠
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2. Открыто (L161–L505, 55.1 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2.2 Граф и анализ (L230–L399, 27.1 KB, ⚠ stale, ⚠ large) — Реализовано: маркеры (факты), suppression `# pa:`, модульный reverse, `find_usages`, source_hash в diff (лимит 2048 снят 2026-10-14, двойной префикс в Lua-индексе исправлен), `grep_replace_mcp` (MCP-side rename), `grep_replace` (FS-side, shared matcher, симметрия с `grep`), `⚠ no summary` только на `##`. Открыто: символьный reverse, diff edges, новые маркеры.
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант A: scope режет и build индекса, и read-тулы (L310–L351, 4.7 KB, ⚠ no summary)
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Вариант B (альтернатива): индекс строится полностью, фильтруется только отображение (L352–L369, 1.6 KB, ⚠ no summary)
-  - PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §Статус: отложено (L370–L505, 22.7 KB, ⚠ no summary)
+.patch_applier/INDEX.md (файлов: 52, без summary: 224) [v579] [⇅17, +2]
+  + PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md §Сессия: единый текстовый матчер + фиксы индекса + GUI settings UX (закрыта) (L12–L84, 8.5 KB, ⚠ no summary)
+  + PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md §Ключевые решения (L18–L25, 2.2 KB)
