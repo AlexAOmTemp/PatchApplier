@@ -1,23 +1,36 @@
-[new-reset] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py: заменено 1 вхожд. (последнее) — +9 стр., +379 Б
+[read-23] ✓ read_file: PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md L400–L430
+400: '### 2.3 Инфраструктура\r\n'
+401: '\r\n'
+402: '<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->\r'
+403: '\r\n'
+404: '\r\n'
+405: '**Passthrough MCP-инструментов — закрыто.** Работает через `MCPBackend.invoke_native` (`native_tools_enabled=true` в конфиге). Нативные тулы (`insert_asset`, `generate_mesh`, `screen_capture`, ...) вызываются тем же патч-форматом под их оригинальными именами; схемы — в `tools_schema.json`. Гейтится флагом `native_tools_enabled`; при выключенном флаге — `error_code="native_tools_disabled"`. См. LLM_START §Native Roblox tools.\r\n'
+406: '\r\n'
+407: '**`CompositeBackend._state` и смерть суббекенда.** `is_alive = any(sub.is_alive())` — правильный контракт (degraded = поддержанное состояние). Но `backend_state(name)` читает `_state[name]`, который обновляется только через `_set_state` (вызывается из `open` / `close` / `reopen`). Если MCP-процесс умер сам — `backend_state("mcp")` продолжает врать «ready». Сейчас это не критично: GUI опрашивает per-backend state и переоткрывает MCP сам при следующем патче. Варианты: (a) периодический sync `_state` с `sub.is_alive()`; (b) subscription — суббекенд уведомляет композит о смерти; (c) не менять — считать `is_alive` ответом на «стоит ли пробовать», а точный per-backend state получать у самого суббекенда. Скорее всего (c) достаточно.\r\n'
+408: '\r\n'
+409: '**Пороги маркеров в конфиг — открыто.** `_LARGE_FILE_LINES = 300`, `_LARGE_FILE_KB = 16.0`, `_LARGE_SYMBOL_LINES = 100` сейчас hard-coded в `formats/renderer.py`. Обсуждалось вынести в конфиг (`large_file_lines`, `large_file_kb`, `large_symbol_lines`). Зачем: у разных проектов разная норма; «16 KB» для кода — одно, для данных — другое. Открыто потому, что до первой реальной жалобы на неверный порог менять смысла нет.\r\n'
+410: '\r\n'
+411: '**`get_index overview` — открыто.** Сейчас `get_index` возвращает либо полный индекс (44–150 KB), либо обрезанный по `max_bytes` — оба плохи для первого контакта. Идея: режим `overview` (grouped или flat) — одна строка на файл/модуль, ~5 KB. Данные для него уже есть: маркеры, граф импортов, размеры, одна строка summary. Примерный формат:\r\n'
+412: '\r\n'
+413: '```\r\n'
+414: 'toolkit/code/toolkit/backends/  (3 files, 1691 строк)\r\n'
+415: '  mcp.py  1115 стр., 20 sym  ◉  ← 17 imp  → 5 users (2 tests)\r\n'
+416: '  composite.py  414 стр., 5 sym  ← 6 imp  → 2 users\r\n'
+417: '```\r\n'
+418: '\r\n'
+419: 'Два режима — `grouped` (по папкам, компактнее) и `flat` (одна строка на файл). Дефолт — `grouped`. Зачем: 5 KB против 150 KB, и видно отношения (кто hub по числу users, кто entry по `◉`), которых в детальном индексе не видно. **Открыто** потому, что нужно решить, что показывать для docs-индекса (там граф не применим) и как показывать символы (одной строкой на модуль или топ-N крупных символов).\r\n'
+420: '\r\n'
+421: '**Rojo backend — открыто.** Обсуждалось в сессии. Третий namespace рядом с FS и MCP: Luau-код на диске (`.luau`/`.lua`). Дизайн:\r\n'
+422: '- Выбор режима — один селектор в GUI: `Luau source: ( ) Studio (MCP)  (•) Disk (Rojo)`. Не две отдельные галочки — они могут разойтись.\r\n'
+423: '- Формулировка про источник истины: в Rojo-mode Studio-копия существует, но **зеркалит диск** и не является источником истины. Правки идут в файлы, Studio подхватывает через Rojo-синк.\r\n'
+424: '- Формат пути: обычный файловый (`src/ServerScriptService/Foo/init.luau`), не dot-notation.\r\n'
+425: '- `rebuild_lua_code_index` в Rojo-mode строит индекс с диска через AST (не через MCP).\r\n'
+426: '- Возможность использовать Python AST и regex на диске, что даёт более сильный инструментарий, чем MCP-путь (у которого `execute_luau` с песочницей).\r\n'
+427: '\r\n'
+428: 'Сцена (Parts, GUI, Folders) в обоих режимах идёт через MCP — ортогонально режиму Luau-кода. **Открыто** потому, что это большая задача (третий backend + переключение в GUI + параллельная логика в индексере), и делать её имеет смысл после того, как стабилизируется текущий Rojo-независимый контур.\r\n'
+429: '\r\n'
+430: '**Ремастер GUI — закрыт (3a-3d).** Шаг 1 (разрезание монолита) сделан: `runner/gui/` — пакет из `state.py`, `formatting.py`, `widgets.py`, `starter_text.py`, `policy_io.py`, `app.py` (остаток Tk-оболочки). Шаг 2 (вынос мёртвого subprocess-пути) сделан. Шаг 3 (парадигма) закрыт.\r'
+[timing] user (1 actions): 0.00s
 
-[ok-fix] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py: заменено 1 вхожд. (последнее) — +11 стр., +461 Б
-
-[roots-keep] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py: заменено 1 вхожд. (последнее) — +2 стр., +146 Б
-
-[name-cb] ✓ replace_in_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py: заменено 1 вхожд. (последнее) — +1 стр., +63 Б
-
-[verify] ✓ verify_syntax: all 3 file(s) compile
-[timing] user (5 actions): 0.02s
-
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1228) [v683] [~3, ⇅32]
-  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py  (+9 стр., +0.4 KB)
-  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py  (+3 стр., +0.2 KB)
-  ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py  (+11 стр., +0.5 KB)
-      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py :: _menu_new_project  [function]  L688–L739 → L688–L748
-      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings  [function]  L312–L893 → L312–L896
-      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py :: open_project_settings._sync_roots_visibility  [function]  L713–L726 → L714–L729
-      ~ PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py :: project_ok  [function]  L72–L84 → L72–L95
-[timing] auto-rebuild (1 actions): 1.25s
-
-##RESULT:{"ok": 6, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 1.27s
+##RESULT:{"ok": 1, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 0.00s
