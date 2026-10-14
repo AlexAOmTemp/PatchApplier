@@ -399,7 +399,7 @@ RimWorld/Mods/1201382956/v1.6/**
 
 ### 2.3 Инфраструктура
 
-<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->
+<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, умный рестарт сессии после Save в настройках, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->
 
 **Passthrough MCP-инструментов — закрыто.** Работает через `MCPBackend.invoke_native` (`native_tools_enabled=true` в конфиге). Нативные тулы (`insert_asset`, `generate_mesh`, `screen_capture`, ...) вызываются тем же патч-форматом под их оригинальными именами; схемы — в `tools_schema.json`. Гейтится флагом `native_tools_enabled`; при выключенном флаге — `error_code="native_tools_disabled"`. См. LLM_START §Native Roblox tools.
 

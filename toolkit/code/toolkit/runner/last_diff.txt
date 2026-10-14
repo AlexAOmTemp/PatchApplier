@@ -1,5 +1,7 @@
-.patch_applier/INDEX.md (файлов: 52, без summary: 224) [v611] [без изменений]
+.patch_applier/INDEX.md (файлов: 52, без summary: 224) [v612] [~2, ⇅1]
+  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2. Открыто (L161–L513, 57.8 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
+  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2.3 Инфраструктура (L400–L477, 16.2 KB, ⚠ stale, ⚠ large) — sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning.
 
-.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1228) [v688] [без изменений]
+.patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1228) [v689] [без изменений]
 
-.patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 267, символов: 861) [v440] [без изменений]
+.patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 267, символов: 861) [v441] [без изменений]
