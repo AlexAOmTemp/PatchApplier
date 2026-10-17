@@ -9,8 +9,9 @@ import json
 from dataclasses import dataclass
 
 from ..core.backend import Backend
-from ..core.models import Module
+from ..core.models import Module, Symbol
 from ..formats import CodeFormat
+from ..formats.code import source_hash
 from ..formats.renderer import render_code_index
 
 
@@ -88,11 +89,25 @@ def build_code_index(
     root: str = "",
     skip_files: set[str] | None = None,
     skip_dirs: set[str] | None = None,
+    prev_manifest: list[dict] | None = None,
 ) -> CodeIndexResult:
+    """Build the Python code index, reusing parsed modules where possible.
+
+    Incremental path: when `prev_manifest` is given, a file is re-parsed
+    only if its source hash differs from the recorded one. Unchanged
+    files reuse their Module via `_module_from_manifest_entry`.
+
+    The Module carries more than C#: `imported_modules`, raw `calls`
+    (with unresolved `target_text`), and `import_bindings`. The import
+    graph and `_resolve_calls` need all three, so the manifest stores
+    them verbatim. Only `used_by` is a derived field and is recomputed
+    every run.
+    """
     skip_f = set(skip_files or DEFAULT_SKIP_FILES)
     skip_d = set(skip_dirs or DEFAULT_SKIP_DIRS)
     fmt = CodeFormat.load()
 
+    prev_by_path = _index_prev_manifest(prev_manifest)
     paths = backend.list(root or "", "*.py")
     modules: list[Module] = []
 
@@ -105,6 +120,17 @@ def build_code_index(
             text = backend.read(path)
         except Exception:
             continue
+
+        # Same polynomial hash the manifest stores — kept for Lua parity,
+        # cheap enough on Python trees.
+        file_hash, file_len = source_hash(text)
+        cached = prev_by_path.get(path)
+        if (cached is not None
+                and cached.get("hash") == file_hash
+                and cached.get("len") == file_len):
+            modules.append(_module_from_manifest_entry(cached, path))
+            continue
+
         try:
             m = fmt.parse(text, path=path)
         except SyntaxError:
@@ -152,9 +178,22 @@ def _build_manifest(
             "path": m.path,
             "hash": m.source_hash,
             "len": m.source_len,
+            # Cold modules carry source, so lines are computable here. Cached
+            # modules have no source; the renderer needs a real count.
+            "lines": m.lines or _count_lines(m.source),
             "imports": list(m.imports),
+            "imported_modules": list(m.imported_modules),
             "used_by": list(used_by_map.get(m.path, [])) if used_by_map else [],
+            # `calls` is the resolved edge list (kept for compatibility
+            # with readers that consume the manifest). `raw_calls` +
+            # `import_bindings` are what `_resolve_calls` needs to rebuild
+            # resolved edges for a cached module; they are opaque to any
+            # external consumer.
             "calls": list(calls_map.get(m.path, [])) if calls_map else [],
+            "raw_calls": list(m.calls),
+            "import_bindings": list(m.import_bindings),
+            "suppress": sorted(m.suppress),
+            "has_main": bool(m.has_main),
             "symbols": [
                 {
                     "qualname": s.qualname,
@@ -164,11 +203,74 @@ def _build_manifest(
                     "line_end": s.line_end,
                     "signature": s.signature,
                     "parent": s.parent,
+                    # Renderer emits `H{hash}` and the docstring inline; the
+                    # cached Module needs both to reproduce the same text.
+                    "source_hash": s.source_hash,
+                    "docstring": s.docstring,
                 }
                 for s in m.symbols
             ],
         })
     return out
+
+
+def _count_lines(source: str) -> int:
+    if not source:
+        return 0
+    n = source.count("\n")
+    if not source.endswith("\n"):
+        n += 1
+    return n
+
+
+def _index_prev_manifest(prev_manifest: list[dict] | None) -> dict[str, dict]:
+    if not isinstance(prev_manifest, list):
+        return {}
+    out: dict[str, dict] = {}
+    for entry in prev_manifest:
+        if isinstance(entry, dict) and isinstance(entry.get("path"), str):
+            out[entry["path"]] = entry
+    return out
+
+
+def _module_from_manifest_entry(entry: dict, path: str) -> Module:
+    """Reconstruct a Module from a manifest entry — no parse.
+
+    `source` is empty on purpose: the renderer reads `lines` from the
+    Module, and both the import graph and `_resolve_calls` operate on
+    `imported_modules` / `raw_calls` / `import_bindings` / symbols,
+    all of which are in the manifest. Re-reading source would defeat
+    the skip.
+    """
+    symbols: list[Symbol] = []
+    for s in entry.get("symbols", []) or []:
+        if not isinstance(s, dict):
+            continue
+        symbols.append(Symbol(
+            name=s.get("name", ""),
+            qualname=s.get("qualname", ""),
+            kind=s.get("kind", "?"),
+            line_start=int(s.get("line_start") or 0),
+            line_end=int(s.get("line_end") or 0),
+            signature=s.get("signature", "") or "",
+            parent=s.get("parent"),
+            source_hash=s.get("source_hash"),
+            docstring=s.get("docstring"),
+        ))
+    return Module(
+        path=path,
+        source="",
+        source_hash=int(entry.get("hash") or 0),
+        source_len=int(entry.get("len") or 0),
+        symbols=symbols,
+        imports=list(entry.get("imports") or []),
+        imported_modules=list(entry.get("imported_modules") or []),
+        lines=int(entry.get("lines") or 0),
+        suppress=frozenset(entry.get("suppress") or ()),
+        has_main=bool(entry.get("has_main")),
+        calls=list(entry.get("raw_calls") or []),
+        import_bindings=list(entry.get("import_bindings") or []),
+    )
 
 
 def _build_import_graph(modules: list) -> tuple[dict[str, list[str]], dict[str, list[str]]]:

@@ -135,6 +135,55 @@ def main():
 
     backend.close()
 
+    # --- incremental: reuse unchanged, re-parse the changed one ---
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / 'a.py').write_text('def helper():\n    return 1\n', encoding='utf-8')
+        (root / 'b.py').write_text(
+            'from a import helper\n\ndef use():\n    return helper()\n',
+            encoding='utf-8')
+
+        b = RootDirBackend(root)
+        r1 = build_code_index(b)
+        b.close()
+        t.expect('incr: cold build', r1.modules_count == 2, r1.modules_count)
+
+        prev = json.loads(r1.manifest_json)
+        t.expect('incr: manifest stores raw_calls',
+                 any(e.get('raw_calls') for e in prev),
+                 [len(e.get('raw_calls') or []) for e in prev])
+        t.expect('incr: manifest stores import_bindings',
+                 any(e.get('import_bindings') for e in prev),
+                 [len(e.get('import_bindings') or []) for e in prev])
+        t.expect('incr: manifest stores imported_modules',
+                 any(e.get('imported_modules') for e in prev),
+                 [e.get('imported_modules') for e in prev])
+
+        # No-op: identical output and manifest
+        b = RootDirBackend(root)
+        r2 = build_code_index(b, prev_manifest=prev)
+        b.close()
+        t.expect('incr: no-op text identical', r2.text == r1.text)
+        t.expect('incr: no-op manifest identical',
+                 r2.manifest_json == r1.manifest_json)
+
+        # Change a.py only; drop its cache entry
+        (root / 'a.py').write_text(
+            'def helper():\n    return 1\n\ndef extra():\n    return 2\n',
+            encoding='utf-8')
+        prev2 = [e for e in prev if e['path'] != 'a.py']
+        b = RootDirBackend(root)
+        r3 = build_code_index(b, prev_manifest=prev2)
+        b.close()
+        t.expect('incr: changed file re-parsed',
+                 'extra' in r3.text, r3.text[:200])
+        t.expect('incr: unchanged file still cached',
+                 any(e['path'] == 'b.py' for e in json.loads(r3.manifest_json)))
+        # The import graph edge from b -> a must survive even though a was
+        # re-parsed and b came from cache.
+        t.expect('incr: used_by edge survives',
+                 'b.py' in r3.text, r3.text[:400])
+
     print()
     if t.failed:
         print(f"=== \u0418\u0422\u041e\u0413: {t.passed} ok, {t.failed} failed ===")
