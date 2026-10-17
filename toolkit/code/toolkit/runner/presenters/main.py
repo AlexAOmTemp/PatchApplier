@@ -412,6 +412,7 @@ def build_session(backend, name: str, config: dict):
         index_paths={
             "docs": paths["docs"],
             "code": paths["code"],
+            "csharp": paths["csharp"],
             "lua":  paths["lua"],
         },
         roots=roots,
@@ -419,6 +420,7 @@ def build_session(backend, name: str, config: dict):
         sources={
             "docs": bool(config.get("index_docs", True)),
             "python": bool(config.get("index_python", True)),
+            "csharp": bool(config.get("index_csharp", True)),
             "mcp": "mcp" in backs,
             "rojo": bool(config.get("index_rojo", False)),
         },
@@ -439,11 +441,14 @@ def plan_init_patches(config: dict, backend_name: str) -> list[dict]:
         return []
     want_docs = bool(config.get("index_docs", has_fs))
     want_py = bool(config.get("index_python", has_fs))
+    want_cs = bool(config.get("index_csharp", has_fs))
     patches: list[dict] = []
     if want_docs:
         patches.append({"action": "rebuild_index", "arguments": {}})
     if want_py:
         patches.append({"action": "rebuild_code_index", "arguments": {}})
+    if want_cs:
+        patches.append({"action": "rebuild_csharp_index", "arguments": {}})
     return patches
 
 

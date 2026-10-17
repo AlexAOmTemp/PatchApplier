@@ -31,7 +31,10 @@ NATIVE_READ_ONLY = frozenset({
 
 
 def _classify_path(path: str) -> str | None:
-    """Map a single path to a rebuild domain: 'docs' / 'code' / 'lua' / None."""
+    """Map a single path to a rebuild domain.
+
+    'docs' / 'code' (Python) / 'csharp' / 'lua' / None.
+    """
     if not path:
         return None
     if is_mcp_path(path):
@@ -41,6 +44,8 @@ def _classify_path(path: str) -> str | None:
         return "docs"
     if low.endswith(".py"):
         return "code"
+    if low.endswith(".cs"):
+        return "csharp"
     return None
 
 
@@ -78,15 +83,16 @@ def plan_rebuilds(
       * write with no declared path_args -> all enabled domains
       * write with path_args -> classified by extension / is_mcp_path
       * docs/code need supports_fs; lua needs supports_mcp
-      * per-domain config flag: index_docs / index_python / index_lua
+      * per-domain config flag: index_docs / index_python / index_csharp / index_lua
 
-    Deterministic order of output: docs, code, lua.
+    Deterministic order of output: docs, code, csharp, lua.
     """
     if not user_patches:
         return []
 
     want_docs = bool(config.get("index_docs", True)) and supports_fs
     want_code = bool(config.get("index_python", True)) and supports_fs
+    want_cs   = bool(config.get("index_csharp", True)) and supports_fs
     want_lua  = bool(config.get("index_lua", True)) and supports_mcp
 
     touched: set[str] = set()
@@ -114,7 +120,7 @@ def plan_rebuilds(
         paths = _paths_of(tool_cls, args)
         if not paths:
             # Opaque writer (e.g. run_python): might have touched anything.
-            touched.update({"docs", "code", "lua"})
+            touched.update({"docs", "code", "csharp", "lua"})
             continue
 
         for p in paths:
@@ -129,6 +135,9 @@ def plan_rebuilds(
     if "code" in touched and want_code:
         out.append(("rebuild_code_index (Python)",
                     {"action": "rebuild_code_index", "arguments": {}}))
+    if "csharp" in touched and want_cs:
+        out.append(("rebuild_csharp_index (C#)",
+                    {"action": "rebuild_csharp_index", "arguments": {}}))
     if "lua" in touched and want_lua:
         out.append(("rebuild_lua_code_index (Roblox)",
                     {"action": "rebuild_lua_code_index", "arguments": {}}))

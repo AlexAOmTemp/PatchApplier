@@ -52,6 +52,7 @@ SCRIPTS = [
     ("xml refinements", HERE / "test_xml_refinements.py"),
     ("starter text", HERE / "test_starter_text.py"),
     ("unit cs", HERE / "test_unit_cs.py"),
+    ("csharp index", HERE / "test_csharp_index.py"),
 ]
 
 

@@ -1,0 +1,17 @@
+# Patch Applier — Python dependencies.
+#
+# Install:  python -m pip install -r requirements.txt
+#
+# Stdlib-only modules (tkinter, ast, json, ...) are not listed.
+
+# --- GUI ---
+# Global hotkey (Ctrl+Enter / Ctrl+Shift+Enter) from any window.
+keyboard>=0.13.5
+# Clipboard read/write for the patch box.
+pyperclip>=1.8.2
+
+# --- C# unit adapter (tools/unit/adapter_cs.py) ---
+# Pinned as a pair: tree-sitter 0.22 changed the Language/Parser API, and
+# tree-sitter-c-sharp wheels are built against a specific ABI. Bump together.
+tree-sitter>=0.26,<0.27
+tree-sitter-c-sharp>=0.23,<0.24

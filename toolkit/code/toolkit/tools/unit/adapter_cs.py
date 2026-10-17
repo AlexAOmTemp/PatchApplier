@@ -325,3 +325,12 @@ def _child(node, typ):
 
 def _text(node) -> str:
     return node.text.decode("utf-8", "replace")
+
+def extract_usings(source: str) -> list[str]:
+    """All `using` / `using static` / alias directives, as written."""
+    tree = parse_tree(source)
+    out: list[str] = []
+    for ch in tree.root_node.children:
+        if ch.type == "using_directive":
+            out.append(_text(ch))
+    return out

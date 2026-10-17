@@ -10,7 +10,7 @@ from typing import Literal
 
 
 ResultStatus = Literal["ok", "error", "skipped", "blocked"]
-ToolOp = Literal["read", "write", "index_docs", "index_py", "index_lua"]
+ToolOp = Literal["read", "write", "index_docs", "index_py", "index_lua", "index_cs"]
 
 
 @dataclass

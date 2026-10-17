@@ -9,8 +9,8 @@ Concepts:
                  Uniqueness enforced: two roots named `toolkit` cannot
                  coexist. No label / id / display_name — the basename is
                  the identity.
-  PathPolicy   — five independent flags (read, write, index_docs,
-                 index_py, index_lua) applied to a path and, by
+  PathPolicy   — six independent flags (read, write, index_docs,
+                 index_py, index_lua, index_cs) applied to a path and, by
                  inheritance, to its subtree.
   Root.overrides — per-path policy map: relative path -> PathPolicy.
                  Special key "." holds the root default; empty means
@@ -21,7 +21,8 @@ Serialization form of a root:
       "path": "...",
       "overrides": {
         ".": {"read": true, "write": true,
-              "index_docs": true, "index_py": true, "index_lua": true},
+              "index_docs": true, "index_py": true,
+              "index_lua": true, "index_cs": true},
         "docs/generated": {"write": false, "index_docs": false}
       },
       "include": [...],
@@ -42,7 +43,7 @@ from pathlib import Path
 
 WORKSPACE_FILENAME = "workspace.json"
 
-ALL_FLAGS = ("read", "write", "index_docs", "index_py", "index_lua")
+ALL_FLAGS = ("read", "write", "index_docs", "index_py", "index_lua", "index_cs")
 
 
 # --- dataclasses -----------------------------------------------------------
@@ -50,13 +51,14 @@ ALL_FLAGS = ("read", "write", "index_docs", "index_py", "index_lua")
 
 @dataclass
 class PathPolicy:
-    """Five independent permission flags for a path (and, by inheritance,
+    """Six independent permission flags for a path (and, by inheritance,
     its subtree). All True by default."""
     read: bool = True
     write: bool = True
     index_docs: bool = True
     index_py: bool = True
     index_lua: bool = True
+    index_cs: bool = True
 
     def to_dict(self) -> dict:
         return {k: bool(getattr(self, k)) for k in ALL_FLAGS}

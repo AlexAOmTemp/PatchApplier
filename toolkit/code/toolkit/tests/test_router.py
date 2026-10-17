@@ -99,7 +99,8 @@ def _actions(plan):
     return [p["action"] for _, p in plan]
 
 
-CFG_ALL_ON = {"index_docs": True, "index_python": True, "index_lua": True}
+CFG_ALL_ON = {"index_docs": True, "index_python": True,
+              "index_csharp": True, "index_lua": True}
 
 
 def main():
@@ -116,6 +117,25 @@ def main():
         TOOL_MAP,
         config=CFG_ALL_ON, supports_fs=True, supports_mcp=True)
     t.expect("read tool -> no trigger", plan == [], _actions(plan))
+
+    # Classification is by path extension; any write tool with
+    # path_args=["file_path"] exercises it.
+    plan = plan_rebuilds(
+        [_patch("replace_symbol", file_path="src/Player.cs")],
+        [_ok("replace_symbol")],
+        TOOL_MAP,
+        config=CFG_ALL_ON, supports_fs=True, supports_mcp=True)
+    t.expect("write .cs -> csharp only",
+             _actions(plan) == ["rebuild_csharp_index"], _actions(plan))
+
+    plan = plan_rebuilds(
+        [_patch("replace_symbol", file_path="src/Player.cs")],
+        [_ok("replace_symbol")],
+        TOOL_MAP,
+        config={**CFG_ALL_ON, "index_csharp": False},
+        supports_fs=True, supports_mcp=True)
+    t.expect("index_csharp=False -> no csharp rebuild",
+             plan == [], _actions(plan))
 
     plan = plan_rebuilds(
         [_patch("replace_between", file_path="docs/X.md")],
@@ -146,8 +166,9 @@ def main():
         [_ok("run_python")],
         TOOL_MAP,
         config=CFG_ALL_ON, supports_fs=True, supports_mcp=True)
-    t.expect("run_python -> all three",
+    t.expect("run_python -> all four",
              _actions(plan) == ["rebuild_index", "rebuild_code_index",
+                                "rebuild_csharp_index",
                                 "rebuild_lua_code_index"],
              _actions(plan))
 

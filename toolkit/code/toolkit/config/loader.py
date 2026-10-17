@@ -75,6 +75,7 @@ DEFAULTS: dict = {
     # backend checkboxes.
     "index_docs": True,
     "index_python": True,
+    "index_csharp": True,
     # Aggregate "any Lua source on?" — read by router to decide whether
     # to rebuild the Lua index after a write. Derived from MCP + Rojo
     # sources on save; never edited directly.
@@ -460,6 +461,8 @@ def resolve_index_paths(cfg: dict) -> dict:
         "docs":          cfg.get("index_output")        or (prefix + "INDEX.md"),
         "code":          cfg.get("code_index_output")   or (prefix + "CODE_INDEX.md"),
         "code_manifest": cfg.get("code_manifest_output") or (prefix + "CODE_INDEX.manifest.json"),
+        "csharp":        cfg.get("csharp_index_output")  or (prefix + "CODE_INDEX_CS.md"),
+        "csharp_manifest": prefix + "CODE_INDEX_CS.manifest.json",
         "lua":           cfg.get("lua_index_output")    or (prefix + "CODE_INDEX_LUA.md"),
         "lua_manifest":  prefix + "CODE_INDEX_LUA.manifest.json",
     }

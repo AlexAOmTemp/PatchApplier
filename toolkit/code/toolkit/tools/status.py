@@ -77,6 +77,7 @@ class GetStatusTool:
             "index_paths": dict(index_paths or {
                 "docs": "INDEX.md",
                 "code": "CODE_INDEX.md",
+                "csharp": "CODE_INDEX_CS.md",
                 "lua": "CODE_INDEX_LUA.md",
             }),
             "backends_enabled": set(backends_enabled or {"filesystem"}),
@@ -177,6 +178,8 @@ class GetStatusTool:
             elif py:
                 py_line += "   exec: ✗"
             lines.append(py_line)
+            cs = bool(sources.get("csharp", True))
+            lines.append(f"  C# (.cs)                     {'✓' if cs else '✗'}")
             lines.append(f"  {mcp_label:28s} {'✓' if mcp else '✗'}")
             lines.append(f"  Lua files on disk (.luau)    {'✓' if rojo else '✗'}")
             lines.append(f"  Luau source:                 {luau_line}")
@@ -345,7 +348,7 @@ class GetStatusTool:
         tokens = []
         for letter, key in (("R", "read"), ("W", "write"),
                             ("Id", "index_docs"), ("Ip", "index_py"),
-                            ("Il", "index_lua")):
+                            ("Ic", "index_cs"), ("Il", "index_lua")):
             try:
                 if bool(getattr(pol, key)):
                     tokens.append(letter)

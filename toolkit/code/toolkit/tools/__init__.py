@@ -29,8 +29,8 @@ from .fileops import (
     CopyFileTool,
 )
 from .index import (
-    RebuildIndexTool, RebuildCodeIndexTool, RebuildLuaCodeIndexTool,
-    GetIndexTool,
+    RebuildIndexTool, RebuildCodeIndexTool, RebuildCsharpIndexTool,
+    RebuildLuaCodeIndexTool, GetIndexTool,
 )
 from .status import GetStatusTool
 from .find_symbol import FindSymbolTool
@@ -78,6 +78,7 @@ TOOL_MAP: dict[str, type] = {
     "copy_unit": CopyUnitTool,
     "rebuild_index": RebuildIndexTool,
     "rebuild_code_index": RebuildCodeIndexTool,
+    "rebuild_csharp_index": RebuildCsharpIndexTool,
     "rebuild_lua_code_index": RebuildLuaCodeIndexTool,
     "get_index": GetIndexTool,
     "get_status": GetStatusTool,
@@ -112,7 +113,8 @@ __all__ = [
     "InsertAtAnchorTool",
     "CreateFileTool", "OverwriteFileTool", "DeleteFileTool", "MoveFileTool",
     "CopyFileTool",
-    "RebuildIndexTool", "RebuildCodeIndexTool", "RebuildLuaCodeIndexTool",
+    "RebuildIndexTool", "RebuildCodeIndexTool", "RebuildCsharpIndexTool",
+    "RebuildLuaCodeIndexTool",
     "GetIndexTool", "GetStatusTool",
     "FindSymbolTool",
     "FindUsagesTool",

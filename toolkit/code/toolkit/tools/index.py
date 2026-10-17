@@ -187,6 +187,7 @@ class GetIndexTool:
     _default_paths = {
         "docs": "INDEX.md",
         "code": "CODE_INDEX.md",
+        "csharp": "CODE_INDEX_CS.md",
         "lua": "CODE_INDEX_LUA.md",
     }
     _paths: dict[str, str] = dict(_default_paths)
@@ -279,6 +280,7 @@ class GetIndexTool:
                     rebuild_action = {
                         "docs": "rebuild_index",
                         "code": "rebuild_code_index",
+                        "csharp": "rebuild_csharp_index",
                         "lua": "rebuild_lua_code_index",
                     }[k]
                     blocks.append(
@@ -447,15 +449,93 @@ def install_index_paths(cfg: dict) -> None:
     from .write import VerifySectionTool
     VerifySectionTool.set_paths(paths["docs"])
     RebuildCodeIndexTool.set_paths(paths["code"], paths["code_manifest"])
+    RebuildCsharpIndexTool.set_paths(paths["csharp"], paths["csharp_manifest"])
     RebuildLuaCodeIndexTool.set_paths(paths["lua"], paths["lua_manifest"])
     GetIndexTool.set_paths({
         "docs": paths["docs"],
         "code": paths["code"],
+        "csharp": paths["csharp"],
         "lua":  paths["lua"],
     })
     from .find_symbol import FindSymbolTool
     from .find_usages import FindUsagesTool
     from .symbol_graph import SymbolGraphTool
-    FindSymbolTool.set_paths(paths["code_manifest"], paths["lua_manifest"])
+    FindSymbolTool.set_paths(paths["code_manifest"], paths["lua_manifest"],
+                             paths["csharp_manifest"])
     FindUsagesTool.set_paths(paths["code_manifest"], paths["lua_manifest"])
     SymbolGraphTool.set_paths(paths["code_manifest"], paths["lua_manifest"])
+
+class RebuildCsharpIndexTool:
+    name = "rebuild_csharp_index"
+    op = "index_cs"
+    path_args: list[str] = []
+    path_list_args: list[str] = []
+
+    _default_output: str | None = None
+    _default_manifest: str | None = None
+
+    @classmethod
+    def set_paths(cls, output: str | None = None,
+                  manifest: str | None = None) -> None:
+        """Set default output / manifest paths for `rebuild_csharp_index`."""
+        cls._default_output = output or None
+        cls._default_manifest = manifest or None
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        code_dir: str | None = None,
+        output: str | None = None,
+        manifest_output: str | None = None,
+        skip_files: list[str] | None = None,
+        skip_dirs: list[str] | None = None,
+        **_: Any,
+    ) -> Result:
+        cd = code_dir or ""
+        out_path = (output or self._default_output
+                    or (f"{cd}/CODE_INDEX_CS.md" if cd else "CODE_INDEX_CS.md"))
+        manifest_path = (manifest_output or self._default_manifest
+                         or out_path.replace(".md", ".manifest.json"))
+
+        prev_text = ""
+        try:
+            if backend.exists(out_path):
+                prev_text = backend.read(out_path)
+        except Exception:
+            prev_text = ""
+
+        try:
+            from ..indexers.csharp import build_csharp_index
+            result = build_csharp_index(
+                backend,
+                root=cd,
+                skip_files=set(skip_files) if skip_files else None,
+                skip_dirs=set(skip_dirs) if skip_dirs else None,
+            )
+        except Exception as e:
+            return Result(
+                status="error",
+                message=f"Ошибка C# index: {type(e).__name__}: {e}",
+                action="rebuild_csharp_index",
+            )
+
+        try:
+            backend.write(out_path, result.text)
+            backend.write(manifest_path, result.manifest_json)
+        except PermissionError as e:
+            return Result(
+                status="blocked",
+                message=str(e),
+                action="rebuild_csharp_index",
+                error_code="sandbox",
+            )
+
+        from ..indexers.state import bump_seq
+        seq = bump_seq(backend, out_path + ".version")
+        from ..indexers.diff import diff_code_index
+        dr = diff_code_index(prev_text, result.text)
+        msg = (f"{out_path} + {manifest_path} "
+               f"(модулей: {result.modules_count}, "
+               f"символов: {result.symbols_count}) [v{seq}]{dr.render()}")
+        return Result(status="ok", message=msg, action="rebuild_csharp_index")

@@ -27,13 +27,17 @@ class FindSymbolTool:
     path_list_args: list[str] = []
 
     _code_manifest: str = DEFAULT_MANIFEST
+    _csharp_manifest: str = "CODE_INDEX_CS.manifest.json"
     _lua_manifest: str = "CODE_INDEX_LUA.manifest.json"
 
     @classmethod
-    def set_paths(cls, code_manifest: str, lua_manifest: str) -> None:
+    def set_paths(cls, code_manifest: str, lua_manifest: str,
+                  csharp_manifest: str | None = None) -> None:
         """Set default manifest paths from service_subdir resolution."""
         cls._code_manifest = code_manifest or DEFAULT_MANIFEST
         cls._lua_manifest = lua_manifest or "CODE_INDEX_LUA.manifest.json"
+        cls._csharp_manifest = (csharp_manifest
+                                or "CODE_INDEX_CS.manifest.json")
 
     def execute(
         self,
@@ -47,8 +51,12 @@ class FindSymbolTool:
         **_,
     ):
         if manifest_path is None:
-            manifest_path = (self._lua_manifest if kind == "lua"
-                             else self._code_manifest)
+            if kind == "lua":
+                manifest_path = self._lua_manifest
+            elif kind == "csharp":
+                manifest_path = self._csharp_manifest
+            else:
+                manifest_path = self._code_manifest
         if not query or not query.strip():
             return Result(
                 status='error',

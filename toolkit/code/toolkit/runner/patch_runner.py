@@ -25,6 +25,7 @@ Notify = Callable[[str, object], None]
 _AUTO_LABEL = {
     "rebuild_index": "auto-md",
     "rebuild_code_index": "auto-py",
+    "rebuild_csharp_index": "auto-cs",
     "rebuild_lua_code_index": "auto-lua",
 }
 
