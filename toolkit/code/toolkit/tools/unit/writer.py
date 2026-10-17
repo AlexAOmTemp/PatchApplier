@@ -1,9 +1,12 @@
-"""Write operations for the unit model. Wave 2, tool 1: set_annotation.
+"""Write operations for the unit model.
 
-Cross-format annotation setter. Replaces an existing annotation in
-place. If the unit has no annotation, fails with `no_annotation` —
-creating one requires knowing the surrounding indentation and quoting
-rules per format, which is out of scope here.
+`set_annotation` is the internal implementation for annotation edits —
+the public entry point is `replace_unit(part="annotation")`, which
+delegates here so the per-format wrapper is applied. Cross-format
+annotation setter. Replaces an existing annotation in place. If the
+unit has no annotation, fails with `no_annotation` — creating one
+requires knowing the surrounding indentation and quoting rules per
+format, which is out of scope here.
 
 Per-format behaviour:
   .py ............ replace the triple-quoted docstring
@@ -36,22 +39,62 @@ def set_annotation(source: str, path: str, address: dict, text: str) -> str:
         raise ValueError(f"unsupported extension: {ext}")
 
     unit = reader.resolve(source, path, address)
+    lines = source.splitlines(keepends=False)
+
     if not unit.annotation.is_present():
         raise KeyError(f"no_annotation: {unit.qualname}")
 
     a = unit.annotation
-    lines = source.splitlines(keepends=False)
     start_i = a.start - 1
     end_i = a.end  # slice end (exclusive)
+    sample_line = lines[start_i] if start_i < len(lines) else ""
 
     if ext == ".py":
-        new_lines = _render_py(text, lines[start_i])
+        new_lines = _render_py(text, sample_line)
     elif ext in (".lua", ".luau"):
         new_lines = _render_lua(text)
     else:
         new_lines = _render_md(text)
 
     new_source_lines = lines[:start_i] + new_lines + lines[end_i:]
+    eol = "\r\n" if "\r\n" in source else "\n"
+    new_source = eol.join(new_source_lines)
+    if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
+        new_source += eol
+
+    _check_parses(new_source, path, unit, ext, source)
+    return new_source
+
+
+def create_annotation(source: str, path: str, address: dict,
+                      text: str) -> str:
+    """Insert a new annotation. Raises already_exists if one is present."""
+    if text is None or not text.strip():
+        raise ValueError("empty_input")
+    ext = Path(path).suffix.lower()
+    if ext not in (".py", ".lua", ".luau", ".md"):
+        raise ValueError(f"unsupported extension: {ext}")
+
+    unit = reader.resolve(source, path, address)
+    if unit.annotation.is_present():
+        raise KeyError(f"already_exists: {unit.qualname}")
+
+    lines = source.splitlines(keepends=False)
+    if unit.kind == UnitKind.MODULE:
+        insert_i = 0
+        sample_line = ""
+    else:
+        insert_i = unit.head.end if unit.head.is_present() else 0
+        sample_line = lines[insert_i] if insert_i < len(lines) else ""
+
+    if ext == ".py":
+        new_lines = _render_py(text, sample_line)
+    elif ext in (".lua", ".luau"):
+        new_lines = _render_lua(text)
+    else:
+        new_lines = _render_md(text)
+
+    new_source_lines = lines[:insert_i] + new_lines + lines[insert_i:]
     eol = "\r\n" if "\r\n" in source else "\n"
     new_source = eol.join(new_source_lines)
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
@@ -123,6 +166,8 @@ def replace_unit(source: str, path: str, address: dict,
     """
     if new_text is None:
         new_text = ""
+    if not new_text.strip():
+        raise ValueError("empty_input")
     if part is None and block is None:
         raise ValueError(
             "scope_required: pass part= or block= "
@@ -133,10 +178,16 @@ def replace_unit(source: str, path: str, address: dict,
     if block is not None:
         return replace_block(source, path, address, block, new_text)
 
+    # Annotation-only: delegate to set_annotation so the format wrapper
+    # (`\"\"\"` for .py, `--[[ ]]` for .lua, `<!-- summary: -->` for .md)
+    # is applied. Without this, raw text replaces the annotation and the
+    # parser no longer sees it as one — silent loss of summary/docstring.
+    parts = reader._normalize_parts(part)
+    if parts == ["annotation"]:
+        return set_annotation(source, path, address, new_text)
+
     ext = Path(path).suffix.lower()
     unit = reader.resolve(source, path, address)
-    parts = reader._normalize_parts(part)
-    is_delete = parts == ["all"] and not (new_text or "").strip()
     if parts == ["all"]:
         start, end = unit.line_start, unit.line_end
     else:
@@ -165,9 +216,50 @@ def replace_unit(source: str, path: str, address: dict,
     if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
         new_source += eol
 
-    _check_parses(new_source, path, unit, ext, source,
-                  expect_missing=is_delete)
+    _check_parses(new_source, path, unit, ext, source)
     return new_source
+
+
+def remove_unit(source: str, path: str, address: dict,
+                part=None, block=None) -> str:
+    """Remove a unit or blocks. Phase 1: part="all" and block=N only."""
+    if part is not None and block is not None:
+        raise ValueError("scope_conflict: use part= or block=, not both")
+    if part is None and block is None:
+        raise ValueError("scope_required: pass part= or block=")
+    ext = Path(path).suffix.lower()
+    unit = reader.resolve(source, path, address)
+    if block is not None:
+        return replace_block(source, path, address, block, "")
+    parts = reader._normalize_parts(part)
+    if parts != ["all"]:
+        raise KeyError(
+            f'not_applicable: remove_unit Phase 1 supports only part="all" '
+            f"(got {parts!r})"
+        )
+    start, end = unit.line_start, unit.line_end
+    lines = source.splitlines()
+    out_lines = lines[:start - 1] + lines[end:]
+    eol = "\r\n" if "\r\n" in source else "\n"
+    new_source = eol.join(out_lines)
+    if source.endswith(("\n", "\r")) and not new_source.endswith(("\n", "\r")):
+        new_source += eol
+    _check_parses(new_source, path, unit, ext, source, expect_missing=True)
+    return new_source
+
+
+def create_unit(source: str, path: str, address: dict,
+                part=None, new_text: str = "") -> str:
+    """Create a unit part. Phase 1: part="annotation" only."""
+    if part is None:
+        raise ValueError("scope_required: pass part=")
+    parts = reader._normalize_parts(part)
+    if parts == ["annotation"]:
+        return create_annotation(source, path, address, new_text)
+    raise KeyError(
+        f'not_applicable: create_unit Phase 1 supports only part="annotation" '
+        f"(got {parts!r})"
+    )
 
 
 def replace_block(source: str, path: str, address: dict,

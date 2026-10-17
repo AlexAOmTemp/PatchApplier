@@ -173,10 +173,12 @@ class RunPythonTool:
         self,
         backend: Backend,
         fmt: Any,
-        script: str | None = None,
+        path: str | None = None,
         module: str | None = None,
+        code: str | None = None,
+        script: str | None = None,  # legacy alias for `path`
         args: list[str] | None = None,
-        cwd: str = ".",
+        cwd: str | None = None,
         timeout: int | None = None,
         max_bytes: int | None = None,
         env: dict | None = None,
@@ -195,10 +197,14 @@ class RunPythonTool:
             )
 
         # -- 2. shape -------------------------------------------------------
-        if bool(script) == bool(module):
+        # `script` is a legacy alias for `path`.
+        if path is None and script is not None:
+            path = script
+        modes = [path, module, code]
+        if sum(x is not None for x in modes) != 1:
             return Result(
                 status="error",
-                message="Specify exactly one of `script` or `module`.",
+                message="Specify exactly one of `path` / `module` / `code`.",
                 error_code="ambiguous_input",
                 action="run_python",
             )
@@ -225,31 +231,68 @@ class RunPythonTool:
 
         # -- 4. argv --------------------------------------------------------
         argv: list[str] = [str(interp)]
-        if script:
-            try:
-                sp = self._resolve_inside_project(script)
-            except ValueError as e:
-                return Result(
-                    status="blocked",
-                    message=str(e),
-                    error_code="script_outside_project",
-                    action="run_python",
-                )
+        script_path: Path | None = None
+        temp_code: Path | None = None
+        if path is not None:
+            resolver = getattr(backend, "resolve_physical", None)
+            sp: Path | None = None
+            if callable(resolver):
+                sp = resolver(path)
+            if sp is None:
+                try:
+                    sp = self._resolve_inside_project(path)
+                except ValueError as e:
+                    return Result(
+                        status="blocked",
+                        message=str(e),
+                        error_code="script_outside_project",
+                        action="run_python",
+                    )
             if not sp.is_file():
                 return Result(
                     status="error",
-                    message=f"script not found: {script}",
+                    message=f"script not found: {path}",
                     error_code="script_not_found",
                     action="run_python",
                 )
             if sp.suffix.lower() != ".py":
                 return Result(
                     status="error",
-                    message=f"script must be a .py file: {script}",
+                    message=f"script must be a .py file: {path}",
                     error_code="script_not_python",
                     action="run_python",
                 )
             argv.append(str(sp))
+            script_path = sp
+        elif code is not None:
+            if not isinstance(code, str) or not code.strip():
+                return Result(
+                    status="error",
+                    message="`code` must be a non-empty string.",
+                    error_code="empty_input",
+                    action="run_python",
+                )
+            import tempfile as _tempfile
+            if cwd is not None:
+                base = self._resolve_inside_project(cwd)
+            elif self._project_root is not None:
+                base = self._project_root
+            else:
+                base = Path.cwd()
+            try:
+                fd, tmp_name = _tempfile.mkstemp(suffix=".py", dir=str(base))
+            except OSError as e:
+                return Result(
+                    status="error",
+                    message=f"cannot create temp file: {e}",
+                    error_code="os_error",
+                    action="run_python",
+                )
+            os.close(fd)
+            temp_code = Path(tmp_name)
+            temp_code.write_text(code, encoding="utf-8")
+            argv.append(str(temp_code))
+            script_path = temp_code
         else:
             argv.extend(["-m", str(module)])
 
@@ -266,19 +309,22 @@ class RunPythonTool:
             argv.extend(args)
 
         # -- 5. cwd ---------------------------------------------------------
-        try:
-            cwd_path = self._resolve_inside_project(cwd or ".")
-        except ValueError as e:
-            return Result(
-                status="blocked",
-                message=str(e),
-                error_code="cwd_outside_project",
-                action="run_python",
-            )
+        if cwd is None and script_path is not None:
+            cwd_path = script_path.parent
+        else:
+            try:
+                cwd_path = self._resolve_inside_project(cwd or ".")
+            except ValueError as e:
+                return Result(
+                    status="blocked",
+                    message=str(e),
+                    error_code="cwd_outside_project",
+                    action="run_python",
+                )
         if not cwd_path.is_dir():
             return Result(
                 status="error",
-                message=f"cwd is not a directory: {cwd}",
+                message=f"cwd is not a directory: {cwd_path}",
                 error_code="cwd_not_found",
                 action="run_python",
             )
@@ -349,6 +395,13 @@ class RunPythonTool:
                 out_b, err_b = b"", b""
         duration_ms = int((time.monotonic() - t0) * 1000)
         exit_code = proc.returncode if proc.returncode is not None else -1
+
+        # Cleanup inline-code tempfile.
+        if temp_code is not None:
+            try:
+                temp_code.unlink()
+            except OSError:
+                pass
 
         # -- 10. truncate ---------------------------------------------------
         out_b, out_tr = _clip(out_b or b"", cap)

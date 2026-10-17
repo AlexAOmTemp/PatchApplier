@@ -2,7 +2,8 @@
 
 Covers:
   - create_file / overwrite_file: content_syntax_error for .py/.json
-  - replace_unit: empty_input_use_delete_block for part=all + empty text
+  - replace_unit: empty_input on empty new_text (use remove_unit instead)
+  - remove_unit: part=all and block=N delete semantics
   - replace_unit: part=own_body on markdown with subsections
   - get_status: roots line when workspace roots are supplied
 
@@ -140,17 +141,16 @@ def main():
         body = (root / 'a.py').read_text(encoding='utf-8')
         t.expect('block replaced', 'return 42' in body and 'return 1' not in body)
 
-        # block= with empty new_text = delete that block. Function must
-        # have more than one block, or we end up with `def f():` and no body.
+        # remove_unit(block=N) deletes that block. Function must have
+        # more than one block, or we end up with `def f():` and no body.
         (root / 'b.py').write_text(
             'def f():\n    a = 1\n    b = 2\n', encoding='utf-8')
-        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+        r = _run(root, [{'action': 'remove_unit', 'arguments': {
             'file_path': 'b.py',
             'address': {'qualname': 'f'},
             'block': 1,
-            'new_text': '',
         }}])[0]
-        t.expect('replace_unit(block=, empty) deletes', r.status == 'ok',
+        t.expect('remove_unit(block=1) deletes', r.status == 'ok',
                  f'{r.status}/{r.error_code}')
         if r.status == 'ok':
             body = (root / 'b.py').read_text(encoding='utf-8')
@@ -217,19 +217,18 @@ def main():
         t.expect('section_number still works',
                  r.status == 'ok' and 'b' in r.message, r.message)
 
-    # --- replace_unit: empty + part=all -> deletes the unit ---
+    # --- remove_unit: part=all -> deletes the unit ---
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / 'a.py').write_text(
             'def foo():\n    pass\n\n\ndef bar():\n    return 1\n',
             encoding='utf-8')
-        r = _run(root, [{'action': 'replace_unit', 'arguments': {
+        r = _run(root, [{'action': 'remove_unit', 'arguments': {
             'file_path': 'a.py',
             'address': {'qualname': 'foo'},
             'part': 'all',
-            'new_text': '',
         }}])[0]
-        t.expect('empty part=all deletes the unit',
+        t.expect('remove_unit(part=all) deletes the unit',
                  r.status == 'ok',
                  f'{r.status}/{r.error_code}: {r.message}')
         remaining = (root / 'a.py').read_text(encoding='utf-8')

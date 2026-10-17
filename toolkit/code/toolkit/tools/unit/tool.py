@@ -235,6 +235,50 @@ class InsertBlockTool:
         )
 
 
+class RemoveUnitTool:
+    name = "remove_unit"
+    op = "write"
+    path_args = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: dict | None = None,
+        part=None,
+        block=None,
+        **_: Any,
+    ) -> Result:
+        return _write_call(
+            backend, file_path, "remove_unit", address,
+            lambda src: writer.remove_unit(src, file_path, address, part, block),
+        )
+
+
+class CreateUnitTool:
+    name = "create_unit"
+    op = "write"
+    path_args = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: dict | None = None,
+        part=None,
+        new_text: str = "",
+        **_: Any,
+    ) -> Result:
+        return _write_call(
+            backend, file_path, "create_unit", address,
+            lambda src: writer.create_unit(src, file_path, address, part, new_text),
+        )
+
+
 def _write_call(backend, file_path, action, address, apply_fn) -> Result:
     if not file_path:
         return Result(status="error", message="file_path required",
@@ -255,7 +299,8 @@ def _write_call(backend, file_path, action, address, apply_fn) -> Result:
     except KeyError as e:
         msg = e.args[0] if e.args else str(e)
         code = "not_found"
-        for p in ("not_applicable", "block_out_of_range", "anchor_not_found",
+        for p in ("not_applicable", "already_exists",
+                  "block_out_of_range", "anchor_not_found",
                   "no_parts", "no_annotation"):
             if msg.startswith(p):
                 code = p

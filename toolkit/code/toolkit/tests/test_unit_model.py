@@ -1,5 +1,5 @@
 """Tests for the unit model tools: read_unit, list_units, set_annotation,
-replace_unit (with part / block), insert_block.
+replace_unit (with part / block), create_unit, remove_unit, insert_block.
 
 Covers Python, markdown, and Luau. Uses a temp project; exercises the
 model end to end via Session.apply_patches so path policy applies as in
@@ -169,29 +169,64 @@ def main():
             t.expect("has helper", "helper" in r.message)
             t.expect("has Widget.render", "Widget.render" in r.message)
 
-            # --- set_annotation ---
-            print("== set_annotation: replace Python docstring ===")
-            r = run("set_annotation", file_path="a.py",
+            # --- annotation via replace_unit ---
+            print("== replace_unit(part=annotation): replace Python docstring ===")
+            r = run("replace_unit", file_path="a.py",
                     address={"qualname": "helper"},
-                    text="NEW DOC")
+                    part="annotation", new_text="NEW DOC")
             t.expect("ok", r.status == "ok", r.message)
             after = (root / "a.py").read_text(encoding="utf-8")
             t.expect("new doc in file", "NEW DOC" in after)
             t.expect("old doc gone", "Return x + 1" not in after)
+            # Regression: the format wrapper must be re-applied. Raw text
+            # without """ would silently stop being a docstring.
+            t.expect('triple-quoted wrapper', '"""NEW DOC"""' in after)
+            import ast as _ast
+            _tree = _ast.parse(after)
+            _helper = next(
+                (n for n in _tree.body
+                 if isinstance(n, _ast.FunctionDef) and n.name == 'helper'),
+                None,
+            )
+            t.expect('helper exists', _helper is not None)
+            t.expect('parses as docstring',
+                     _ast.get_docstring(_helper) == 'NEW DOC')
 
-            print("== set_annotation: no annotation fails ===")
-            r = run("set_annotation", file_path="a.py",
+            print("== replace_unit(part=annotation): no annotation fails ===")
+            r = run("replace_unit", file_path="a.py",
                     address={"qualname": "Widget.render"},
-                    text="x")
+                    part="annotation", new_text="x")
             t.expect("error", r.status == "error")
             t.expect("no_annotation", r.error_code == "no_annotation", r.error_code)
 
-            print("== set_annotation: markdown summary ===")
-            r = run("set_annotation", file_path="doc.md",
-                    address={"section_number": "2"}, text="updated 2")
+            print("== create_unit(part=annotation): creates when missing ===")
+            r = run("create_unit", file_path="a.py",
+                    address={"qualname": "Widget.render"},
+                    part="annotation", new_text="render doc")
+            t.expect("ok", r.status == "ok", r.message)
+            after = (root / "a.py").read_text(encoding="utf-8")
+            t.expect("docstring added",
+                     '\"\"\"render doc\"\"\"' in after, repr(after))
+
+            print("== create_unit(part=annotation): already_exists ===")
+            r = run("create_unit", file_path="a.py",
+                    address={"qualname": "Widget.render"},
+                    part="annotation", new_text="x")
+            t.expect("error", r.status == "error")
+            t.expect("already_exists",
+                     r.error_code == "already_exists", r.error_code)
+
+            print("== replace_unit(part=annotation): markdown summary ===")
+            r = run("replace_unit", file_path="doc.md",
+                    address={"section_number": "2"},
+                    part="annotation", new_text="updated 2")
             t.expect("ok", r.status == "ok")
             md = (root / "doc.md").read_text(encoding="utf-8")
             t.expect("new summary", "updated 2" in md)
+            # Regression: markdown summary must stay wrapped in the
+            # HTML comment, otherwise the parser loses it.
+            t.expect('html-comment wrapper',
+                     '<!-- summary: updated 2 -->' in md)
 
             # --- replace_block ---
             print("== replace_block: single ===")
@@ -202,10 +237,10 @@ def main():
             after = (root / "a.py").read_text(encoding="utf-8")
             t.expect("new return", "return 42" in after)
 
-            print("== replace_block: range deletes ===")
-            r = run("replace_unit", file_path="a.py",
+            print("== remove_unit: range deletes ===")
+            r = run("remove_unit", file_path="a.py",
                     address={"qualname": "Widget.fetch"},
-                    block="1-2", new_text="")
+                    block="1-2")
             t.expect("ok", r.status == "ok", r.message)
             after = (root / "a.py").read_text(encoding="utf-8")
             t.expect("a=1 gone", "a = 1" not in after)
@@ -219,13 +254,13 @@ def main():
             t.expect("error", r.status == "error")
             t.expect("bad_block_range", r.error_code == "bad_block_range", r.error_code)
 
-            # --- delete_block ---
-            print("== delete_block ===")
+            # --- remove_unit: single block ---
+            print("== remove_unit: single block ===")
             (root / "b.py").write_text(
                 "def f():\n    a = 1\n    b = 2\n    return a + b\n",
                 encoding="utf-8")
-            r = run("replace_unit", file_path="b.py",
-                    address={"qualname": "f"}, block=1, new_text="")
+            r = run("remove_unit", file_path="b.py",
+                    address={"qualname": "f"}, block=1)
             t.expect("ok", r.status == "ok", r.message)
             after = (root / "b.py").read_text(encoding="utf-8")
             t.expect("a=1 gone", "a = 1" not in after)

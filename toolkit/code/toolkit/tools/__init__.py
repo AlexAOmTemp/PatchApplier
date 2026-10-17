@@ -11,12 +11,15 @@ Deprecated tools (removed from TOOL_MAP 2026-10-11, see DECISIONS §2.1):
 Class definitions remain in `tools/write.py`, `tools/code.py`, `tools/lua_code.py`,
 `tools/symbols/*`, `tools/unit/tool.py`. To reactivate one, add its import and a
 TOOL_MAP entry back.
+
+`set_annotation` (removed from TOOL_MAP): use `replace_unit(part="annotation")` to replace, `create_unit(part="annotation")` to create.
 """
 
 from .read import (
     ReadFileTool, FileExistsTool, FileStatTool, ListFilesTool, GrepTool,
     SurveyDirTool,
 )
+from .tree import TreeTool
 from .write import (
     ReplaceInFileTool, ReplaceRangeTool, ReplaceBetweenTool,
     InsertAtAnchorTool,
@@ -39,9 +42,9 @@ from .find_usages import FindUsagesTool
 from .copy import CopyUnitTool
 from .shell import RunPythonTool
 from .verify import VerifySyntaxTool
-from .unit import (
-    ReadUnitTool, ListUnitsTool, SetAnnotationTool,
-    ReplaceUnitTool, InsertBlockTool,
+from .unit.tool import (
+    ReadUnitTool, ListUnitsTool,
+    ReplaceUnitTool, RemoveUnitTool, CreateUnitTool, InsertBlockTool,
 )
 
 
@@ -51,6 +54,7 @@ TOOL_MAP: dict[str, type] = {
     "file_stat": FileStatTool,
     "list_files": ListFilesTool,
     "survey_dir": SurveyDirTool,
+    "tree": TreeTool,
     "grep": GrepTool,
     "grep_mcp": GrepMcpTool,
     "grep_replace": GrepReplaceTool,
@@ -79,15 +83,16 @@ TOOL_MAP: dict[str, type] = {
     "verify_syntax": VerifySyntaxTool,
     "read_unit": ReadUnitTool,
     "list_units": ListUnitsTool,
-    "set_annotation": SetAnnotationTool,
     "replace_unit": ReplaceUnitTool,
+    "remove_unit": RemoveUnitTool,
+    "create_unit": CreateUnitTool,
     "insert_block": InsertBlockTool,
 }
 
 __all__ = [
     "TOOL_MAP",
     "ReadFileTool", "FileExistsTool", "FileStatTool", "ListFilesTool", "GrepTool",
-    "SurveyDirTool",
+    "SurveyDirTool", "TreeTool",
     "ReplaceInFileTool", "ReplaceRangeTool", "ReplaceBetweenTool",
     "InsertAtAnchorTool",
     "CreateFileTool", "OverwriteFileTool", "DeleteFileTool", "MoveFileTool",
@@ -103,6 +108,6 @@ __all__ = [
     "CopyUnitTool",
     "RunPythonTool",
     "VerifySyntaxTool",
-    "ReadUnitTool", "ListUnitsTool", "SetAnnotationTool",
-    "ReplaceUnitTool", "InsertBlockTool",
+    "ReadUnitTool", "ListUnitsTool",
+    "ReplaceUnitTool", "RemoveUnitTool", "CreateUnitTool", "InsertBlockTool",
 ]

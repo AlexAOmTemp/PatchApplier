@@ -301,6 +301,23 @@ class WorkspaceBackend:
             raise FileNotFoundError(f"copy: unknown root in {src!r} -> {dst!r}")
         src_fb.copy_to(s_rel, dst_fb, d_rel)
 
+    def resolve_physical(self, path: str) -> Path | None:
+        """Physical Path for a workspace-relative path, or None.
+
+        Delegates to the owning FilesystemBackend (or state FS for the
+        `.patch_applier/` prefix). Returns None for unknown roots and
+        sandbox violations.
+        """
+        name, rel = self._split(path)
+        if name == patchignore.STATE_DIR:
+            if self._state_fs is None:
+                return None
+            return self._state_fs.resolve_physical(rel)
+        fb = self.roots.get(name)
+        if fb is None:
+            return None
+        return fb.resolve_physical(rel)
+
     # --- filter ------------------------------------------------------------
 
     def filter_check(self, path: str, op: str) -> tuple[str, str] | None:

@@ -431,6 +431,26 @@ class CompositeBackend:
             )
         src_owner[1].copy(src, dst)
 
+    # --- physical path ----------------------------------------------------
+
+    def resolve_physical(self, path: str):
+        """Physical Path for `path`, or None.
+
+        Delegates to the sub-backend that owns the path. MCP paths
+        (Service.X.Y) are not physical files -- they return None so the
+        caller falls back to its non-FS resolution path.
+        """
+        name, backend = self._owner(path)
+        if backend is None:
+            return None
+        fn = getattr(backend, "resolve_physical", None)
+        if not callable(fn):
+            return None
+        try:
+            return fn(path)
+        except Exception:
+            return None
+
     # --- filter ------------------------------------------------------------
 
     def filter_check(self, path: str, op: str) -> tuple[str, str] | None:

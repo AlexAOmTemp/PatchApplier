@@ -60,6 +60,13 @@ class FilesystemBackend:
             n += 1
         return n
 
+    def resolve_physical(self, path: str) -> Path | None:
+        """Best-effort local Path for `path`; None on sandbox violation."""
+        try:
+            return self._resolve(path)
+        except PermissionError:
+            return None
+
     # --- data -------------------------------------------------------------
 
     def read(self, path: str) -> str:

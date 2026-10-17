@@ -455,6 +455,23 @@ class GrepTool:
         # index itself. When the caller names files explicitly, they
         # mean them — only a caller-supplied exclude_glob narrows that.
         if paths:
+            # Reject directory entries in `paths` -- they would be silently
+            # skipped by the per-file read loop below, yielding a false
+            # "no matches". Recursive scans go through `directory`.
+            for _p in paths:
+                try:
+                    _st = backend.stat(_p)
+                except Exception:
+                    _st = None
+                if _st is not None and not _st.is_file:
+                    return Result(
+                        status="error", action="grep",
+                        error_code="bad_options",
+                        message=(
+                            f"`paths` содержит каталог: {_p!r} — "
+                            f"используй `directory` для рекурсивного поиска"
+                        ),
+                    )
             candidates = list(paths)
             if exclude_glob is None:
                 excludes = []
