@@ -4,12 +4,12 @@
 <!-- summary: Patch Applier is a JSON-patch tool over four sources (Docs, Python, Luau code, Roblox scene); Luau code lives in one of two modes (MCP/Rojo); index as map, structural units, deterministic result. -->
 <!-- tags: overview, purpose -->
 
-**Patch Applier** lets an LLM work on a project through **JSON patches**: one LLM reply = a list of actions, each a read or an edit. Patches apply to four sources: **Docs** and **Python** live on disk; **Luau code** lives either on disk (Rojo mode) or in Studio (MCP mode); the **Roblox scene** (Parts, GUI, Folders) always lives in Studio and is reached through the MCP bridge. The user picks the Luau mode; it is fixed in the status line `luau:`.
+**Patch Applier** lets an LLM work on a project through **JSON patches**: one LLM reply = a list of actions, each a read or an edit. Patches apply to four sources: **Docs** and **Python** live on disk; **Luau code** lives either on disk (Rojo mode) or in Studio (MCP mode); the **Roblox scene** (Parts, GUI, Folders) always lives in Studio and is reached through the MCP bridge. The user picks the Luau mode; it is fixed in the status line `Luau source:`.
 
 **Axis: where Luau code lives.** Two mutually exclusive modes:
 
-- **MCP mode** (`luau: mcp`) — code in Studio, instance `.Source`; path like `Service.X.Y`; edits go through the bridge.
-- **Rojo mode** (`luau: rojo`) — source of truth is `.luau` on disk; ordinary filesystem paths; edits go through the same AST tools as Python. A copy of the code exists in Studio but **mirrors the disk** and is not the source of truth.
+- **MCP mode** (`Luau source: mcp`) — code in Studio, instance `.Source`; path like `Service.X.Y`; edits go through the bridge.
+- **Rojo mode** (`Luau source: rojo`) — source of truth is `.luau` on disk; ordinary filesystem paths; edits go through the same AST tools as Python. A copy of the code exists in Studio but **mirrors the disk** and is not the source of truth.
 
 **`MCP` ≠ `Roblox`.** MCP is the transport to the Studio DataModel. A Roblox path `Service.X.Y` is a marker of MCP mode. The scene (Parts, GUI, Folders) goes through MCP in both modes — orthogonal to the Luau-code mode. Docs and Python always live on disk; the mode does not touch them.
 
@@ -23,7 +23,7 @@ Three load-bearing ideas:
 
 More on requirements — `docs/REQUIREMENTS.md`. Internal design — `docs/ARCHITECTURE.md`.
 
-**What arrives in the starter message.** At the very bottom of this starter text the first `get_status` snapshot is attached — the active backend, index versions, path policy, and the `run_python` flag. Read it first: it tells you what is available in this session before you spend a request. You can request a fresh status at any time via the `get_status` action.
+**What arrives in the starter message.** At the very bottom of this starter text the first `get_status` snapshot is attached — the active sources (`sources:`), index versions, path policy, and the `run_python` flag. Read it first: it tells you what is available in this session before you spend a request. You can request a fresh status at any time via the `get_status` action.
 
 ## 2. How to read this document
 <!-- summary: This file covers the toolkit; Roblox code rules and bridge rules are optional addenda below; toolkit wins on conflict. Tool priority: unified tools first, native bridge tools only when no unified one exists. -->
@@ -43,7 +43,7 @@ This file describes the **toolkit**. Three blocks follow, in this order:
 
 **If Roblox mode is off** — read this document only; no addenda will follow.
 
-**Tool priority.** Always prefer **unified toolkit tools** — the unit model (`list_units`, `read_unit`, `replace_unit`, `insert_block`); call graph and module search (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); text escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); indexes and execution (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). They are covered by path policy, logged, pass verify-after-write, and **handle backend quirks themselves** — including known bridge bugs: the toolkit hides those inside, you never work around them by hand.
+**Tool priority.** Always prefer **unified toolkit tools** — the unit model (`list_units`, `read_unit`, `replace_unit`, `insert_block`); call graph and module search (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); text escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); indexes and execution (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). They are covered by path policy, logged, pass verify-after-write, and **handle transport quirks themselves** — including known bridge bugs: the toolkit hides those inside, you never work around them by hand.
 
 **Native MCP bridge tools** (`multi_edit`, `execute_luau`, `script_read`, `search_game_tree`, `insert_asset`, `generate_mesh`, `inspect_instance`, `http_get`, ...) are for cases **where no unified tool exists** for the operation. That covers:
 
@@ -91,8 +91,7 @@ If a unified tool solves the task — **do not** switch to a native one, even if
 
 The user's starter message normally already contains the output of `get_status` — produced by the "Starter Text" button in the GUI. **The snapshot describes the session configuration, not runtime.** Live bridge state is not part of the snapshot: the LLM works asynchronously (a human may apply a patch an hour or a day later), and a live status would be stale. If the bridge is down, a patch will fail with `backend_not_ready`, and the LLM will honestly report "Studio is not connected". What matters in the snapshot:
 
-- `backend` — `filesystem` / `mcp` / `composite`.
-- `luau:` — **where the Luau code lives**: `mcp` (Studio, `.Source`) or `rojo` (disk, `.luau`). Determines path format and edit backend (see §1).
+- `sources:` — enabled sources: `Documentation (.md)`, `Python (.py)`, `MCP (Roblox bridge)`, `Lua files on disk (.luau)`. Next to it the `Luau source:` line (`mcp` — Studio, `.Source`; `rojo` — `.luau` on disk) determines path format and edit channel (see §1).
 - The list of indexes with versions `[vN]`.
 - `## Policy Filesystem` — policy for **filesystem paths only** (docs, Python, `.luau`-on-disk in Rojo mode).
 - `## MCP` — policy for the Studio DataModel. Filesystem policy does **not** apply to `Service.X.Y` paths.
@@ -193,9 +192,9 @@ For **every supported format** (`.py`, `.lua`, `.luau`, `.md`) use the unit mode
 
 Two `read_file` axes: `numbered` (default `true` — `N: ` prefix) and `escape` (`perline` default / `blob` / `none`). `blob` — the whole fragment as one literal (handy for copying a multi-line `search`); `none` — raw text, no escaping (for reading to understand). `numbered=true` + `escape=blob` is an error. CRLF is preserved: if the file had `\r\n`, the edit keeps `\r\n`.
 
-**⚠ Path format depends on the Luau mode.** In MCP mode (`luau: mcp`), a Roblox path uses dot-notation: `ReplicatedStorage.X.Y`, first segment is a service name. In Rojo mode (`luau: rojo`), Luau files are addressed by filesystem path, like `.py` modules (`src/ServerScriptService/Foo/init.luau`).
+**⚠ Path format depends on the Luau mode.** In MCP mode (`Luau source: mcp`), a Roblox path uses dot-notation: `ReplicatedStorage.X.Y`, first segment is a service name. In Rojo mode (`Luau source: rojo`), Luau files are addressed by filesystem path, like `.py` modules (`src/ServerScriptService/Foo/init.luau`).
 
-**⚠ Names with dots/special chars (MCP mode only).** In `luau: mcp` a dot is a **separator**. If **one instance name** contains `.`, `-`, `@` or whitespace, the path cannot be read (`read_file`, `read_unit`, `file_exists`, `grep_mcp`). This is a Luau limitation (identifier = `[A-Za-z0-9_]`), not the toolkit's. Typical case — Wally packages under `_Index`. Workaround: `inspect_instance` or reading from disk.
+**⚠ Names with dots/special chars (MCP mode only).** In `Luau source: mcp` a dot is a **separator**. If **one instance name** contains `.`, `-`, `@` or whitespace, the path cannot be read (`read_file`, `read_unit`, `file_exists`, `grep_mcp`). This is a Luau limitation (identifier = `[A-Za-z0-9_]`), not the toolkit's. Typical case — Wally packages under `_Index`. Workaround: `inspect_instance` or reading from disk.
 
 **⚠ Open Studio tabs.** If the user keeps a Roblox module open in the Studio editor, saving from the editor (Ctrl+S or closing the tab) writes the editor buffer back to `.Source`, overwriting LLM changes. Before patching a Roblox module, **ask the user whether the tab is closed**; if open, ask them to close it. After the patch, if the tab was open, ask them to reopen it to sync the buffer with `.Source`.
 
@@ -609,7 +608,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 **File operations:**
 - `already_exists` — `create_file`: file already exists.
 - `source_not_found` / `destination_exists` — `move_file` and `copy_file`.
-- `backend_not_supported` — `copy_file`: backend cannot `copy()` (e.g. MCP without clone semantics for this instance type).
+- `backend_not_supported` — `copy_file`: transport cannot `copy()` (e.g. MCP without clone semantics for this instance type).
 
 **`grep` / `grep_replace` (FS), `grep_mcp` / `grep_replace_mcp` (Roblox):**
 - `wrong_domain` — path belongs to a different domain. For FS tools a Roblox path → error (use `*_mcp`); for MCP tools a filesystem path → error (use the FS version).
@@ -620,7 +619,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 - `empty_mappings` / `patterns_in_mappings_not_supported` / `bad_mapping` / `empty_mapping` / `noop_mapping` / `duplicate_mapping` — `mappings` shape problems.
 - `no_matches` — on the FS side `grep_replace` returns **ok**, not error: message "no matches" (symmetric with `grep`). On `grep_replace_mcp` — `error_code=no_matches`; nothing written.
 - `too_many_replacements` — `grep_replace` / `grep_replace_mcp`: total replacements exceed `max_replacements`. Nothing written. Narrow the scope, add `word_boundary=true`, refine `pattern`, or raise the limit.
-- `backend_not_supported` — backend does not support `grep_mcp` / `grep_replace_mcp` (MCP required).
+- `backend_not_supported` — transport does not support `grep_mcp` / `grep_replace_mcp` (MCP required).
 
 **Copying structural units:**
 - `bad_selector` — `copy_unit`: `selector` is not a dict or does not have exactly one of `section_number` / `section_title` / `qualname`.
@@ -632,7 +631,7 @@ Why mute: the file itself knows it's generated data (`# pa: no-large`) or a publ
 
 **Native calls:**
 - `native_error` — exception inside a native MCP bridge tool (`execute_luau`, `multi_edit`, ...). Check `message` — it has the class and text.
-- `requires_mcp` — `rebuild_lua_code_index`: backend has no `execute()` (no MCP).
+- `requires_mcp` — `rebuild_lua_code_index`: MCP bridge unavailable, `execute()` is not possible.
 
 ## 14. What not to do
 

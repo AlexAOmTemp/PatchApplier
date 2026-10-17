@@ -340,6 +340,12 @@ def main(argv=None) -> int:
         },
         roots=_roots,
         backends_enabled=_enabled_backends,
+        sources={
+            "docs": bool(cfg.get("index_docs", True)),
+            "python": bool(cfg.get("index_python", True)),
+            "mcp": "mcp" in _enabled_backends,
+            "rojo": bool(cfg.get("index_rojo", False)),
+        },
     )
 
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:

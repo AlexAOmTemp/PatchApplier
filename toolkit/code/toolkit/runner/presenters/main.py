@@ -383,6 +383,12 @@ def build_session(backend, name: str, config: dict):
         },
         roots=roots,
         backends_enabled=backs,
+        sources={
+            "docs": bool(config.get("index_docs", True)),
+            "python": bool(config.get("index_python", True)),
+            "mcp": "mcp" in backs,
+            "rojo": bool(config.get("index_rojo", False)),
+        },
     )
 
     return Session(backend, fmt=fmt, tools=TOOL_MAP)

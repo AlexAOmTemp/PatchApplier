@@ -62,6 +62,7 @@ class GetStatusTool:
         index_paths: dict | None = None,
         backends_enabled: set | None = None,
         roots: list | None = None,
+        sources: dict | None = None,
     ) -> None:
         cls._context = {
             "project_name": project_name or "",
@@ -79,6 +80,7 @@ class GetStatusTool:
                 "lua": "CODE_INDEX_LUA.md",
             }),
             "backends_enabled": set(backends_enabled or {"filesystem"}),
+            "sources": dict(sources or {}),
         }
 
 
@@ -132,16 +134,66 @@ class GetStatusTool:
     # --- session ----------------------------------------------------------
 
     def _render_session(self) -> str:
-            ctx = self._context
-            lines = ["## Session"]
-            lines.append(f"project:  {ctx.get('project_name') or '(unknown)'}")
-            _roots = ctx.get("roots") or []
-            if _roots:
-                lines.append(f"roots:    {', '.join(_roots)}")
+        ctx = self._context
+        lines = ["## Session"]
+        lines.append(f"project:  {ctx.get('project_name') or '(unknown)'}")
+        _roots = ctx.get("roots") or []
+        if _roots:
+            lines.append(f"roots:    {', '.join(_roots)}")
+        lines.append(f"format:   {ctx.get('format_preset') or 'default'}")
+
+        sources = ctx.get("sources") or {}
+        luau_mode = ctx.get("luau_mode") or "mcp"
+
+        if sources:
+            # GUI-style sources block. This is what the user sees in the
+            # settings dialog -- mirror it, do not expose internal backend
+            # class names (RootDirBackend / MultiRootFsBackend /
+            # MultiDomainBackend). `backend` is derived from these flags
+            # at config-save time, not an independent choice.
+            docs = bool(sources.get("docs"))
+            py = bool(sources.get("python"))
+            mcp = bool(sources.get("mcp"))
+            rojo = bool(sources.get("rojo"))
+
+            if mcp and luau_mode == "mcp":
+                mcp_label = "MCP (Roblox bridge: scene + code)"
+            elif mcp and luau_mode == "rojo":
+                mcp_label = "MCP (Roblox bridge: scene only)"
+            else:
+                mcp_label = "MCP (Roblox bridge)"
+
+            if mcp or rojo:
+                luau_line = f"{luau_mode}"
+            else:
+                luau_line = f"{luau_mode}  (no Luau source enabled)"
+
+            lines.append("sources:")
+            lines.append(f"  Documentation (.md)          {'✓' if docs else '✗'}")
+            py_line = f"  Python (.py)                 {'✓' if py else '✗'}"
+            if py and ctx.get("exec_enabled"):
+                interp = ctx.get("exec_interpreter") or "sys.executable"
+                py_line += f"   exec: ✓ ({interp})"
+            elif py:
+                py_line += "   exec: ✗"
+            lines.append(py_line)
+            lines.append(f"  {mcp_label:28s} {'✓' if mcp else '✗'}")
+            lines.append(f"  Lua files on disk (.luau)    {'✓' if rojo else '✗'}")
+            lines.append(f"  Luau source:                 {luau_line}")
+
+            if mcp:
+                if ctx.get("native_tools_enabled"):
+                    allow = ctx.get("native_tools_allow") or []
+                    allow_s = ", ".join(allow) if allow else "(no allowlist -> all)"
+                    lines.append(f"  native:                      enabled  ({allow_s})")
+                else:
+                    lines.append("  native:                      disabled")
+        else:
+            # Legacy format (no sources info supplied). Kept for backward
+            # compatibility with callers that only know the backend name.
             lines.append(f"backend:  {ctx.get('backend') or '(unknown)'}")
-            lines.append(f"luau:     {ctx.get('luau_mode') or 'mcp'}")
+            lines.append(f"luau:     {luau_mode}")
             enabled = ctx.get("backends_enabled") or {"filesystem"}
-            lines.append(f"format:   {ctx.get('format_preset') or 'default'}")
             if ctx.get("exec_enabled"):
                 interp = ctx.get("exec_interpreter") or "sys.executable"
                 lines.append(f"exec:     enabled  ({interp})")
@@ -154,7 +206,7 @@ class GetStatusTool:
                     lines.append(f"native:   enabled  ({allow_s})")
                 else:
                     lines.append("native:   disabled")
-            return "\n".join(lines)
+        return "\n".join(lines)
 
     # --- indexes ----------------------------------------------------------
 
@@ -168,13 +220,29 @@ class GetStatusTool:
         kind_to_owner = {"docs": "filesystem", "code": "filesystem", "lua": "mcp"}
 
         entries: list[tuple[str, str]] = []
-        for kind in ("docs", "code", "lua"):
-            if kind_to_owner[kind] not in enabled:
-                continue
-            path = paths.get(kind)
-            if not path:
-                continue
-            entries.append((kind, path))
+        sources = ctx.get("sources") or {}
+        if sources:
+            # GUI-style: use source flags, not the internal backend set.
+            if sources.get("docs"):
+                p = paths.get("docs")
+                if p:
+                    entries.append(("docs", p))
+            if sources.get("python"):
+                p = paths.get("code")
+                if p:
+                    entries.append(("code", p))
+            if sources.get("mcp") or sources.get("rojo"):
+                p = paths.get("lua")
+                if p:
+                    entries.append(("lua", p))
+        else:
+            for kind in ("docs", "code", "lua"):
+                if kind_to_owner[kind] not in enabled:
+                    continue
+                path = paths.get(kind)
+                if not path:
+                    continue
+                entries.append((kind, path))
 
         if not entries:
             return "## Indexes\n(no indexes for enabled backends)"
@@ -219,10 +287,18 @@ class GetStatusTool:
     def _render_policy(self, backend: Backend) -> str:
         ctx = self._context
         enabled = ctx.get("backends_enabled") or {"filesystem"}
+        sources = ctx.get("sources") or {}
+
+        if sources:
+            show_fs = bool(sources.get("docs") or sources.get("python") or sources.get("rojo"))
+            show_mcp = bool(sources.get("mcp"))
+        else:
+            show_fs = "filesystem" in enabled
+            show_mcp = "mcp" in enabled
 
         blocks: list[str] = []
 
-        if "filesystem" in enabled:
+        if show_fs:
             ws = getattr(backend, "ws", None)
             if ws is None:
                 blocks.append("## Policy Filesystem")
@@ -234,7 +310,7 @@ class GetStatusTool:
                 blocks.append("+ auto-closed: dotdirs, __pycache__, node_modules, .venv  (not shown)")
                 blocks.append("  to open a hidden path: set + on the dir itself or its named ancestor")
 
-        if "mcp" in enabled:
+        if show_mcp:
             luau = ctx.get("luau_mode") or "mcp"
             scope = "Roblox scene + Luau code" if luau == "mcp" else "Roblox scene"
             blocks.append("## MCP")

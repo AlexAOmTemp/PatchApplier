@@ -36,6 +36,11 @@ SCRIPTS = [
     ("router", HERE / "test_router.py"),
     ("get_index", HERE / "test_get_index.py"),
     ("get_status", HERE / "test_get_status.py"),
+    ("xml address", HERE / "test_xml_address.py"),
+    ("xml discriminator", HERE / "test_xml_discriminator.py"),
+    ("xml reader", HERE / "test_xml_reader.py"),
+    ("xml resolver", HERE / "test_xml_resolver.py"),
+    ("xml tool", HERE / "test_xml_tool.py"),
 ]
 
 

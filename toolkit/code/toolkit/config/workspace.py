@@ -117,6 +117,9 @@ class Workspace:
     format: dict = field(default_factory=dict)
     exec: dict = field(default_factory=dict)
     mcp: dict = field(default_factory=dict)
+    # XML toolset config: `{"discriminators": {tag_or_suffix: str|list|null}}`.
+    # Absent / null both mean "use DEFAULT_CHAIN" (see toolkit/xml/discriminator.py).
+    xml: dict = field(default_factory=dict)
 
     def root_names(self) -> list[str]:
         return sorted(self.roots.keys())
@@ -215,7 +218,7 @@ def add_root(ws: Workspace, path: str) -> str:
     probe = Workspace(
         id=ws.id, name=ws.name,
         roots={**ws.roots, name: candidate},
-        format=ws.format, exec=ws.exec, mcp=ws.mcp,
+        format=ws.format, exec=ws.exec, mcp=ws.mcp, xml=ws.xml,
     )
     validate(probe)
     ws.roots[name] = candidate
@@ -255,6 +258,7 @@ def to_dict(ws: Workspace) -> dict:
         "format": dict(ws.format),
         "exec": dict(ws.exec),
         "mcp": dict(ws.mcp),
+        "xml": dict(ws.xml),
     }
 
 
@@ -275,6 +279,7 @@ def from_dict(d: dict) -> Workspace:
         format=dict(d.get("format") or {}),
         exec=dict(d.get("exec") or {}),
         mcp=dict(d.get("mcp") or {}),
+        xml=dict(d.get("xml") or {}),
     )
 
 

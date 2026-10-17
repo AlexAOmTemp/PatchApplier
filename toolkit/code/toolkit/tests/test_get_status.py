@@ -146,6 +146,81 @@ def main():
         t.expect("version shown", "[v12]" in r.message)
         t.expect("files counted", "1 files" in r.message)
 
+        # --- 6b. sources: GUI-style output, all four off ---
+        print()
+        print("== sources: docs+python on, mcp/rojo off ==")
+        GetStatusTool.set_context(
+            project_name="proj",
+            backend="filesystem",
+            backends_enabled={"filesystem"},
+            sources={
+                "docs": True, "python": True,
+                "mcp": False, "rojo": False,
+            },
+            exec_enabled=True,
+            exec_interpreter="python3",
+            luau_mode="mcp",
+        )
+        r = _run(root, [{"action": "get_status", "arguments": {"sections": "session"}}])[0]
+        t.expect("ok", r.status == "ok", r.message)
+        msg = r.message
+        t.expect("has sources block", "sources:" in msg, msg)
+        t.expect("Documentation on", "Documentation (.md)" in msg and "✓" in msg)
+        t.expect("Python on with exec", "Python (.py)" in msg and "exec: ✓" in msg)
+        t.expect("MCP off", "MCP (Roblox bridge)" in msg)
+        t.expect("Lua on disk off", "Lua files on disk (.luau)" in msg)
+        t.expect("no backend line in GUI mode", "backend:" not in msg, msg)
+
+        # --- 6c. sources: mcp + rojo, luau=rojo ---
+        print()
+        print("== sources: all on, luau=rojo ==")
+        GetStatusTool.set_context(
+            project_name="proj",
+            backend="composite",
+            backends_enabled={"filesystem", "mcp"},
+            sources={
+                "docs": True, "python": True,
+                "mcp": True, "rojo": True,
+            },
+            luau_mode="rojo",
+        )
+        r = _run(root, [{"action": "get_status", "arguments": {"sections": "session"}}])[0]
+        t.expect("ok", r.status == "ok", r.message)
+        msg = r.message
+        t.expect("MCP scene only label",
+                 "MCP (Roblox bridge: scene only)" in msg, msg)
+        t.expect("luau: rojo", "Luau source:                 rojo" in msg, msg)
+
+        # --- 6d. sources: mcp + luau=mcp ---
+        print()
+        print("== sources: mcp + luau=mcp (scene+code) ==")
+        GetStatusTool.set_context(
+            project_name="proj",
+            backend="composite",
+            backends_enabled={"filesystem", "mcp"},
+            sources={"docs": True, "python": True, "mcp": True, "rojo": False},
+            luau_mode="mcp",
+        )
+        r = _run(root, [{"action": "get_status", "arguments": {"sections": "session"}}])[0]
+        msg = r.message
+        t.expect("MCP scene+code label",
+                 "MCP (Roblox bridge: scene + code)" in msg, msg)
+
+        # --- 6e. sources: all off, luau inactive ---
+        print()
+        print("== sources: all off ==")
+        GetStatusTool.set_context(
+            project_name="proj",
+            backend="filesystem",
+            backends_enabled={"filesystem"},
+            sources={"docs": False, "python": False, "mcp": False, "rojo": False},
+            luau_mode="mcp",
+        )
+        r = _run(root, [{"action": "get_status", "arguments": {"sections": "session"}}])[0]
+        msg = r.message
+        t.expect("luau inactive hint",
+                 "(no Luau source enabled)" in msg, msg)
+
         # --- 6. unknown section ---
         print()
         print("== unknown section ==")

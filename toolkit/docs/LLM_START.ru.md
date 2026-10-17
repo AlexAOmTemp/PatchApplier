@@ -4,7 +4,7 @@
 <!-- summary: Patch Applier — утилита правки проекта через JSON-патчи; четыре источника (Docs, Python, Luau-код, Roblox-сцена); ось MCP/Rojo для Luau-кода; индекс как карта, структурные единицы, детерминированный результат. -->
 <!-- tags: overview, purpose -->
 
-**Patch Applier** — утилита, которая позволяет LLM работать с проектом через **JSON-патчи**: один ответ LLM = список действий, каждое — чтение или правка. Патч применяется к четырём источникам: **Docs** и **Python** — на диске; **Luau-код** — на диске (Rojo-mode) либо в Studio (MCP-mode); **Roblox-сцена** (Parts, GUI, Folders) — всегда в Studio через MCP-мост. Режим Luau выбирает пользователь, он фиксирован в статусе строкой `luau:`.
+**Patch Applier** — утилита, которая позволяет LLM работать с проектом через **JSON-патчи**: один ответ LLM = список действий, каждое — чтение или правка. Патч применяется к четырём источникам: **Docs** и **Python** — на диске; **Luau-код** — на диске (Rojo-mode) либо в Studio (MCP-mode); **Roblox-сцена** (Parts, GUI, Folders) — всегда в Studio через MCP-мост. Режим Luau выбирает пользователь, он фиксирован в статусе строкой `Luau source:`.
 
 **Ось: где живёт Luau-код.** Два взаимоисключающих режима:
 
@@ -23,7 +23,7 @@
 
 Подробнее о требованиях — `docs/REQUIREMENTS.md`. Внутреннее устройство — `docs/ARCHITECTURE.md`.
 
-**Что приходит в стартовом сообщении.** В самом низу этого стартового текста приложен первый снимок `get_status` — активный backend, версии индексов, политика по каталогам, флаг `run_python`. Читай его первым: он говорит, что доступно в этой сессии, до того как ты потратишь запрос. В любой момент можно запросить статус заново действием `get_status`.
+**Что приходит в стартовом сообщении.** В самом низу этого стартового текста приложен первый снимок `get_status` — активные источники (`sources:`), версии индексов, политика по каталогам, флаг `run_python`. Читай его первым: он говорит, что доступно в этой сессии, до того как ты потратишь запрос. В любой момент можно запросить статус заново действием `get_status`.
 
 **Этот документ — часть утилиты, не проекта.** LLM_START живёт в дереве toolkit (`toolkit/docs/`), не перечисляется в `INDEX.md` проекта и не правится обычными патчами. Если нужно изменить сам стартовый текст — это осознанное действие человека в репозитории утилиты, а не побочный эффект рабочего патча. По расширению — `.ru.md` / `.en.md` — выбирается язык.
 
@@ -45,7 +45,7 @@
 
 **Если Roblox-режим не включён** — читаешь только этот документ; дополнений ниже не будет.
 
-**Приоритет инструментов.** Всегда предпочитай **унифицированные инструменты утилиты** — unit-модель (`list_units`, `read_unit`, `replace_unit`, `insert_block`); граф и модульный поиск (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); текстовый escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); индексы и исполнение (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). Они покрыты path-политикой, логируются, проходят verify-after-write и **сами обрабатывают особенности backend'а** — включая известные проблемы моста: утилита прячет их внутри себя, тебе не нужно обходить их руками.
+**Приоритет инструментов.** Всегда предпочитай **унифицированные инструменты утилиты** — unit-модель (`list_units`, `read_unit`, `replace_unit`, `insert_block`); граф и модульный поиск (`find_symbol`, `find_usages`, `symbol_graph`, `copy_unit`); текстовый escape hatch (`read_file`, `grep`, `replace_in_file`, `replace_between`, `insert_at_anchor`, `replace_range`); индексы и исполнение (`rebuild_index`, `rebuild_code_index`, `rebuild_lua_code_index`, `get_status`, `get_index`, `run_python`). Они покрыты path-политикой, логируются, проходят verify-after-write и **сами обрабатывают особенности транспорта** — включая известные проблемы моста: утилита прячет их внутри себя, тебе не нужно обходить их руками.
 
 **Нативные инструменты MCP-моста** (`multi_edit`, `execute_luau`, `script_read`, `search_game_tree`, `insert_asset`, `generate_mesh`, `inspect_instance`, `http_get`, ...) — **только когда нет унифицированного инструмента** для нужной операции. Это относится к:
 
@@ -93,8 +93,7 @@
 
 В стартовом сообщении пользователя обычно уже приложен вывод `get_status` — он формируется кнопкой «Стартовый текст» в GUI. **Снимок описывает конфигурацию сессии, не runtime.** Live-состояние моста в снимок не входит: LLM работает асинхронно (человек применяет патч через час или через день), и статус успел бы устареть. Если мост не поднят — патч упрётся в `backend_not_ready`, и LLM честно сообщит «Студия не подключена». Что в снимке важно:
 
-- `backend` — `filesystem` / `mcp` / `composite`.
-- `luau:` — **где живёт Luau-код**: `mcp` (Studio, `.Source`) или `rojo` (диск, `.luau`). Определяет формат путей и backend правок (см. §1).
+- `sources:` — включённые источники: `Documentation (.md)`, `Python (.py)`, `MCP (Roblox bridge)`, `Lua files on disk (.luau)`. Рядом — строка `Luau source:` (`mcp` — Studio, `.Source`; `rojo` — `.luau` на диске): определяет формат путей и канал правок (см. §1).
 - Список индексов с версиями `[vN]`.
 - `## Policy Filesystem` — политика **только для файловых путей** (docs, Python, `.luau`-на-диске при Rojo).
 - `## MCP` — политика DataModel Studio. К путям `Service.X.Y` FS-политика **не применяется**.
@@ -195,9 +194,9 @@
 
 Две оси `read_file`: `numbered` (дефолт `true` — префикс `N: `) и `escape` (`perline` дефолт / `blob` / `none`). `blob` — весь фрагмент одним литералом (удобно копировать многострочный `search`); `none` — сырой текст без escape (для чтения-понимания). `numbered=true` + `escape=blob` — ошибка. CRLF сохраняется: если файл был с `\r\n`, после правки он останется с `\r\n`.
 
-**⚠ Формат пути зависит от режима Luau.** В MCP-mode (`luau: mcp`) Roblox-путь — dot-notation: `ReplicatedStorage.X.Y`, первый сегмент — имя сервиса. В Rojo-mode (`luau: rojo`) Luau-файлы адресуются файловым путём, как `.py`-модули (`src/ServerScriptService/Foo/init.luau`).
+**⚠ Формат пути зависит от режима Luau.** В MCP-mode (`Luau source: mcp`) Roblox-путь — dot-notation: `ReplicatedStorage.X.Y`, первый сегмент — имя сервиса. В Rojo-mode (`Luau source: rojo`) Luau-файлы адресуются файловым путём, как `.py`-модули (`src/ServerScriptService/Foo/init.luau`).
 
-**⚠ Имена с точкой/спецсимволом (только MCP-mode).** В `luau: mcp` точка — **разделитель**. Если **имя одного инстанса** содержит `.`, `-`, `@` или пробел — такой путь не читается (`read_file`, `read_unit`, `file_exists`, `grep_mcp`). Это ограничение Luau (имя идентификатора = `[A-Za-z0-9_]`), не утилиты. Типичный пример — Wally-пакеты в `_Index`. Обход — `inspect_instance` или чтение с диска.
+**⚠ Имена с точкой/спецсимволом (только MCP-mode).** В `Luau source: mcp` точка — **разделитель**. Если **имя одного инстанса** содержит `.`, `-`, `@` или пробел — такой путь не читается (`read_file`, `read_unit`, `file_exists`, `grep_mcp`). Это ограничение Luau (имя идентификатора = `[A-Za-z0-9_]`), не утилиты. Типичный пример — Wally-пакеты в `_Index`. Обход — `inspect_instance` или чтение с диска.
 
 **⚠ Открытые вкладки Studio.** Если пользователь держит Roblox-модуль открытым в редакторе Studio, при сохранении из редактора (Ctrl+S или закрытие вкладки) буфер затирает `.Source`, включая правки LLM. Перед патчем Roblox-модуля **спроси пользователя, закрыта ли вкладка**; если открыта — попроси закрыть. После патча, если вкладка была открыта — попроси переоткрыть, чтобы синхронизировать буфер с `.Source`.
 
@@ -614,7 +613,7 @@ Write без объявленных `path_args` (например, `run_python`)
 **Файловые операции:**
 - `already_exists` — `create_file`: файл уже есть; `create_unit(part="annotation")`: annotation уже присутствует — заменить через `replace_unit(part="annotation")`.
 - `source_not_found` / `destination_exists` — `move_file` и `copy_file`.
-- `backend_not_supported` — `copy_file`: backend не умеет `copy()` (например, MCP без clone-семантики для этого типа инстанса).
+- `backend_not_supported` — `copy_file`: транспорт не умеет `copy()` (например, MCP без clone-семантики для этого типа инстанса).
 
 **`grep` / `grep_replace` (FS), `grep_mcp` / `grep_replace_mcp` (Roblox):**
 - `wrong_domain` — путь не того домена. Для FS-тулов Roblox-путь → ошибка (используй `*_mcp`); для MCP-тулов файловый путь → ошибка (используй FS-версию).
@@ -625,7 +624,7 @@ Write без объявленных `path_args` (например, `run_python`)
 - `empty_mappings` / `patterns_in_mappings_not_supported` / `bad_mapping` / `empty_mapping` / `noop_mapping` / `duplicate_mapping` — форма `mappings`.
 - `no_matches` — у FS `grep_replace` **не ошибка**: возвращается `ok` с сообщением «Совпадений не найдено» (симметрия с `grep`). У `grep_replace_mcp` — `error_code=no_matches`; ничего не записано.
 - `too_many_replacements` — `grep_replace` / `grep_replace_mcp`: суммарных замен больше `max_replacements`. Ничего не записано. Сузь scope, добавь `word_boundary=true`, уточни `pattern` или подними лимит.
-- `backend_not_supported` — backend не поддерживает `grep_mcp` / `grep_replace_mcp` (нужен MCP).
+- `backend_not_supported` — транспорт не поддерживает `grep_mcp` / `grep_replace_mcp` (нужен MCP).
 
 **Копирование структурных единиц:**
 - `bad_selector` — `copy_unit`: `selector` не dict или содержит не ровно один ключ из `section_number` / `section_title` / `qualname`.
@@ -637,7 +636,7 @@ Write без объявленных `path_args` (например, `run_python`)
 
 **Нативные вызовы:**
 - `native_error` — исключение внутри нативного тула MCP-моста (`execute_luau`, `multi_edit`, ...). Смотри `message` — там класс и текст исключения.
-- `requires_mcp` — `rebuild_lua_code_index`: backend не умеет `execute()` (нет MCP).
+- `requires_mcp` — `rebuild_lua_code_index`: MCP-мост недоступен, `execute()` невозможен.
 
 ## 14. Чего не делать
 
