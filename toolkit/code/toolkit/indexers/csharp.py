@@ -12,11 +12,11 @@ adapter_cs module docstring.
 from __future__ import annotations
 
 import json
+import zlib
 from dataclasses import dataclass
 
 from ..core.backend import Backend
 from ..core.models import Module, Symbol
-from ..formats.code import source_hash
 from ..formats.renderer import render_code_index
 from ..tools.unit import adapter_cs
 from ..tools.unit.model import Unit, UnitKind
@@ -61,12 +61,12 @@ def build_csharp_index(
             text = backend.read(path)
         except Exception:
             continue
+        if adapter_cs.parse_tree(text).root_node.has_error:
+            # Broken C#: skip, like the Python indexer skips SyntaxError.
+            continue
         try:
             root_unit = adapter_cs.build(text, path)
         except Exception:
-            continue
-        if adapter_cs.parse_tree(text).root_node.has_error:
-            # Broken C#: skip, like the Python indexer skips SyntaxError.
             continue
         modules.append(_module_from_unit(path, text, root_unit))
 
@@ -87,12 +87,18 @@ def _module_from_unit(path: str, source: str, root: Unit) -> Module:
     symbols: list[Symbol] = []
     _walk(root, symbols)
     usings = adapter_cs.extract_usings(source)
+    data = source.encode("utf-8")
     n_lines = source.count("\n") + (1 if source and not source.endswith("\n") else 0)
+    # zlib.crc32, not the shared polynomial source_hash: the latter exists
+    # to stay byte-compatible with the Lua-side indexer, and C# has no Lua
+    # counterpart. The polynomial version cost ~1.9s on RimWorld's 20 MB
+    # of .cs; crc32 is C-speed. Diff only compares numbers, so any stable
+    # algorithm works here.
     return Module(
         path=path,
         source=source,
-        source_hash=source_hash(source),
-        source_len=len(source.encode("utf-8")),
+        source_hash=zlib.crc32(data),
+        source_len=len(data),
         symbols=symbols,
         imports=usings,
         lines=n_lines,

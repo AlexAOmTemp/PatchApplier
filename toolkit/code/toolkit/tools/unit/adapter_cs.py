@@ -21,6 +21,9 @@ the whole line — read before you write.
 """
 from __future__ import annotations
 
+import bisect
+import threading
+
 from .model import Block, Part, Unit, UnitKind
 
 
@@ -55,23 +58,128 @@ _BODY_CHILD_TYPES = (
 )
 
 
-_LANG = None
-_PARSER = None
+_TLS = threading.local()
+
+
+class _Point:
+    __slots__ = ("row", "column")
+
+    def __init__(self, row, column=0):
+        self.row = row
+        self.column = column
+
+
+class _Snap:
+    """Pure-Python snapshot of one tree-sitter node.
+
+    Holding tree-sitter Node objects across a recursive walk is unsafe:
+    on large files some Node references become dangling and the next
+    attribute read raises an access violation (0xC0000005). Taking a full
+    snapshot right after parse() makes the rest of the adapter independent
+    of tree-sitter lifetimes.
+
+    The node's source text is NOT copied — only byte offsets are kept.
+    On RimWorld (3551 files, 13k nodes each) materializing text for every
+    node tripled the index time. Callers that need text go through
+    ``_text(node)``, which slices the source bytes by offset.
+    """
+    __slots__ = ("type", "start_byte", "end_byte", "_sp_row", "_ep_row",
+                 "is_named", "children", "_src")
+
+    def __init__(self, type_, start_byte, end_byte, sp_row, ep_row,
+                 is_named, src):
+        self.type = type_
+        self.start_byte = start_byte
+        self.end_byte = end_byte
+        self._sp_row = sp_row
+        self._ep_row = ep_row
+        self.is_named = is_named
+        self._src = src
+        self.children: list["_Snap"] = []
+
+    @property
+    def text(self):
+        return self._src[self.start_byte:self.end_byte].decode(
+            "utf-8", "replace")
+
+    @property
+    def start_point(self):
+        return _Point(self._sp_row)
+
+    @property
+    def end_point(self):
+        return _Point(self._ep_row)
+
+
+def _snapshot(ts_root, src: bytes) -> _Snap:
+    """Iterative snapshot — no recursion, no Point access.
+
+    Recursion on deep trees overflows the C stack. Reading
+    start_point / end_point off tree-sitter Nodes segfaults on some
+    Windows builds (0xC0000005). Both are avoided: iteration for
+    structure, bisect over a line-start index for row numbers.
+    """
+    line_starts = [0]
+    for i, b in enumerate(src):
+        if b == 0x0A:
+            line_starts.append(i + 1)
+
+    def make_snap(ts_node):
+        start, end = ts_node.start_byte, ts_node.end_byte
+        sp_row = bisect.bisect_right(line_starts, start) - 1
+        ep_row = bisect.bisect_right(line_starts, end) - 1
+        return _Snap(ts_node.type, start, end, sp_row, ep_row,
+                     ts_node.is_named, src)
+
+    root_snap = make_snap(ts_root)
+    stack = [(ts_root, root_snap)]
+    while stack:
+        ts_node, snap = stack.pop()
+        for ch in ts_node.children:
+            csnap = make_snap(ch)
+            snap.children.append(csnap)
+            stack.append((ch, csnap))
+    return root_snap
 
 
 def _parser():
-    global _LANG, _PARSER
-    if _PARSER is None:
+    """One Parser per thread — tree-sitter Parser is not thread-safe.
+
+    The Language object is stored on the same thread-local and kept alive
+    for the lifetime of the thread. A temporary Language(...) can be
+    garbage-collected while the Parser still refers to its grammar
+    tables, which crashes on the next node access (0xC0000005).
+    """
+    p = getattr(_TLS, "parser", None)
+    if p is None:
         from tree_sitter import Language, Parser
         import tree_sitter_c_sharp as _tscs
-        _LANG = Language(_tscs.language())
-        _PARSER = Parser(_LANG)
-    return _PARSER
+        _TLS.lang = Language(_tscs.language())   # keep alive
+        p = Parser(_TLS.lang)
+        _TLS.parser = p
+    return p
 
 
 def parse_tree(source: str):
-    """Parse and return the raw tree-sitter tree (for syntax checks)."""
-    return _parser().parse(source.encode("utf-8"))
+    """Parse and return the raw tree-sitter tree (for syntax checks).
+
+    The encoded bytes are stored on the thread-local and kept alive for
+    the whole build pass. Node.text reads from the original source
+    buffer; letting it be garbage-collected is a use-after-free that
+    segfaults (Windows: 0xC0000005). ``_text`` slices these bytes by
+    ``start_byte``/``end_byte`` instead of going through ``Node.text``.
+
+    Last parsed (source, tree) is cached per thread: indexers call
+    parse_tree(text) for the has_error check and then build(text) right
+    after, and the second call would otherwise re-parse the same file.
+    """
+    src = source.encode("utf-8")
+    cached_src = getattr(_TLS, "src", None)
+    if cached_src == src:
+        return _TLS.tree
+    _TLS.src = src
+    _TLS.tree = _parser().parse(src)
+    return _TLS.tree
 
 
 def has_qualname(root: Unit, qualname: str) -> bool:
@@ -88,9 +196,10 @@ def has_qualname(root: Unit, qualname: str) -> bool:
 
 def build(source: str, path: str = "") -> Unit:
     tree = parse_tree(source)
+    snap = _snapshot(tree.root_node, _TLS.src)
     lines = source.splitlines()
     n = len(lines) or 1
-    return _build_module(tree.root_node, lines, n)
+    return _build_module(snap, lines, n)
 
 
 # --- module ---------------------------------------------------------------
@@ -324,6 +433,11 @@ def _child(node, typ):
 
 
 def _text(node) -> str:
+    if isinstance(node, _Snap):
+        return node.text
+    src = getattr(_TLS, "src", b"")
+    if src:
+        return src[node.start_byte:node.end_byte].decode("utf-8", "replace")
     return node.text.decode("utf-8", "replace")
 
 def extract_usings(source: str) -> list[str]:
