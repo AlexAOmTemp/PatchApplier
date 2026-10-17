@@ -122,6 +122,54 @@ def main():
         t.expect('find_symbol(csharp) ok', r.status == 'ok', r.message)
         t.expect('find_symbol finds Damage', 'Damage' in r.message, r.message)
 
+    # --- incremental: reuse unchanged, re-parse the changed one ---
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / 'A.cs').write_text(
+            'namespace N { public class A { public void M() { } } }',
+            encoding='utf-8')
+        (root / 'B.cs').write_text(
+            'namespace N { public class B { public void M() { } } }',
+            encoding='utf-8')
+
+        backend = RootDirBackend(root)
+        r1 = build_csharp_index(backend)
+        t.expect('incremental: cold build', r1.modules_count == 2, r1.modules_count)
+
+        import json as _json
+        prev = _json.loads(r1.manifest_json)
+
+        # No-op: pass the manifest, expect identical text
+        r2 = build_csharp_index(backend, prev_manifest=prev)
+        t.expect('incremental: no-op output identical',
+                 r2.text == r1.text)
+        t.expect('incremental: no-op keeps module count',
+                 r2.modules_count == r1.modules_count)
+
+        # A module reconstructed from manifest has no source but keeps lines/symbols
+        m0 = next(m for m in r2.modules if m.path == 'A.cs')
+        t.expect('incremental: cached module has no source', m0.source == '')
+        t.expect('incremental: cached module keeps lines', m0.lines > 0, m0.lines)
+        t.expect('incremental: cached module keeps symbols',
+                 any(s.qualname.endswith('.M') for s in m0.symbols),
+                 [s.qualname for s in m0.symbols])
+        t.expect('incremental: cached module keeps hash', m0.source_hash != 0,
+                 m0.source_hash)
+
+        # Change A.cs only; drop its manifest entry so the tool must re-parse it
+        (root / 'A.cs').write_text(
+            'namespace N { public class A { public void M() { } public void N2() { } } }',
+            encoding='utf-8')
+        prev_modified = [e for e in prev if e['path'] != 'A.cs']
+        r3 = build_csharp_index(backend, prev_manifest=prev_modified)
+        t.expect('incremental: re-parsed file has new symbol',
+                 any(s.qualname.endswith('.N2')
+                     for m in r3.modules if m.path == 'A.cs'
+                     for s in m.symbols))
+        mb = next(m for m in r3.modules if m.path == 'B.cs')
+        t.expect('incremental: untouched B still cached (no source)',
+                 mb.source == '')
+
     print()
     print(f'=== {t.passed} ok, {t.failed} failed ===')
     return 0 if t.failed == 0 else 1

@@ -505,6 +505,14 @@ class RebuildCsharpIndexTool:
         except Exception:
             prev_text = ""
 
+        prev_manifest = None
+        try:
+            if backend.exists(manifest_path):
+                import json as _json
+                prev_manifest = _json.loads(backend.read(manifest_path))
+        except Exception:
+            prev_manifest = None
+
         try:
             from ..indexers.csharp import build_csharp_index
             result = build_csharp_index(
@@ -512,6 +520,7 @@ class RebuildCsharpIndexTool:
                 root=cd,
                 skip_files=set(skip_files) if skip_files else None,
                 skip_dirs=set(skip_dirs) if skip_dirs else None,
+                prev_manifest=prev_manifest,
             )
         except Exception as e:
             return Result(
