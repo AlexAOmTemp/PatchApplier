@@ -1,12 +1,13 @@
 """Tk widget: scrollable directory list with per-row policy cells.
 
-A row = one directory. On the right: five possible cells, R / W / Id /
-Ip / Il. Which cells are shown is controlled by `active_flags`:
+A row = one directory. On the right: six possible cells, R / W / Id /
+Ip / Ic / Il. Which cells are shown is controlled by `active_flags`:
 
     read        always visible
     write       always visible
     index_docs  visible only when Documentation is enabled
     index_py    visible only when Python indexing is enabled
+    index_cs    visible only when C# indexing is enabled
     index_lua   visible only when Lua-on-disk (Rojo) is enabled
 
 The MCP-side Lua index is not configured from here (it is always on
@@ -42,6 +43,7 @@ FLAG_COLUMNS = (
     ("write",      "W"),
     ("index_docs", "Id"),
     ("index_py",   "Ip"),
+    ("index_cs",   "Ic"),
     ("index_lua",  "Il"),
 )
 

@@ -344,6 +344,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     # --- state --------------------------------------------------------
     docs_var = tk.BooleanVar(value=bool(config.get("index_docs", True)))
     py_var = tk.BooleanVar(value=bool(config.get("index_python", True)))
+    cs_var = tk.BooleanVar(value=bool(config.get("index_csharp", True)))
     backend_now = (config.get("backend") or "composite")
     mcp_var = tk.BooleanVar(value=backend_now in ("mcp", "composite"))
     rojo_var = tk.BooleanVar(value=bool(config.get("index_rojo", False)))
@@ -394,6 +395,12 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
     exec_hint = tk.Label(r_py_sub, text="", fg="#c07000",
                          font=("Consolas", 8))
     exec_hint.pack(side="left", padx=(8, 0))
+
+    # Row 2b: C#
+    r_cs = tk.Frame(src)
+    r_cs.pack(fill="x")
+    tk.Checkbutton(r_cs, text="C# (.cs)", variable=cs_var,
+                   anchor="w").pack(side="left")
 
     # Row 3: MCP + MCP ignore (right-aligned)
     mcp_label_var = tk.StringVar(value="MCP (Roblox bridge)")
@@ -468,6 +475,8 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             flags.add("index_docs")
         if py_var.get():
             flags.add("index_py")
+        if cs_var.get():
+            flags.add("index_cs")
         if rojo_var.get():
             flags.add("index_lua")
         return flags
@@ -799,6 +808,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         "roots": frozenset(w.root_names()),
         "docs": bool(docs_var.get()),
         "py": bool(py_var.get()),
+        "cs": bool(cs_var.get()),
         "mcp": bool(mcp_var.get()),
         "rojo": bool(rojo_var.get()),
         "luau": luau_var.get(),
@@ -811,6 +821,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
             "roots": frozenset(w.root_names()),
             "docs": bool(docs_var.get()),
             "py": bool(py_var.get()),
+            "cs": bool(cs_var.get()),
             "mcp": bool(mcp_var.get()),
             "rojo": bool(rojo_var.get()),
             "luau": luau_var.get(),
@@ -836,11 +847,13 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
 
         docs = bool(docs_var.get())
         py = bool(py_var.get())
+        cs = bool(cs_var.get())
         mcp = bool(mcp_var.get())
         rojo = bool(rojo_var.get())
 
         config["index_docs"] = docs
         config["index_python"] = py
+        config["index_csharp"] = cs
         config["index_lua"] = bool(mcp or rojo)
         config["index_rojo"] = rojo
 
@@ -853,7 +866,7 @@ def open_project_settings(parent, project_dir: Path, state_subdir: str,
         else:
             config["luau_mode"] = (config.get("luau_mode") or "mcp")
 
-        fs_on = docs or py
+        fs_on = docs or py or cs
         if fs_on and mcp:
             config["backend"] = "composite"
         elif mcp:

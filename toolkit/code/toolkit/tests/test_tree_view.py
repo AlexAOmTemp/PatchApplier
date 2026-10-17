@@ -121,6 +121,22 @@ def main():
     t.expect('Id cell present after enable', 'index_docs' in code_widgets)
     t.expect('Ip still absent', 'index_py' not in code_widgets)
 
+    # C# column: Ic appears with index_cs, cycles independently of Ip
+    w2.set_active_flags({'read', 'write', 'index_py', 'index_cs'})
+    w2.render(paths, show_hidden=False)
+    code_widgets = w2._row_widgets.get('code', {})
+    t.expect('Ic cell present when index_cs on', 'index_cs' in code_widgets,
+             str(list(code_widgets.keys())))
+    w2._cycle('code', 'index_cs')
+    pcs = w2.overrides().get('code')
+    t.expect('index_cs override created', pcs is not None and pcs.index_cs is False)
+    t.expect('index_py unaffected by index_cs',
+             pcs is not None and pcs.index_py is not False)
+    w2.set_active_flags({'read', 'write', 'index_py'})
+    w2.render(paths, show_hidden=False)
+    t.expect('Ic cell absent when index_cs off',
+             'index_cs' not in w2._row_widgets.get('code', {}))
+
     # overrides survive re-render
     w2._cycle('code', 'index_docs')
     t.expect('override set on index_docs',
