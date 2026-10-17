@@ -449,7 +449,19 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
         if unit.qualname != "<module>" and not expect_missing:
             if not any(s.qualname == unit.qualname for s in syms):
                 raise ValueError(f"result_missing_symbol: {unit.qualname}")
-    else:  # .md
+    elif ext == ".cs":
+        from . import adapter_cs as _cs
+        try:
+            tree = _cs.parse_tree(new_source)
+        except Exception as e:
+            raise ValueError(f"result_parse_error: {e}")
+        if tree.root_node.has_error:
+            raise ValueError("result_syntax_error: C# parse produced ERROR nodes")
+        if unit.qualname != "<module>" and not expect_missing:
+            root = _cs.build(new_source, path)
+            if not _cs.has_qualname(root, unit.qualname):
+                raise ValueError(f"result_missing_symbol: {unit.qualname}")
+    elif ext == ".md":
         from ...formats import Format
         try:
             doc = Format.load("default").parse(new_source)
@@ -473,3 +485,5 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
                         f"result_missing_section: unintended loss of "
                         f"{sorted(lost)} (target \u00a7{target})"
                     )
+    else:
+        raise ValueError(f"unsupported extension: {ext}")

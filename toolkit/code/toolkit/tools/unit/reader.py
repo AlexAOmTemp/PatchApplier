@@ -22,6 +22,7 @@ from ...core.paths import is_mcp_path
 
 def _build(source: str, path: str) -> Unit:
     # MCP (Roblox) paths carry no extension; their source is Luau.
+    # MCP (Roblox) paths carry no extension; their source is Luau.
     if is_mcp_path(path):
         from . import adapter_lua as a
         return a.build(source, path)
@@ -32,6 +33,8 @@ def _build(source: str, path: str) -> Unit:
         from . import adapter_lua as a
     elif ext == ".md":
         from . import adapter_md as a
+    elif ext == ".cs":
+        from . import adapter_cs as a
     else:
         raise ValueError(f"unsupported extension: {ext}")
     return a.build(source, path)
@@ -294,8 +297,9 @@ def list_units(source: str, path: str) -> str:
         else:
             top_level_counter += 1
             pos = f"[{top_level_counter}] "
+        extra = f"  {u.title}" if u.title else ""
         rows.append(
             f"{pos}{u.qualname:<40} [{u.kind.value:<8}] "
-            f"L{u.line_start}-{u.line_end}  blocks={len(u.blocks)}"
+            f"L{u.line_start}-{u.line_end}  blocks={len(u.blocks)}{extra}"
         )
     return "\n".join(rows)

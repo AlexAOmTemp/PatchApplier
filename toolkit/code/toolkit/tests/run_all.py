@@ -51,6 +51,7 @@ SCRIPTS = [
     ("xml copy move", HERE / "test_xml_copy_move.py"),
     ("xml refinements", HERE / "test_xml_refinements.py"),
     ("starter text", HERE / "test_starter_text.py"),
+    ("unit cs", HERE / "test_unit_cs.py"),
 ]
 
 
