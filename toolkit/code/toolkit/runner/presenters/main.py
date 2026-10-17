@@ -174,14 +174,20 @@ def build_starter_text(
     lang: str,
     session,
     include_roblox: bool,
+    include_xml: bool = False,
     docs_dir: Path,
     runtime_state_dir: Path,
     read_text_fn,
 ) -> tuple[str, str, str]:
     """Assemble the LLM starter message: base text + optional extras + status.
 
-    Returns (full_text, used_lang, suffix). The suffix is "+roblox" when
-    extras were appended, "" otherwise.
+    Returns (full_text, used_lang, suffix). Suffix is a union of "+roblox"
+    and/or "+xml" when the corresponding extras were appended, "" otherwise.
+
+    Extras are independent: each is a self-contained document that adds a
+    domain to the starter text without changing the tools in TOOL_MAP.
+    The dispatcher accepts an XML call regardless; what changes is whether
+    the LLM knows the XML toolset exists.
 
     Raises StarterTextError when the base text is missing.
     """
@@ -192,9 +198,14 @@ def build_starter_text(
         )
 
     status_block = _build_status_block(session)
-    extras = _build_extras(include_roblox, docs_dir, runtime_state_dir)
+    extras = _build_extras(include_roblox, include_xml, docs_dir, runtime_state_dir)
     extras_block = ("\n\n" + "\n\n".join(extras)) if extras else ""
-    suffix = "+roblox" if include_roblox else ""
+    suffix_parts: list[str] = []
+    if include_roblox:
+        suffix_parts.append("roblox")
+    if include_xml:
+        suffix_parts.append("xml")
+    suffix = ("+" + "+".join(suffix_parts)) if suffix_parts else ""
     return text + extras_block + status_block, used, suffix
 
 
@@ -211,11 +222,42 @@ def _build_status_block(session) -> str:
         return f"\n\n---\n\n(status unavailable: {e})"
 
 
-def _build_extras(include_roblox: bool, docs_dir: Path, runtime_state_dir: Path) -> list[str]:
-    if not include_roblox:
-        return []
+def _build_extras(
+    include_roblox: bool, include_xml: bool,
+    docs_dir: Path, runtime_state_dir: Path,
+) -> list[str]:
+    """Assemble optional blocks appended to the LLM starter text.
+
+    Each block is a self-contained document that adds a domain to the
+    starter message. Base + extras + status are concatenated in that
+    order. Domains are independent: a user working on RimWorld enables
+    XML and skips Roblox; a Roblox user does the reverse.
+    """
     extras: list[str] = []
-    for name in ("RobloxCodeRules.md", "MCPBridgeRules.md"):
+    if include_roblox:
+        for name in ("RobloxCodeRules.md", "MCPBridgeRules.md"):
+            p = docs_dir / name
+            if p.is_file():
+                try:
+                    extras.append(
+                        "---\n\n# \u0414\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435: " + name + "\n\n"
+                        + p.read_text(encoding="utf-8")
+                    )
+                except Exception as e:
+                    extras.append(f"---\n\n({name}: cannot read: {e})")
+            else:
+                extras.append(f"---\n\n({name} not found at {p})")
+        schema_path = runtime_state_dir / "tools_schema.json"
+        if schema_path.is_file():
+            try:
+                extras.append(
+                    "---\n\n# \u0421\u0445\u0435\u043c\u0430 \u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u043e\u0432 (tools_schema.json)\n\n"
+                    + schema_path.read_text(encoding="utf-8")
+                )
+            except Exception as e:
+                extras.append(f"---\n\n(tools_schema.json: cannot read: {e})")
+    if include_xml:
+        name = "XML_START.md"
         p = docs_dir / name
         if p.is_file():
             try:
@@ -227,15 +269,6 @@ def _build_extras(include_roblox: bool, docs_dir: Path, runtime_state_dir: Path)
                 extras.append(f"---\n\n({name}: cannot read: {e})")
         else:
             extras.append(f"---\n\n({name} not found at {p})")
-    schema_path = runtime_state_dir / "tools_schema.json"
-    if schema_path.is_file():
-        try:
-            extras.append(
-                "---\n\n# \u0421\u0445\u0435\u043c\u0430 \u043d\u0430\u0442\u0438\u0432\u043d\u044b\u0445 \u0438\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u043e\u0432 (tools_schema.json)\n\n"
-                + schema_path.read_text(encoding="utf-8")
-            )
-        except Exception as e:
-            extras.append(f"---\n\n(tools_schema.json: cannot read: {e})")
     return extras
 
 

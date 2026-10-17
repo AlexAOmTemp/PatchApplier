@@ -102,4 +102,5 @@ btn = None
 repeat_btn = None
 root = None
 starter_include_roblox_var = None
+starter_include_xml_var = None
 mcp_reconnect_btn = None

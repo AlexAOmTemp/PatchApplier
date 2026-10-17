@@ -303,12 +303,14 @@ def on_starter_text():
     with _state._session_lock:
         s = _state._session
     include_roblox = bool(starter_include_roblox_var.get())
+    include_xml = bool(starter_include_xml_var.get())
     from ...config.loader import toolkit_runtime_state_dir as _trsd
     try:
         full_text, used, suffix = _presenter.build_starter_text(
             lang=lang,
             session=s,
             include_roblox=include_roblox,
+            include_xml=include_xml,
             docs_dir=_docs_dir(),
             runtime_state_dir=_trsd(),
             read_text_fn=_read_starter_text,
@@ -801,7 +803,7 @@ def _refresh_recent_menu() -> None:
 
 def run():
     global root, btn, repeat_btn, status_var
-    global starter_include_roblox_var
+    global starter_include_roblox_var, starter_include_xml_var
     global fs_status_var, mcp_status_var, fs_status_label, mcp_status_label
     global mcp_reconnect_btn
     global project_label, right_panel, toggle_btn
@@ -866,6 +868,7 @@ def run():
     repeat_btn = mw.repeat_btn
     status_var = mw.status_var
     starter_include_roblox_var = mw.starter_include_roblox_var
+    starter_include_xml_var = mw.starter_include_xml_var
     fs_status_var = mw.fs_status_var
     mcp_status_var = mw.mcp_status_var
     fs_status_label = mw.fs_status_label

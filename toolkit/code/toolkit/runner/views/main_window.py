@@ -223,6 +223,11 @@ class MainWindow:
                        variable=self.starter_include_roblox_var,
                        justify="left").pack(anchor="w", pady=(4, 0))
 
+        self.starter_include_xml_var = tk.BooleanVar(value=False)
+        tk.Checkbutton(session_frame, text="+ XML_START.md",
+                       variable=self.starter_include_xml_var,
+                       justify="left").pack(anchor="w", pady=(0, 0))
+
     # -- toggle ----------------------------------------------------------
 
     def toggle_right_panel(self) -> None:

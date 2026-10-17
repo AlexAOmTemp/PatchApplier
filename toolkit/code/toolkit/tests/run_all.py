@@ -50,6 +50,7 @@ SCRIPTS = [
     ("xml delete replace", HERE / "test_xml_delete_replace.py"),
     ("xml copy move", HERE / "test_xml_copy_move.py"),
     ("xml refinements", HERE / "test_xml_refinements.py"),
+    ("starter text", HERE / "test_starter_text.py"),
 ]
 
 
