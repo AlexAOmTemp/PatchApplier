@@ -147,7 +147,18 @@ def parse(data: bytes) -> XmlDocument:
 
     encoding, bom = detect_encoding(data)
 
-    parser = expat.ParserCreate(encoding=encoding)
+    # Expat accepts only the "base" name for multi-byte encodings
+    # (utf-16, utf-32) -- passing utf-16-le / utf-16-be raises
+    # ValueError("multi-byte encodings are not supported"). Expat detects
+    # endianness from the BOM; for our slicing and re-encoding we keep
+    # the precise encoding (utf-16-le / -be) in `doc.encoding` below.
+    expat_encoding = encoding
+    if encoding in ("utf-16-le", "utf-16-be", "utf-16"):
+        expat_encoding = "utf-16"
+    elif encoding in ("utf-32-le", "utf-32-be", "utf-32"):
+        expat_encoding = "utf-32"
+
+    parser = expat.ParserCreate(encoding=expat_encoding)
     parser.ordered_attributes = True
     parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
     parser.ExternalEntityRefHandler = lambda *a: 0  # reject external
@@ -205,9 +216,19 @@ def parse(data: bytes) -> XmlDocument:
         # non-self-closing elements, and just past the '/>' for self-closing
         # ones (observed, not documented). We want `end` to point just past
         # the '>' in both cases, so advance for the non-self-closing form.
-        if i + 1 < len(data) and data[i:i + 2] == b"</":
-            j = data.find(b">", i)
-            el.end = j + 1 if j > 0 else i
+        #
+        # Encoding-aware: in UTF-16 a single '<' is two bytes, so `data[i:i+2]
+        # == b"</"` never matched. Compare against the encoded open+slash
+        # and find the encoded '>' byte pair.
+        lt_b = "<".encode(encoding)
+        slash_b = "/".encode(encoding)
+        gt_b = ">".encode(encoding)
+        n_lt, n_sl = len(lt_b), len(slash_b)
+        if (i + n_lt + n_sl <= len(data)
+                and data[i:i + n_lt] == lt_b
+                and data[i + n_lt:i + n_lt + n_sl] == slash_b):
+            j = data.find(gt_b, i)
+            el.end = (j + len(gt_b)) if j >= 0 else i
         else:
             el.end = i
 

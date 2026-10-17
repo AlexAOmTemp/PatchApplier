@@ -19,6 +19,14 @@ from .discriminator import (
     match_value,
     parse_spec,
 )
+from .writer import (
+    WriteError,
+    escape_attr,
+    escape_text,
+    remove_attr,
+    replace_text,
+    set_attr,
+)
 
 __all__ = [
     "AddressError",
@@ -32,4 +40,10 @@ __all__ = [
     "extract_value",
     "match_value",
     "parse_spec",
+    "WriteError",
+    "escape_attr",
+    "escape_text",
+    "remove_attr",
+    "replace_text",
+    "set_attr",
 ]

@@ -43,6 +43,7 @@ SCRIPTS = [
     ("xml tool", HERE / "test_xml_tool.py"),
     ("xml find", HERE / "test_xml_find.py"),
     ("xml map", HERE / "test_xml_map.py"),
+    ("xml writer", HERE / "test_xml_writer.py"),
 ]
 
 
