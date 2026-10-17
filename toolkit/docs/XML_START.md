@@ -51,8 +51,8 @@ ModMetaData/modDependencies/li[brrainz.harmony]
 
 **Если ничего не нашлось** — `not_found` с сообщением «N `<tag>` под `<parent>`, ни один не матчит `[value]` (tried: defName, @Name, ...)».
 
-## 4. Девять тулов
-<!-- summary: read, find, map, modify, append, delete, replace, copy, move. Что принимают, что возвращают, когда отказывают. rebuild для XML не нужен. -->
+## 4. Десять тулов
+<!-- summary: read, find, map, modify, append, delete, replace, copy, move, insert. Что принимают, что возвращают, когда отказывают. rebuild для XML не нужен. -->
 
 ### 4.1 `xml_read(file_path, address, occurrence?)`
 
@@ -124,13 +124,30 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 
 `renames` — dict `{old: new}`, применяется к тексту фрагмента через `str.replace`, **длинные ключи первыми**. Не regex, не word-boundary: передавай точные идентификаторы (`TM_WoodGolem`, `TM_Wood_Manipulator`), иначе `TM_Wood` сломает префикс `TM_WoodGolemLS`.
 
-`source_occurrence` / `target_occurrence` — как везде. `before`/`after` (сиблинг) — не в v1 (`bad_position`).
+`source_occurrence` / `target_occurrence` — как везде. Сиблинговая вставка (before/after) — отдельный `xml_insert`.
+
+**`register_in` / `register_as`.** Если заданы оба: после успешной копии в контейнер по адресу `register_in` добавляется `<li>{register_as}</li>` как последний ребёнок. Для `<upgrades><li>X</li>…</upgrades>`. Оба обязательны или ни один (`bad_input`).
+
+**`renames`-warnings.** Ключ, который **не нашёлся** в тексте источника, попадает в `message` как `⚠ rename keys with no match in source: …`. Статус остаётся `ok` (это предупреждение, не ошибка). Причина: опечатка в ключе или длинный ключ съел вхождение короткого.
+
+**`source_hash`** — опционально, см. §4.10.
 
 ### 4.9 `xml_move(source_file, source_address, target_file, …)`
 
 Тот же pipeline, что `xml_copy` + удаление source после успешной записи target. **Same-file запрещено** (`same_file_move_unsupported`): удаление сдвигает offset, что ломает оставшиеся адреса. Для перемещения внутри файла — `xml_copy` + `xml_delete` двумя действиями.
 
 Cross-file partial failure: target записан, source не удалён → `status=ok` с `⚠ WARN` в message (дубликат лучше потери).
+
+### 4.10 `xml_insert(file_path, address, fragment, position, occurrence?, source_hash?)`
+
+Вставить `fragment` как сиблинга целевого элемента. `position` — `before` или `after`. Родитель берётся из цели.
+
+- `cannot_insert_root_sibling` если target — корень документа.
+- `mixed_content_unsupported` если родитель смешанного типа.
+- `bad_fragment` если fragment не well-formed или multi-root.
+- Reindent по целевому элементу, EOL файла сохраняется.
+
+**`source_hash`** (опционально) — если задан, проверяется против текущего хеша файла; несовпадение → `source_changed`. Хеш приходит в шапке `xml_read` (суффикс `#XXXXXXXX`).
 
 ### 4.6 `rebuild_*` для XML нет
 
@@ -207,16 +224,16 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 
 **Уже есть (не ограничение):**
 
-- `xml_read`, `xml_find`, `xml_map`, `xml_modify`, `xml_append`, `xml_delete`, `xml_replace`, `xml_copy`, `xml_move`.
+- `xml_read`, `xml_find`, `xml_map`, `xml_modify`, `xml_append`, `xml_delete`, `xml_replace`, `xml_copy`, `xml_move`, `xml_insert`.
 - `xml_modify` ops: `set_attr` / `remove_attr` / `set_text` / `set_annotation`.
+- `source_changed` — stale-source protection через `source_hash` (см. §4.10).
 
 **Пока нет:**
 
-- **`xml_insert`** — вставить сиблинга рядом с адресом (before/after). Обход: `xml_replace` на соседа с двумя элементами, либо `xml_copy` с `position=end` в промежуточный родитель.
-- **`source_changed`** — stale-source protection. Обход: работай быстро или перечитай файл перед write.
 - **`xml_patch_op`** — генерация `<xpath>` из адреса тула (RimWorld Patch). Пока пиши XPath руками.
 - **`xml_list`** — плоский список файла (при наличии `xml_map` обычно не нужен).
 - **`xml_move` внутри одного файла** — запрещено. `xml_copy` + `xml_delete` двумя действиями.
+- **Batched `xml_copy`** (`addresses=[...]`) — сознательно не делаем: падение одного def'а не должно откатывать остальные.
 - **Namespaces по URI** — только по префиксу как в файле.
 
 ## 9. Быстрый выбор тула
@@ -232,13 +249,16 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 | Удалить элемент | `xml_delete` |
 | Заменить элемент | `xml_replace` |
 | Скопировать в другой файл (с переименованием) | `xml_copy` |
+| Скопировать + добавить `<li>` в контейнер | `xml_copy` + `register_in`/`register_as` |
 | Переместить между файлами | `xml_move` |
+| Вставить сиблинга до/после | `xml_insert` |
 | Массовая замена по `defName` (не XML-семантика) | `grep_replace` (FS) |
 
 ## 10. Что помнить
 <!-- summary: Один фенс на патч. Не использовать replace_unit для XML. Проверять версию мода через tree перед разведкой. Читать перед правкой. Адрес ≠ XPath. -->
 
 - **Один фенс на весь ответ** — как везде в утилите.
+- **Разведка по C#/Java/TS — сначала `grep <имя_символа>`, потом `<как_работает>`.** Утилита индексирует Python и Lua; `symbol_graph` для C# недоступен. Рабочий приём: нашёл `TM_GolemEnergy` в XML — сразу `grep 'TM_GolemEnergy'` по всему корню. Там будут: определение need'а, harmony-патч `ShouldHaveNeed`, `GolemPawns.Contains`, часто — комментарий с указанием на проблему. Один grep вместо цепочки `grep method → read_file → grep callback → read_file`. Имена сильнее цепочек вызовов: `grep <symbol_name>` почти всегда за 1 вызов даёт ту же картину, что `symbol_graph` для Python.
 - **Сначала `tree` по корню мода.** Моды часто содержат несколько `v1.3/ v1.4/ v1.5/ v1.6/` подкаталогов. `tree(path=корень_мода, max_depth=1)` покажет их за один вызов; **`About/About.xml` `<supportedVersions>`** — какой активный. `xml_find` слепо уважает `path` — если ткнул не в ту версию, найдёшь 0 совпадений и решишь, что «в моде этого нет». Реальный кейс: искал `DesecratedBone` в `RWoM-main/v1.5/Defs`, пусто; правильный путь — `v1.6/Defs/Desecrated/`. Ошибка не в `xml_find`, а в выборе `path`.
 - **`replace_unit` для XML — нет.** Только `xml_*`.
 - **Перед правкой — прочитай актуальное состояние** (`xml_read` / `xml_find`).
