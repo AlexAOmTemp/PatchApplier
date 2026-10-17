@@ -1,11 +1,11 @@
-"""WorkspaceBackend — multi-root FS backend (read-only, step 3).
+"""MultiRootFsBackend — multi-root FS backend (read-only, step 3).
 
 Spec: docs/WORKSPACE_BACKEND.md. Standalone skeleton — routes paths of
-the form ``<basename>/<rel>`` to one of N internal FilesystemBackend
+the form ``<basename>/<rel>`` to one of N internal RootDirBackend
 instances (one per workspace root). Read-only: write/delete/move/copy
 raise NotImplementedError. Write is enabled in step 6.
 
-Not wired into CompositeBackend yet — that is step 4. Nothing in the
+Not wired into MultiDomainBackend yet — that is step 4. Nothing in the
 runtime uses this class today.
 
 Path forms:
@@ -23,17 +23,17 @@ from pathlib import Path
 from ..config import patchignore
 from ..config.workspace import Workspace
 from ..core.models import FileStat
-from .filesystem import FilesystemBackend
+from .root_dir import RootDirBackend
 
 
-class WorkspaceBackend:
+class MultiRootFsBackend:
     """Read-only multi-root FS backend."""
 
     def __init__(self, workspace: Workspace, state_dir: str | Path):
         self.ws = workspace
         self.state_dir = Path(state_dir).resolve()
-        self.roots: dict[str, FilesystemBackend] = {}
-        self._state_fs: FilesystemBackend | None = None
+        self.roots: dict[str, RootDirBackend] = {}
+        self._state_fs: RootDirBackend | None = None
         self._patterns: list[tuple[str, bool]] = []
         self._opened = False
 
@@ -43,16 +43,16 @@ class WorkspaceBackend:
         if self._opened:
             return
         # One FS backend per root. Their own `.patchignore` (created by
-        # FilesystemBackend.open) is separate from the workspace-level one
+        # RootDirBackend.open) is separate from the workspace-level one
         # in state_dir — the latter is what filter_check consults.
         for name, root in self.ws.roots.items():
-            fb = FilesystemBackend(root.path)
+            fb = RootDirBackend(root.path)
             fb.open()
             self.roots[name] = fb
         # State directory — a separate FS backend. Addressed by the reserved
         # prefix `.patch_applier/` (patchignore.STATE_DIR), never by a root
         # basename. Exempt from policy: RW for internal tools, never indexed.
-        self._state_fs = FilesystemBackend(self.state_dir)
+        self._state_fs = RootDirBackend(self.state_dir)
         self._state_fs.open()
         patchignore.ensure_default(self.state_dir)
         self._patterns = patchignore.read(self.state_dir)
@@ -85,7 +85,7 @@ class WorkspaceBackend:
         """The state directory — where the workspace's own files live.
 
         Kept for compatibility with tools that need "one path" for
-        indexing (RebuildLuaCodeIndexTool) and with CompositeBackend's
+        indexing (RebuildLuaCodeIndexTool) and with MultiDomainBackend's
         working_dir property. It is NOT a filesystem root; roots are in
         self.roots.
         """
@@ -107,7 +107,7 @@ class WorkspaceBackend:
             name, rel = p, ""
         return name, rel
 
-    def _resolve_root(self, path: str) -> tuple[str, str, FilesystemBackend]:
+    def _resolve_root(self, path: str) -> tuple[str, str, RootDirBackend]:
         # See also: list() / list_with_stat() above for walk semantics.
         name, rel = self._split(path)
         # State directory is addressed by its reserved prefix — never by a
@@ -304,7 +304,7 @@ class WorkspaceBackend:
     def resolve_physical(self, path: str) -> Path | None:
         """Physical Path for a workspace-relative path, or None.
 
-        Delegates to the owning FilesystemBackend (or state FS for the
+        Delegates to the owning RootDirBackend (or state FS for the
         `.patch_applier/` prefix). Returns None for unknown roots and
         sandbox violations.
         """

@@ -4,9 +4,9 @@ All paths are relative to the root. Sandbox enforcement: any path that
 resolves outside the root is rejected before I/O.
 
 This class does **not** know about `.patchignore`. Hiding rules are a
-workspace concern: `WorkspaceBackend` reads them from its own state_dir
+workspace concern: `MultiRootFsBackend` reads them from its own state_dir
 and applies them in `filter_check` before delegating. A bare
-FilesystemBackend driven directly (tests, ad-hoc tools) sees everything
+RootDirBackend driven directly (tests, ad-hoc tools) sees everything
 inside its root and consults no policy.
 """
 from __future__ import annotations
@@ -17,7 +17,7 @@ from pathlib import Path
 from ..core.models import FileStat
 
 
-class FilesystemBackend:
+class RootDirBackend:
     def __init__(self, working_dir: str | Path):
         # Public constructor takes `working_dir` for legacy compatibility;
         # internally it is stored as a private root. All path resolution
@@ -159,11 +159,11 @@ class FilesystemBackend:
         d.parent.mkdir(parents=True, exist_ok=True)
         s.rename(d)
 
-    def copy_to(self, src_rel: str, other: "FilesystemBackend",
+    def copy_to(self, src_rel: str, other: "RootDirBackend",
                 dst_rel: str) -> None:
-        """Copy a file into another FilesystemBackend's root.
+        """Copy a file into another RootDirBackend's root.
 
-        Used by WorkspaceBackend to support cross-root copies without
+        Used by MultiRootFsBackend to support cross-root copies without
         exposing one backend's `_root` to the other.
         """
         s = self._resolve(src_rel)
@@ -182,10 +182,10 @@ class FilesystemBackend:
     def filter_check(self, path: str, op: str) -> tuple[str, str] | None:
         """No path-level policy at the FS level.
 
-        In the new model, FilesystemBackend is used as a sub-backend of
-        WorkspaceBackend. Path policy is a Workspace concern (per-root,
-        per-path PathPolicy), enforced in WorkspaceBackend.filter_check.
-        When FilesystemBackend is driven directly (tests, ad-hoc tools),
+        In the new model, RootDirBackend is used as a sub-backend of
+        MultiRootFsBackend. Path policy is a Workspace concern (per-root,
+        per-path PathPolicy), enforced in MultiRootFsBackend.filter_check.
+        When RootDirBackend is driven directly (tests, ad-hoc tools),
         there is no policy to consult — return None.
 
         Sandbox enforcement (path must be inside the root) still happens

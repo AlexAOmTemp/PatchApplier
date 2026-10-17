@@ -13,7 +13,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.indexers.code import build_code_index
 
 
@@ -66,7 +66,7 @@ def broken(:
 
 def main():
     t = T()
-    backend = FilesystemBackend(TOOLKIT_ROOT)
+    backend = RootDirBackend(TOOLKIT_ROOT)
     backend.open()
 
     with tempfile.TemporaryDirectory() as td:
@@ -80,7 +80,7 @@ def main():
         (root / "__pycache__" / "fake.py").write_text(SAMPLE_B, encoding="utf-8")
 
         # Use a backend rooted at tmp for this test.
-        tmp_backend = FilesystemBackend(root)
+        tmp_backend = RootDirBackend(root)
         tmp_backend.open()
 
         print("== build_code_index on tmp root ==")

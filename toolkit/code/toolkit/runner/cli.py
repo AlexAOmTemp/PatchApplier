@@ -33,7 +33,7 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-from toolkit.backends import FilesystemBackend, MCPBackend, CompositeBackend
+from toolkit.backends import RootDirBackend, MCPBackend, MultiDomainBackend
 from toolkit.config import loader as cfg_loader
 from toolkit.core.patchparse import parse_patches
 from toolkit.core import Session
@@ -134,7 +134,7 @@ def _rebuild_lua_patch(args, cfg: dict) -> dict:
 
 
 def _create_backend(args, cfg, project_dir: Path):
-    """FS side is a WorkspaceBackend loaded from workspace.json. Missing
+    """FS side is a MultiRootFsBackend loaded from workspace.json. Missing
     workspace.json is a hard error — no single-root fallback."""
     backend_name = args.backend or cfg.get("backend", "composite")
     if backend_name == "auto":
@@ -142,7 +142,7 @@ def _create_backend(args, cfg, project_dir: Path):
         backend_name = "composite" if mcp_cfg.get("bridge_script") else "filesystem"
 
     def _build_fs():
-        from toolkit.backends.workspace import WorkspaceBackend
+        from toolkit.backends.multi_root_fs import MultiRootFsBackend
         from toolkit.config import loader as _l
         state_dir = project_dir / _l.resolve_state_dir(cfg)
         ws = _l.load_workspace(cfg)
@@ -151,14 +151,14 @@ def _create_backend(args, cfg, project_dir: Path):
                 f"no workspace.json under {state_dir}/ "
                 "— create a project via the GUI first"
             )
-        return WorkspaceBackend(ws, state_dir)
+        return MultiRootFsBackend(ws, state_dir)
 
     if backend_name == "filesystem":
         return _build_fs()
     if backend_name == "mcp":
         return _create_mcp_backend(args, cfg, project_dir)
     if backend_name == "composite":
-        return CompositeBackend([
+        return MultiDomainBackend([
             ("fs", _build_fs()),
             ("mcp", _create_mcp_backend(args, cfg, project_dir)),
         ])
@@ -314,7 +314,7 @@ def main(argv=None) -> int:
         print(f"[error] cannot create backend: {e}", file=sys.stderr)
         return 2
 
-    from toolkit.backends import CompositeBackend as _CB, MCPBackend as _MB
+    from toolkit.backends import MultiDomainBackend as _CB, MCPBackend as _MB
     if isinstance(backend, _CB):
         _enabled_backends = {"filesystem", "mcp"}
     elif isinstance(backend, _MB):

@@ -12,7 +12,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
-from toolkit.backends import FilesystemBackend  # noqa: E402
+from toolkit.backends import RootDirBackend  # noqa: E402
 from toolkit.core import Session  # noqa: E402
 from toolkit.formats import Format  # noqa: E402
 from toolkit.tools import TOOL_MAP  # noqa: E402
@@ -54,7 +54,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         _setup(root)
-        be = FilesystemBackend(root)
+        be = RootDirBackend(root)
         fmt = Format.load("default")
         with Session(be, fmt=fmt, tools=TOOL_MAP) as s:
             # Full survey. 7 files + .patchignore auto-created by backend.

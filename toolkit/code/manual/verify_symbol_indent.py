@@ -15,7 +15,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve()
 sys.path.insert(0, str(_HERE.parents[1]))  # toolkit/code
 
-from toolkit.backends import FilesystemBackend  # noqa: E402
+from toolkit.backends import RootDirBackend  # noqa: E402
 from toolkit.tools.symbols.python import (  # noqa: E402
     ReplaceSymbolSignatureTool,
     ReplaceSymbolTool,
@@ -50,7 +50,7 @@ def _check(label, ok):
 def main():
     all_ok = True
     tmp = Path(tempfile.mkdtemp())
-    backend = FilesystemBackend(str(tmp))
+    backend = RootDirBackend(str(tmp))
     backend.open()
     try:
         # 1. multi-line signature

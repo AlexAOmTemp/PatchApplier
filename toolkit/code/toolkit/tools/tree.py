@@ -47,9 +47,9 @@ def _human(n: int) -> str:
 def _fs_roots(backend: Backend) -> list[tuple[str | None, Path]]:
     """Return [(name_or_None, Path)] for FS roots.
 
-    - CompositeBackend: recurses into its 'fs' sub-backend only.
-    - WorkspaceBackend: returns [(root_name, root_path)] for each root.
-    - FilesystemBackend: returns [(None, _root)] -- one implicit root.
+    - MultiDomainBackend: recurses into its 'fs' sub-backend only.
+    - MultiRootFsBackend: returns [(root_name, root_path)] for each root.
+    - RootDirBackend: returns [(None, _root)] -- one implicit root.
     """
     pairs = getattr(backend, "_pairs", None)
     if pairs is not None:
@@ -129,7 +129,7 @@ class TreeTool:
         # Resolve `path` to a starting set of (physical, display, depth).
         # Semantics mirror `read`/`list`: for a concrete path the first
         # segment selects the root by name; only the empty path ("" / ".")
-        # means "all roots". FilesystemBackend has an implicit root -- any
+        # means "all roots". RootDirBackend has an implicit root -- any
         # path is root-relative.
         stack: list[tuple[Path, str, int]] = []
         implicit = roots[0][0] is None

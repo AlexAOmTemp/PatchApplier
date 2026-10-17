@@ -1,4 +1,4 @@
-"""Tests for CompositeBackend path routing + lifecycle delegation."""
+"""Tests for MultiDomainBackend path routing + lifecycle delegation."""
 from __future__ import annotations
 
 import sys
@@ -11,7 +11,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends.composite import CompositeBackend
+from toolkit.backends.multi_domain import MultiDomainBackend
 from toolkit.core.paths import ROBLOX_SERVICES
 
 
@@ -87,7 +87,7 @@ def main():
 
     fs = FakeBackend("fs")
     mcp = FakeBackend("mcp")
-    comp = CompositeBackend([("fs", fs), ("mcp", mcp)])
+    comp = MultiDomainBackend([("fs", fs), ("mcp", mcp)])
 
     print("== lifecycle ==")
     comp.open()

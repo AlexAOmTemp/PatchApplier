@@ -2,7 +2,7 @@
 
 Runs GetStatusTool with the current session's backend (if any) — but
 since this is a standalone script, it constructs a fresh workspace from
-`.patch_applier/workspace.json` and a WorkspaceBackend, then calls
+`.patch_applier/workspace.json` and a MultiRootFsBackend, then calls
 GetStatusTool with the right context. The output is compared against
 expected shape: `## Policy Filesystem` + root basename + `[R W Id Ip Il]`.
 """
@@ -20,7 +20,7 @@ STATE = ROOT / ".patch_applier"
 
 from toolkit.config import workspace as ws_mod
 from toolkit.config.loader import load_workspace
-from toolkit.backends.workspace import WorkspaceBackend
+from toolkit.backends.multi_root_fs import MultiRootFsBackend
 from toolkit.formats import Format
 from toolkit.tools.status import GetStatusTool
 
@@ -31,7 +31,7 @@ if ws is None:
     sys.exit(1)
 print(f"[OK]   workspace loaded: {ws.name}  roots={ws.root_names()}")
 
-wb = WorkspaceBackend(ws, STATE)
+wb = MultiRootFsBackend(ws, STATE)
 wb.open()
 
 try:

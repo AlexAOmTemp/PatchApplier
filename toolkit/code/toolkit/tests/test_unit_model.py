@@ -17,7 +17,7 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -105,7 +105,7 @@ def main():
         (root / "doc.md").write_text(MD_SAMPLE, encoding="utf-8")
         (root / "m.lua").write_text(LUA_SAMPLE, encoding="utf-8")
 
-        backend = FilesystemBackend(root)
+        backend = RootDirBackend(root)
         backend.open()
         fmt = Format.load("default")
         with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:

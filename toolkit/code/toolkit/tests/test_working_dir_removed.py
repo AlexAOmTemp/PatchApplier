@@ -1,9 +1,9 @@
-'''Regression: working_dir is gone from FilesystemBackend.
+'''Regression: working_dir is gone from RootDirBackend.
 
 After the multi-root prep refactor:
-  - FilesystemBackend stores its root as private `_root` (Path), not as a
+  - RootDirBackend stores its root as private `_root` (Path), not as a
     public `working_dir` attribute.
-  - CompositeBackend.working_dir is a property that probes
+  - MultiDomainBackend.working_dir is a property that probes
     `_root -> working_dir` on the FS sub-backend, returns None when no FS.
 
 The public constructor argument `working_dir` is kept for compatibility
@@ -24,8 +24,8 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
-from toolkit.backends.composite import CompositeBackend
+from toolkit.backends import RootDirBackend
+from toolkit.backends.multi_domain import MultiDomainBackend
 
 
 PASS = '[OK]  '
@@ -75,38 +75,38 @@ def main():
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
 
-        # --- FilesystemBackend: private root, no public working_dir ---
-        b = FilesystemBackend(root)
+        # --- RootDirBackend: private root, no public working_dir ---
+        b = RootDirBackend(root)
         t.expect('fs._root is Path', isinstance(b._root, Path))
         t.expect('fs._root resolves to root', b._root == root.resolve())
         t.raises_attr('fs.working_dir gone', b, 'working_dir')
 
         # --- Composite: FS with _root -> property returns _root ---
-        cb = CompositeBackend([('fs', b)])
+        cb = MultiDomainBackend([('fs', b)])
         t.expect('composite.working_dir == fs._root',
                  cb.working_dir == b._root,
                  'got ' + repr(cb.working_dir))
 
         # --- Composite: legacy FS with only working_dir ---
         legacy = _LegacyFS(root)
-        cb2 = CompositeBackend([('fs', legacy)])
+        cb2 = MultiDomainBackend([('fs', legacy)])
         t.expect('composite falls back to legacy working_dir',
                  cb2.working_dir == root,
                  'got ' + repr(cb2.working_dir))
 
         # --- Composite: FS with neither -> None ---
-        cb3 = CompositeBackend([('fs', _NoRootFS())])
+        cb3 = MultiDomainBackend([('fs', _NoRootFS())])
         t.expect('composite returns None when FS has no root',
                  cb3.working_dir is None,
                  'got ' + repr(cb3.working_dir))
 
         # --- Composite: no FS at all (only MCP) -> None ---
-        cb4 = CompositeBackend([('mcp', _MCPOnly())])
+        cb4 = MultiDomainBackend([('mcp', _MCPOnly())])
         t.expect('composite returns None when no FS sub-backend',
                  cb4.working_dir is None,
                  'got ' + repr(cb4.working_dir))
 
-        # --- Real FilesystemBackend still reads/writes files ---
+        # --- Real RootDirBackend still reads/writes files ---
         (root / 'hello.txt').write_text('hi', encoding='utf-8')
         b.open()
         t.expect('read still works', b.read('hello.txt') == 'hi')

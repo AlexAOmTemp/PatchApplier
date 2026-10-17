@@ -16,7 +16,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.formats import Format
 from toolkit.indexers.meta import load_meta, resolve_path
 from toolkit.tools.index import RebuildIndexTool
@@ -81,7 +81,7 @@ def main():
     tmp.mkdir(parents=True)
     try:
         (tmp / "doc.md").write_text(SOURCE, encoding="utf-8")
-        be = FilesystemBackend(str(tmp))
+        be = RootDirBackend(str(tmp))
         be.open()
         fmt = Format.load("default", None)
 

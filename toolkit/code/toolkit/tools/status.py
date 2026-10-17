@@ -6,7 +6,7 @@ status, and effective path policy. Pure text, no JSON.
 
 Policy flags are R / W / Id / Ip / Il — a letter present means the flag
 is allowed for that path. For filesystem roots the policy comes from the
-WorkspaceBackend's Workspace (per-root and per-path PathPolicy); for MCP
+MultiRootFsBackend's Workspace (per-root and per-path PathPolicy); for MCP
 there is no path policy.
 
 Only indexes whose owning backend is enabled are reported: docs/code need

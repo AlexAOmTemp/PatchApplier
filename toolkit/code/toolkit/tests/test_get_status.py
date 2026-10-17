@@ -1,7 +1,7 @@
 '''Tests for get_status: session, indexes, policy rendering.
 
-Policy is read from backend.ws if it exists (WorkspaceBackend). With a
-plain FilesystemBackend there is no workspace and the policy section
+Policy is read from backend.ws if it exists (MultiRootFsBackend). With a
+plain RootDirBackend there is no workspace and the policy section
 reports that. The MCP section is added when mcp is enabled.
 '''
 from __future__ import annotations
@@ -18,7 +18,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -44,7 +44,7 @@ class T:
 
 
 def _run(root: Path, patches: list[dict]):
-    backend = FilesystemBackend(root)
+    backend = RootDirBackend(root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
         return s.apply_patches(patches)

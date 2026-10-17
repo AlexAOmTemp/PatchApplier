@@ -11,7 +11,7 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.tools.find_usages import FindUsagesTool
 
 
@@ -65,7 +65,7 @@ def main():
         root = Path(td)
         (root / "CODE_INDEX.manifest.json").write_text(
             json.dumps(MANIFEST, indent=2), encoding="utf-8")
-        be = FilesystemBackend(root)
+        be = RootDirBackend(root)
         be.open()
 
         print("== exact path match ==")

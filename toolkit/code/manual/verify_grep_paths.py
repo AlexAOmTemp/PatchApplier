@@ -8,7 +8,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve()
 sys.path.insert(0, str(_HERE.parents[1]))
 
-from toolkit.backends import FilesystemBackend  # noqa: E402
+from toolkit.backends import RootDirBackend  # noqa: E402
 from toolkit.core import Policy, Session  # noqa: E402
 from toolkit.formats import Format  # noqa: E402
 from toolkit.tools import TOOL_MAP  # noqa: E402
@@ -20,7 +20,7 @@ def _check(label, ok):
 
 
 def _run(root, patches):
-    backend = FilesystemBackend(root)
+    backend = RootDirBackend(root)
     fmt = Format.load("default")
     with Session(backend, fmt=fmt, tools=TOOL_MAP, policy=Policy()) as s:
         return s.apply_patches(patches)

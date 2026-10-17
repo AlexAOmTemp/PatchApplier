@@ -6,7 +6,7 @@ files from both roots, with `<basename>/<rel>` paths.
 
 This is the live check that `test_workspace_backend.py` covers only in
 isolation (list/read/filter). Here the whole pipeline runs: Workspace →
-WorkspaceBackend → Session → RebuildIndexTool → INDEX.md.
+MultiRootFsBackend → Session → RebuildIndexTool → INDEX.md.
 
 Run: python toolkit/code/toolkit/tests/test_multi_root_smoke.py
 '''
@@ -20,7 +20,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 
-from toolkit.backends.workspace import WorkspaceBackend
+from toolkit.backends.multi_root_fs import MultiRootFsBackend
 from toolkit.config import workspace as ws_mod
 from toolkit.core import Session
 from toolkit.formats import Format
@@ -75,7 +75,7 @@ def main():
             return 1
 
         # --- open workspace backend ---
-        wb = WorkspaceBackend(w, state)
+        wb = MultiRootFsBackend(w, state)
         wb.open()
         try:
             # sanity: list across roots

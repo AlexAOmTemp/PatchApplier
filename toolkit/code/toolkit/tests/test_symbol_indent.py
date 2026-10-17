@@ -15,7 +15,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.tools.symbols.python import ReplaceSymbolTool, ReplaceSymbolBodyTool
 
 
@@ -47,9 +47,9 @@ class T:
             self.fail += 1
 
 
-def _fresh(tmp: Path) -> FilesystemBackend:
+def _fresh(tmp: Path) -> RootDirBackend:
     (tmp / "m.py").write_text(SOURCE, encoding="utf-8")
-    be = FilesystemBackend(str(tmp))
+    be = RootDirBackend(str(tmp))
     be.open()
     return be
 

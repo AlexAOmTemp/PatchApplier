@@ -12,7 +12,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.tools.symbols import lua as _lua
 
 
@@ -74,7 +74,7 @@ end
 
 
 def _run(root, fn, *args, **kwargs):
-    backend = FilesystemBackend(root)
+    backend = RootDirBackend(root)
     return fn(backend, *args, **kwargs)
 
 

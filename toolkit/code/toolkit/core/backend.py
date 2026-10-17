@@ -1,7 +1,7 @@
 """Backend protocol.
 
 The only transport contract Tools know about. Two implementations planned:
-  - FilesystemBackend (this release)
+  - RootDirBackend (this release)
   - MCPBackend (next)
 
 Sandbox and whitelist checks live here, not in Tools. Each Backend interprets

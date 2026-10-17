@@ -11,7 +11,7 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend  # noqa: E402
+from toolkit.backends import RootDirBackend  # noqa: E402
 from toolkit.tools.read import GrepTool  # noqa: E402
 from toolkit.tools.grep_replace import GrepReplaceTool  # noqa: E402
 
@@ -45,7 +45,7 @@ def main() -> int:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         (root / "a.txt").write_text(SEED, encoding="utf-8")
-        be = FilesystemBackend(root)
+        be = RootDirBackend(root)
         be.open()
 
         # --- symmetry: grep finds something, replace plans same matches

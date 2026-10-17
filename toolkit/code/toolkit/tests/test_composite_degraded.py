@@ -1,6 +1,6 @@
 """Composite backend with a dead MCP sub-backend must still serve FS ops.
 
-Regression test: previously CompositeBackend.open() raised if *any*
+Regression test: previously MultiDomainBackend.open() raised if *any*
 sub-backend failed, so a dead MCP killed the whole session and even a
 filesystem-only patch was refused with "Session not ready".
 
@@ -18,8 +18,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from toolkit.backends.composite import CompositeBackend
-from toolkit.backends.filesystem import FilesystemBackend
+from toolkit.backends.multi_domain import MultiDomainBackend
+from toolkit.backends.root_dir import RootDirBackend
 from toolkit.core.session import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -89,9 +89,9 @@ def main():
     try:
         (tmp / "note.md").write_text("# hello\n", encoding="utf-8")
 
-        fs = FilesystemBackend(str(tmp))
+        fs = RootDirBackend(str(tmp))
         mcp = DeadMCPBackend()
-        cb = CompositeBackend([("fs", fs), ("mcp", mcp)])
+        cb = MultiDomainBackend([("fs", fs), ("mcp", mcp)])
 
         # 1. open() must not raise when only fs comes up
         try:

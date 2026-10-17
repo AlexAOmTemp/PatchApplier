@@ -13,7 +13,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.indexers.state import bump_seq, read_seq
 
 
@@ -40,7 +40,7 @@ def main():
 
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
-        backend = FilesystemBackend(root)
+        backend = RootDirBackend(root)
         vpath = "INDEX.md.version"
 
         print("== read missing ==")

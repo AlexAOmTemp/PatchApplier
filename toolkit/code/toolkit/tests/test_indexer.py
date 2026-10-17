@@ -12,7 +12,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.formats import Format
 from toolkit.indexers.doc import build_index
 from toolkit.indexers.diff import diff_index, parse_index_text
@@ -38,7 +38,7 @@ class T:
 
 def main():
     t = T()
-    backend = FilesystemBackend(TOOLKIT_ROOT)
+    backend = RootDirBackend(TOOLKIT_ROOT)
     backend.open()
     fmt = Format.load("default")
 

@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from toolkit.backends.composite import CompositeBackend  # noqa: E402
+from toolkit.backends.multi_domain import MultiDomainBackend  # noqa: E402
 
 
 class SwitchableBackend:
@@ -71,7 +71,7 @@ def main():
     print("=== Switching backend: ready -> dead ===")
     a = SwitchableBackend()
     b = SwitchableBackend()
-    comp = CompositeBackend([("fs", a), ("mcp", b)])
+    comp = MultiDomainBackend([("fs", a), ("mcp", b)])
     comp.open()
 
     check("after open, fs is ready", comp.backend_state("fs") == "ready")
@@ -100,7 +100,7 @@ def main():
 
     print("=== Bomb backend: is_alive raises ===")
     bomb = BombBackend()
-    comp2 = CompositeBackend([("fs", SwitchableBackend()), ("mcp", bomb)])
+    comp2 = MultiDomainBackend([("fs", SwitchableBackend()), ("mcp", bomb)])
     comp2.open()
     check("bomb reported as failed: not alive",
           comp2.backend_state("mcp") == "failed: not alive")

@@ -1,4 +1,4 @@
-"""CompositeBackend -- routes operations across multiple backends by path.
+"""MultiDomainBackend -- routes operations across multiple backends by path.
 
 Motivating case: one Session that edits both local docs/Python (Filesystem)
 and Roblox code (MCP). Path domains are disjoint by construction:
@@ -29,11 +29,11 @@ from ..core.paths import is_mcp_path
 # one of these is treated as an MCP path.
 
 
-class CompositeBackend:
+class MultiDomainBackend:
     """Routes each operation to the sub-backend that owns the path.
 
     Constructor takes (name, backend) pairs. The two standard
-    configurations are ('fs', FilesystemBackend) and ('mcp', MCPBackend),
+    configurations are ('fs', RootDirBackend) and ('mcp', MCPBackend),
     but any pair is accepted for testing.
     """
     def __init__(self, pairs):
@@ -385,7 +385,7 @@ class CompositeBackend:
     def create(self, path: str, content: str, class_name: str = "ModuleScript") -> None:
         """Create a file/script at `path`. Routes to the owning sub-backend.
 
-        MCPBackend has a dedicated create (via multi_edit); FilesystemBackend
+        MCPBackend has a dedicated create (via multi_edit); RootDirBackend
         falls back to write. Cross-domain create (e.g. into an MCP folder
         with a filesystem path) is rejected by routing: the owner is one.
         """

@@ -12,7 +12,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.core.models import Result
 from toolkit.formats import Format
@@ -37,7 +37,7 @@ class T:
             self.failed += 1
 
 
-class FakeNativeBackend(FilesystemBackend):
+class FakeNativeBackend(RootDirBackend):
     """Filesystem backend + invoke_native for Patcher-level tests."""
 
     def __init__(self, root, calls=None):
@@ -55,7 +55,7 @@ class FakeNativeBackend(FilesystemBackend):
         return None  # unknown
 
 
-class NoNativeBackend(FilesystemBackend):
+class NoNativeBackend(RootDirBackend):
     """No invoke_native at all — Patcher falls through to skipped."""
 
 

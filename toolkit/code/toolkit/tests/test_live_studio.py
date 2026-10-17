@@ -53,7 +53,7 @@ class T:
 
 def _make_session():
     """Build a Session identical to the GUI's composite session (fs + mcp)."""
-    from toolkit.backends import CompositeBackend, FilesystemBackend, MCPBackend
+    from toolkit.backends import MultiDomainBackend, RootDirBackend, MCPBackend
     from toolkit.config import loader as _cfg
     from toolkit.core import Session
     from toolkit.formats import Format
@@ -65,7 +65,7 @@ def _make_session():
     fmt = Format.load(cfg.get("format_preset", "default"), cfg.get("format") or None)
 
     wd = Path(cfg.get("project_dir") or PROJECT_ROOT)
-    fs = FilesystemBackend(wd)
+    fs = RootDirBackend(wd)
     mcp_cfg = cfg.get("mcp") or {}
     native = mcp_cfg.get("native_tools") or {}
     bridge = mcp_cfg.get("bridge_script") or str(_cfg.default_bridge_script())
@@ -86,7 +86,7 @@ def _make_session():
         native_tools_enabled=bool(native.get("enabled", True)),
         native_tools_allow=native.get("allow") or None,
     )
-    backend = CompositeBackend([("fs", fs), ("mcp", mcp)])
+    backend = MultiDomainBackend([("fs", fs), ("mcp", mcp)])
     return Session(backend, fmt=fmt, tools=TOOL_MAP)
 
 

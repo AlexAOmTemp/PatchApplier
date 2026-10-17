@@ -8,7 +8,7 @@ from pathlib import Path
 _HERE = Path(__file__).resolve()
 sys.path.insert(0, str(_HERE.parents[1]))
 
-from toolkit.backends import FilesystemBackend  # noqa: E402
+from toolkit.backends import RootDirBackend  # noqa: E402
 from toolkit.indexers.code import build_code_index  # noqa: E402
 
 
@@ -70,7 +70,7 @@ def main():
         (root / "vendor" / "v.py").write_text(VENDOR, encoding="utf-8")
         (root / "suppressed.py").write_text(SUPPRESSED, encoding="utf-8")
 
-        be = FilesystemBackend(root)
+        be = RootDirBackend(root)
         r = build_code_index(be)
         text = r.text
 
@@ -128,7 +128,7 @@ def small():\n    return 1\n\n\ndef big_func():\n''' + ''.join(
         (root / "cyc_a.py").write_text("import cyc_b\nX = 1\n", encoding="utf-8")
         (root / "cyc_b.py").write_text("import cyc_a\nY = 1\n", encoding="utf-8")
 
-        be2 = FilesystemBackend(root)
+        be2 = RootDirBackend(root)
         r2 = build_code_index(be2)
         headers2 = {}
         for line in r2.text.splitlines():

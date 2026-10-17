@@ -1,88 +1,45 @@
 [
-[{"id": "cleanup-tmp",
-  "action": "delete_file",
-  "arguments": {"file_path": "PatchAppliers/PatchApplier/tmpaitw17cr.py"}}],
-
-[{"id": "fix-tempfile",
-  "action": "replace_in_file",
-  "arguments": {
-    "file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/tools/shell.py",
-    "search": "        # Cleanup inline-code tempfile.\n        if temp_code is not None:\n            try:\n                temp_code.unlink()\n            except OSError:\n                pass",
-    "replace": "        # Cleanup inline-code tempfile. On Windows the file may still be\n        # held briefly by AV/indexer after the child exits; retry a few\n        # times with small sleeps to avoid leaking the file into the project.\n        if temp_code is not None:\n            import time as _t\n            for _ in range(5):\n                try:\n                    temp_code.unlink()\n                    break\n                except OSError:\n                    _t.sleep(0.05)"
-  }}],
-
-[{"id": "dry-filesystem",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "FilesystemBackend",
-    "replacement": "RootDirBackend",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "word_boundary": true,
-    "dry_run": true
-  }}],
-
-[{"id": "dry-workspace",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "WorkspaceBackend",
-    "replacement": "MultiRootFsBackend",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "word_boundary": true,
-    "dry_run": true
-  }}],
-
-[{"id": "dry-composite",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "CompositeBackend",
-    "replacement": "MultiDomainBackend",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "word_boundary": true,
-    "dry_run": true
-  }}],
-
-[{"id": "dry-imports-fs",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "backends.filesystem",
-    "replacement": "backends.root_dir",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "dry_run": true
-  }}],
-
-[{"id": "dry-imports-ws",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "backends.workspace",
-    "replacement": "backends.multi_root_fs",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "dry_run": true
-  }}],
-
-[{"id": "dry-imports-comp",
-  "action": "grep_replace",
-  "arguments": {
-    "pattern": "backends.composite",
-    "replacement": "backends.multi_domain",
-    "directory": "PatchAppliers/PatchApplier/toolkit",
-    "file_glob": "*.py",
-    "fixed_strings": true,
-    "dry_run": true
-  }}],
-
-[{"id": "commit-cleanup",
+[{"id": "commit-rename",
   "action": "run_python",
   "arguments": {
-    "code": "import subprocess, sys\n\ndef run(cmd, cwd):\n    return subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=cwd)\n\ntl = 'D:/Programs/UnityAiDevSystem/PatchAppliers/PatchApplier'\n\nout = run(['git', 'status', '--short'], tl)\nprint('=== status ===')\nprint(out.stdout.rstrip('\\n') or '(clean)')\n\nout = run(['git', 'add', '-A'], tl)\nprint('')\nprint('git add rc:', out.returncode)\n\nmsg = 'chore: remove temp leftover, harden inline-code tempfile cleanup\\n\\n- run_python(code=...): retry unlink with small sleeps (Windows AV lock)\\n'\nout = run(['git', 'commit', '-m', msg], tl)\nprint('')\nprint('commit rc:', out.returncode)\nprint(out.stdout.rstrip('\\n'))\nif out.stderr.strip():\n    print('stderr:', out.stderr.strip()[:300])\n\nout = run(['git', 'log', '--oneline', '-1'], tl)\nprint('HEAD:', out.stdout.strip())\n"
-  }}]
+    "code": "import subprocess\n\ndef run(cmd):\n    return subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd='D:/Programs/UnityAiDevSystem/PatchAppliers/PatchApplier')\n\nout = run(['git', 'status', '--short'])\nprint('=== status ===')\nprint(out.stdout.rstrip('\\n') or '(clean)')\n\nrun(['git', 'add', '-A'])\n\nmsg = 'refactor(backends): rename classes to reflect roles\\n\\n- FilesystemBackend -> RootDirBackend (one directory, sandbox only, no policy)\\n- WorkspaceBackend -> MultiRootFsBackend (N roots + policy, production FS backend)\\n- CompositeBackend -> MultiDomainBackend (FS + Roblox DataModel, routes by path)\\n- files: backends/filesystem.py -> backends/root_dir.py\\n  backends/workspace.py -> backends/multi_root_fs.py\\n  backends/composite.py -> backends/multi_domain.py\\n- imports updated across manual/, runner/, tests/\\n- .gitignore: ignore tmp*.py from run_python(code=...)\\n- shell: retry unlink on Windows AV lock\\n'\nout = run(['git', 'commit', '-m', msg])\nprint('')\nprint('commit rc:', out.returncode)\nprint(out.stdout.rstrip('\\n'))\nif out.stderr.strip():\n    print('stderr:', out.stderr.strip()[:300])\n\nout = run(['git', 'log', '--oneline', '-3'])\nprint('')\nprint('=== log ===')\nprint(out.stdout.rstrip('\\n'))\n"
+  }}],
+
+[{"id": "recon-set-context-callers",
+  "action": "grep",
+  "arguments": {
+    "pattern": "GetStatusTool.set_context|set_context\\(",
+    "directory": "PatchAppliers/PatchApplier/toolkit/code/toolkit",
+    "file_glob": "*.py",
+    "regex": true,
+    "max_results": 40
+  }}],
+
+[{"id": "recon-config-sources",
+  "action": "grep",
+  "arguments": {
+    "pattern": "sources",
+    "directory": "PatchAppliers/PatchApplier/toolkit/code/toolkit/config",
+    "regex": true,
+    "max_results": 40
+  }}],
+
+[{"id": "recon-config-loader-dict",
+  "action": "read_unit",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py",
+                "address": {"qualname": "DEFAULTS"}, "part": "all"}}],
+
+[{"id": "recon-gui-build-config",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py",
+                "start_line": 640, "end_line": 780}}],
+
+[{"id": "recon-test-get-status",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_status.py"}}],
+
+[{"id": "recon-presenters-build-backend",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py",
+                "start_line": 250, "end_line": 380}}]
 ]

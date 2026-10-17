@@ -1,4 +1,4 @@
-'''Tests for WorkspaceBackend (read/write + routing).
+'''Tests for MultiRootFsBackend (read/write + routing).
 
 Covers: path routing <basename>/<rel>, read/exists/stat/list, list("") ->
 flat list across roots, state-prefix addressing, write into roots,
@@ -17,7 +17,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 
-from toolkit.backends.workspace import WorkspaceBackend
+from toolkit.backends.multi_root_fs import MultiRootFsBackend
 from toolkit.config import workspace as ws_mod
 
 
@@ -69,7 +69,7 @@ def main():
         ws_mod.add_root(w, str(root / 'alpha'))
         ws_mod.add_root(w, str(root / 'beta'))
 
-        wb = WorkspaceBackend(w, root / 'state')
+        wb = MultiRootFsBackend(w, root / 'state')
         wb.open()
 
         # --- read ---

@@ -1,4 +1,4 @@
-"""Symmetry test: run_python(path=...) resolves through WorkspaceBackend.
+"""Symmetry test: run_python(path=...) resolves through MultiRootFsBackend.
 
 Regression for the bug where run_python(script=...) resolved from
 project_root, while create_file / read_file / grep used workspace-relative
@@ -17,7 +17,7 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends.workspace import WorkspaceBackend
+from toolkit.backends.multi_root_fs import MultiRootFsBackend
 from toolkit.config import workspace as ws_mod
 from toolkit.core import Session
 from toolkit.formats import Format
@@ -57,7 +57,7 @@ def _setup(tmp: Path):
     if not ws_mod.save(w, state):
         raise RuntimeError("could not save workspace")
 
-    wb = WorkspaceBackend(w, state)
+    wb = MultiRootFsBackend(w, state)
     wb.open()
     return wb, project
 

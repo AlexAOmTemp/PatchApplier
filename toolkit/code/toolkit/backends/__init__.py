@@ -1,13 +1,13 @@
 """Backend implementations: filesystem, mcp, composite, workspace."""
 
-from .filesystem import FilesystemBackend
+from .root_dir import RootDirBackend
 from .mcp import MCPBackend
-from .composite import CompositeBackend
-from .workspace import WorkspaceBackend
+from .multi_domain import MultiDomainBackend
+from .multi_root_fs import MultiRootFsBackend
 
 __all__ = [
-    "FilesystemBackend",
+    "RootDirBackend",
     "MCPBackend",
-    "CompositeBackend",
-    "WorkspaceBackend",
+    "MultiDomainBackend",
+    "MultiRootFsBackend",
 ]

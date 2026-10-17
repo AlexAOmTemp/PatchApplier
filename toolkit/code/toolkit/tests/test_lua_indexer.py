@@ -17,7 +17,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.indexers.lua_runner import build_lua_index
@@ -204,7 +204,7 @@ def main():
         fs_root = root / "fs"
         fs_root.mkdir()
         fmt = Format.load("default")
-        with Session(FilesystemBackend(fs_root), fmt=fmt,
+        with Session(RootDirBackend(fs_root), fmt=fmt,
                      tools=TOOL_MAP) as s:
             res = s.apply_patches([
                 {"action": "rebuild_lua_code_index", "arguments": {}}

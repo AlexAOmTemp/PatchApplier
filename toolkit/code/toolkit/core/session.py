@@ -39,7 +39,7 @@ class Session:
     def open_async(self) -> "Session":
         """Non-blocking variant of __enter__.
 
-        CompositeBackend opens the filesystem synchronously and any remote
+        MultiDomainBackend opens the filesystem synchronously and any remote
         backend in a background thread, so the session is immediately
         usable for filesystem operations. Backends without open_async fall
         back to the blocking open().

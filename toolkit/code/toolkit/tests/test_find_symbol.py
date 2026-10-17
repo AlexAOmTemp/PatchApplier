@@ -12,7 +12,7 @@ PROJECT_ROOT = TOOLKIT_ROOT.parent
 
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.indexers.code import build_code_index
@@ -70,7 +70,7 @@ def main():
         (root / "alpha.py").write_text(SAMPLE_A, encoding="utf-8")
         (root / "beta.py").write_text(SAMPLE_B, encoding="utf-8")
 
-        backend = FilesystemBackend(root)
+        backend = RootDirBackend(root)
         backend.open()
 
         ci = build_code_index(backend)

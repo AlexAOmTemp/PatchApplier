@@ -12,7 +12,7 @@ TOOLKIT_ROOT = HERE.parent
 PROJECT_ROOT = TOOLKIT_ROOT.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.indexers.code import build_code_index
 
 
@@ -109,7 +109,7 @@ def main():
         (root / "pkg" / "__init__.py").write_text(PKG_INIT, encoding="utf-8")
         (root / "pkg" / "a.py").write_text(PKG_A, encoding="utf-8")
 
-        be = FilesystemBackend(root)
+        be = RootDirBackend(root)
         be.open()
         result = build_code_index(be)
         be.close()

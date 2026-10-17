@@ -263,7 +263,7 @@ def build_backend_for_config(config: dict):
     Returns (backend, name) on success. Raises BackendError with a short
     human message on failure -- caller renders it.
     """
-    from ...backends import FilesystemBackend, MCPBackend, CompositeBackend  # noqa: F401
+    from ...backends import RootDirBackend, MCPBackend, MultiDomainBackend  # noqa: F401
     backend_name = config.get("backend", "filesystem")
     work_dir = config.get("project_dir", "").strip()
     if not work_dir or not Path(work_dir).is_dir():
@@ -275,9 +275,9 @@ def build_backend_for_config(config: dict):
         ws = load_workspace_or_none(work_dir, config)
         if ws is None:
             raise BackendError("workspace.json not found in project folder")
-        from ...backends.workspace import WorkspaceBackend
+        from ...backends.multi_root_fs import MultiRootFsBackend
         state_dir = Path(work_dir) / _l.resolve_state_dir(config)
-        return WorkspaceBackend(ws, state_dir), "filesystem"
+        return MultiRootFsBackend(ws, state_dir), "filesystem"
 
     from ...config.loader import default_bridge_script
     mcp_cfg = dict(config.get("mcp") or {})
@@ -318,10 +318,10 @@ def build_backend_for_config(config: dict):
         ws = load_workspace_or_none(work_dir, config)
         if ws is None:
             raise BackendError("workspace.json not found in project folder")
-        from ...backends.workspace import WorkspaceBackend
+        from ...backends.multi_root_fs import MultiRootFsBackend
         state_dir = Path(work_dir) / _l.resolve_state_dir(config)
-        return CompositeBackend([
-            ("fs", WorkspaceBackend(ws, state_dir)),
+        return MultiDomainBackend([
+            ("fs", MultiRootFsBackend(ws, state_dir)),
             ("mcp", mcp_backend),
         ]), "composite"
     raise BackendError(f"unknown backend: {backend_name}")

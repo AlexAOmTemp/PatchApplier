@@ -17,7 +17,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent.parent))
 
-from toolkit.backends import FilesystemBackend
+from toolkit.backends import RootDirBackend
 from toolkit.core import Session
 from toolkit.formats import Format
 from toolkit.tools import TOOL_MAP
@@ -42,7 +42,7 @@ class T:
 
 
 def _run(root: Path, patches):
-    backend = FilesystemBackend(root)
+    backend = RootDirBackend(root)
     fmt = Format.load('default')
     with Session(backend, fmt=fmt, tools=TOOL_MAP) as s:
         return s.apply_patches(patches)
