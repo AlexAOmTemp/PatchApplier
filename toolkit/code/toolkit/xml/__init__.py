@@ -28,6 +28,7 @@ from .writer import (
     remove_attr,
     replace_element,
     replace_text,
+    set_annotation,
     set_attr,
 )
 
@@ -51,5 +52,6 @@ __all__ = [
     "remove_attr",
     "replace_element",
     "replace_text",
+    "set_annotation",
     "set_attr",
 ]

@@ -274,6 +274,69 @@ def _wrap_new_text(_el_str: str, new_text: str) -> str:
     return escape_text(new_text)
 
 
+def set_annotation(doc: XmlDocument, el: XmlElement, text: str) -> bytes:
+    """Insert or replace `<summary>` comment as the first child of `el`.
+
+    Comment format: `<!-- summary: <text> -->`, one line, at the child
+    indentation of `el`. If a summary comment already exists as the first
+    non-whitespace inside `el`, only its value is replaced.
+
+    Refuses self-closing parent — use xml_append for that case, or
+    set_text on a text leaf.
+    """
+    el_str = _decode_span(doc, el)
+    open_tag = _parse_open_tag(el_str)
+    if open_tag.self_closing:
+        raise WriteError(
+            "empty_element",
+            f"<{el.tag}> is self-closing; set_annotation needs children context",
+        )
+    close_start = _find_close_tag_start(el_str, open_tag)
+    if close_start < 0:
+        raise WriteError("bad_span", "no closing tag found")
+
+    between = el_str[open_tag.gt_pos + 1:close_start]
+    eol = doc.line_ending
+    parent_indent = _line_indent(doc, el)
+    child_indent = (
+        _line_indent(doc, el.children[0]) if el.children
+        else parent_indent + "  "
+    )
+
+    # Look for an existing comment at first non-ws.
+    i = 0
+    while i < len(between) and between[i] in " \t\r\n":
+        i += 1
+    if between[i:i + 4] == "<!--":
+        end_m = between.find("-->", i)
+        if end_m < 0:
+            raise WriteError("bad_span", "unclosed comment")
+        body = between[i + 4:end_m].strip()
+        if body.startswith("summary:"):
+            new_comment = f"<!-- summary: {text} -->"
+            new_between = between[:i] + new_comment + between[end_m + 3:]
+            new_el_str = (
+                el_str[:open_tag.gt_pos + 1] + new_between + el_str[close_start:]
+            )
+            return _splice(doc, el, new_el_str)
+
+    # No existing summary: insert as first child.
+    new_comment = f"<!-- summary: {text} -->"
+    if not between.strip():
+        new_between = eol + child_indent + new_comment + eol + parent_indent
+    else:
+        content_start = 0
+        while content_start < len(between) and between[content_start] in " \t\r\n":
+            content_start += 1
+        rest = between[content_start:]
+        new_between = (
+            eol + child_indent + new_comment + eol + child_indent + rest
+        )
+
+    new_el_str = el_str[:open_tag.gt_pos + 1] + new_between + el_str[close_start:]
+    return _splice(doc, el, new_el_str)
+
+
 def delete_element(doc: XmlDocument, el: XmlElement) -> bytes:
     """Delete `el` and its surrounding line (if the element is the only
     non-whitespace on that line). Otherwise, delete only the element span

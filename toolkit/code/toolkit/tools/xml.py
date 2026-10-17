@@ -22,7 +22,7 @@ from ..xml.discriminator import chain_for, match_value
 from ..xml.reader import is_mixed_content
 from ..xml.writer import (
     WriteError, append_child, delete_element, remove_attr, replace_element,
-    replace_text, set_attr,
+    replace_text, set_annotation, set_attr,
 )
 
 
@@ -506,9 +506,9 @@ class XmlModifyTool:
       {"op": "set_attr", "name": "...", "value": "..."}
       {"op": "remove_attr", "name": "..."}
       {"op": "set_text", "value": "..."}     # leaf only, refuses children
+      {"op": "set_annotation", "value": "..."}  # <!-- summary: ... --> first child
 
-    Not in v1 (Step 3.5): `set_annotation` (needs child-insertion logic),
-    `append_child` (needs indentation), `replace_self` (uses xml_replace).
+    Not in v1 (Step 4): `replace_self` (uses xml_replace).
     """
 
     name = "xml_modify"
@@ -633,6 +633,8 @@ class XmlModifyTool:
                             ),
                         )
                     current_bytes = replace_text(doc, el, op_spec["value"])
+                elif op_spec["op"] == "set_annotation":
+                    current_bytes = set_annotation(doc, el, op_spec["value"])
                 else:  # pragma: no cover -- validate_op caught it
                     raise WriteError("bad_op", f"unknown op {op_spec['op']!r}")
             except WriteError as e:
@@ -691,16 +693,16 @@ class XmlModifyTool:
         if not isinstance(spec, dict):
             return f"op[{i}] must be a dict, got {type(spec).__name__}"
         kind = spec.get("op")
-        if kind not in ("set_attr", "remove_attr", "set_text"):
-            return f"op[{i}].op must be one of set_attr/remove_attr/set_text, got {kind!r}"
+        if kind not in ("set_attr", "remove_attr", "set_text", "set_annotation"):
+            return (
+                f"op[{i}].op must be one of "
+                f"set_attr/remove_attr/set_text/set_annotation, got {kind!r}"
+            )
         if kind in ("set_attr", "remove_attr"):
             name = spec.get("name")
             if not isinstance(name, str) or not name:
                 return f"op[{i}].name must be a non-empty string"
-        if kind == "set_attr":
-            if not isinstance(spec.get("value"), str):
-                return f"op[{i}].value must be a string"
-        if kind == "set_text":
+        if kind in ("set_attr", "set_text", "set_annotation"):
             if not isinstance(spec.get("value"), str):
                 return f"op[{i}].value must be a string"
         return None

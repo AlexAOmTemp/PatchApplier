@@ -178,6 +178,47 @@ with tempfile.TemporaryDirectory() as td:
                      ops=[{'op': 'set_text', 'value': 'v'}])
     t.expect_code('missing file', r, 'not_found')
 
+    # --- set_annotation: insert as first child -------------------------
+    (proj / 'a.xml').write_text(
+        '<Defs>\n  <ThingDef>\n    <defName>Steel</defName>\n  </ThingDef>\n</Defs>',
+        encoding='utf-8')
+    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+                     ops=[{'op': 'set_annotation', 'value': 'metal from steel'}])
+    t.expect('set_annotation: ok', r.status == 'ok', r.message)
+    cur = read()
+    t.expect('set_annotation: inserted', '<!-- summary: metal from steel -->' in cur, cur)
+    t.expect('set_annotation: before defName',
+             cur.index('<!-- summary') < cur.index('<defName>Steel'), cur)
+    t.expect('set_annotation: 4-space indent',
+             '\n    <!-- summary: metal from steel -->' in cur, cur)
+
+    # --- set_annotation: replace existing -------------------------------
+    (proj / 'a.xml').write_text(
+        '<Defs>\n  <ThingDef>\n    <!-- summary: old text -->\n    <defName>Steel</defName>\n  </ThingDef>\n</Defs>',
+        encoding='utf-8')
+    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+                     ops=[{'op': 'set_annotation', 'value': 'new text'}])
+    t.expect('set_annotation replace: ok', r.status == 'ok', r.message)
+    cur = read()
+    t.expect('set_annotation replace: new present', '<!-- summary: new text -->' in cur, cur)
+    t.expect('set_annotation replace: old gone', 'old text' not in cur)
+    t.expect('set_annotation replace: no duplicate',
+             cur.count('<!-- summary') == 1, cur)
+
+    # --- set_annotation: empty parent -----------------------------------
+    (proj / 'a.xml').write_text('<Defs>\n  <A></A>\n</Defs>', encoding='utf-8')
+    r = tool.execute(backend, file_path=path, address='Defs/A',
+                     ops=[{'op': 'set_annotation', 'value': 'ann'}])
+    t.expect('set_annotation empty: ok', r.status == 'ok', r.message)
+    cur = read()
+    t.expect('set_annotation empty: present', '<!-- summary: ann -->' in cur, cur)
+
+    # --- set_annotation on self-closing ---------------------------------
+    (proj / 'a.xml').write_text('<Defs>\n  <A/>\n</Defs>', encoding='utf-8')
+    r = tool.execute(backend, file_path=path, address='Defs/A',
+                     ops=[{'op': 'set_annotation', 'value': 'ann'}])
+    t.expect_code('set_annotation self-closing', r, 'empty_element')
+
     backend.close()
 
 # --- integration: real RimWorld file -----------------------------------------

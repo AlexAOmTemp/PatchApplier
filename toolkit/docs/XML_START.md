@@ -84,8 +84,9 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 | `set_attr` | `name`, `value` | Установить/обновить атрибут. Существующий — на месте, новый — в конец. Значение эскейпится (`&`, `<`, `>`, `"`). |
 | `remove_attr` | `name` | Удалить. Нет атрибута → `attr_not_found` |
 | `set_text` | `value` | Лист → текст. `has_children` если есть дети. `mixed_content_unsupported` если настоящий mixed. Self-closing → пара тегов. CDATA-обёртка сохраняется. |
+| `set_annotation` | `value` | Вставить/заменить `<!-- summary: ... -->` первым ребёнком. `empty_element` если родитель self-closing. Идемпотентно: повторный вызов заменяет значение. |
 
-**Удаление children нет.** Если нужно удалить ребёнка — `xml_modify` не подойдёт (Step 4 — `xml_delete`).
+**Удаление children нет.** Для удаления ребёнка — `xml_delete` (см. §4.6).
 
 ### 4.5 `xml_append(file_path, parent, fragment)`
 
@@ -95,6 +96,24 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 - `mixed_content_unsupported` если parent с mixed content или текстовый лист.
 - Self-closing parent раскрывается в пару.
 - CRLF/EOL файла сохраняется.
+
+### 4.6 `xml_delete(file_path, address, occurrence?)`
+
+Удалить один элемент.
+
+- Если элемент — единственное не-whitespace на своей строке — удаляется строка целиком (включая `\n`). Иначе — только span элемента.
+- Нельзя удалить корень (`cannot_delete_root`). Для замены корня — `xml_replace`.
+- Неоднозначность — через `occurrence`, как в `xml_read`.
+- BOM / CRLF / кодировка сохраняются.
+
+### 4.7 `xml_replace(file_path, address, fragment, occurrence?)`
+
+Заменить элемент целиком на `fragment`.
+
+- `fragment` — ровно один well-formed элемент (`bad_fragment` иначе).
+- Reindent: первая строка без дополнительного отступа (splice-точка уже имеет отступ старого элемента), остальные — с отступом старого элемента.
+- Работает на корне тоже.
+- BOM / CRLF / кодировка сохраняются.
 
 ### 4.6 `rebuild_*` для XML нет
 
@@ -166,16 +185,35 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 
 Шесть вызовов. Без `grep` по сотням XML. Без чтения vanilla-структуры целиком.
 
-## 8. Открытые ограничения (Step 4+)
-<!-- summary: xml_insert, xml_delete, xml_replace, xml_patch_op, source_changed, namespaces по URI. Пока нет — обход через grep_replace_mcp и ручные правки. -->
+## 8. Открытые ограничения
+<!-- summary: Что осталось: xml_insert (сиблинг), xml_patch_op, source_changed, xml_list, namespaces по URI. Что уже есть — перечислено для контраста. -->
 
-Пока не реализовано, обходись существующим:
+**Уже есть (не ограничение):**
 
-- **`xml_delete` / `xml_insert` / `xml_replace`** — для удаления/вставки-сиблинга/замены элемента целиком. Обход: `xml_read` → точечный `replace_in_file` по уникальному anchor или `grep_replace_mcp`.
+- `xml_read`, `xml_find`, `xml_map`, `xml_modify`, `xml_append`, `xml_delete`, `xml_replace`.
+- `xml_modify` ops: `set_attr` / `remove_attr` / `set_text` / `set_annotation`.
+
+**Пока нет:**
+
+- **`xml_insert`** — вставить сиблинга рядом с адресом (before/after). Обход: `xml_replace` на соседа с двумя элементами, либо ручной `replace_in_file` по anchor.
 - **`source_changed`** — stale-source protection. Обход: работай быстро или перечитай файл перед write.
-- **`xml_patch_op`** — генерация `<xpath>` из адреса тула. Пока пиши XPath руками.
+- **`xml_patch_op`** — генерация `<xpath>` из адреса тула (RimWorld Patch). Пока пиши XPath руками.
+- **`xml_list`** — плоский список файла (при наличии `xml_map` обычно не нужен).
 - **Namespaces по URI** — только по префиксу как в файле.
-- **`set_annotation`** (`<!-- summary: ... -->` первым ребёнком) — Step 4.
+
+## 9. Быстрый выбор тула
+<!-- summary: Задача → тул. read/find/map для разведки; modify/append/delete/replace для записи. -->
+
+| Задача | Тул |
+|---|---|
+| Прочитать элемент | `xml_read` |
+| Найти все элементы по тегу+фильтру | `xml_find` |
+| Карта каталогов | `xml_map` |
+| Поменять атрибут / текст / summary | `xml_modify` (ops) |
+| Добавить ребёнка | `xml_append` |
+| Удалить элемент | `xml_delete` |
+| Заменить элемент | `xml_replace` |
+| Массовая замена по `defName` (не XML-семантика) | `grep_replace` (FS) |
 
 ## 9. Что помнить
 <!-- summary: Один фенс на патч. Не использовать replace_unit для XML. Читать перед правкой. Проверять diff после rebuild. Проверять адрес ≠ XPath. -->
