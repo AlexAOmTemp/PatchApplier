@@ -20,7 +20,7 @@ from ..xml.reader import XmlError, parse
 from ..xml.resolver import ResolveError, resolve_one
 from ..xml.discriminator import chain_for, match_value
 from ..xml.reader import is_mixed_content
-from ..xml.writer import WriteError, remove_attr, replace_text, set_attr
+from ..xml.writer import WriteError, append_child, remove_attr, replace_text, set_attr
 
 
 def _xml_cfg(backend: Backend) -> dict | None:
@@ -137,6 +137,122 @@ def _matches_where(el, where: dict) -> bool:
 # under their depth-2 ancestor to keep the output compact even on big
 # trees. Depth-0 is the start itself, depth-1 immediate children, etc.
 _MAP_MAX_SAMPLE = 5
+
+
+class XmlAppendTool:
+    """Append one well-formed element as the last child of `parent`.
+
+    Primary use case: Patch-файлы и новые Def'ы. Fragment must be one
+    element (mult-root refused). Indentation matches the parent's existing
+    children; parent's own line-indent is used as the fallback. CRLF/EOL,
+    BOM and encoding of the file are preserved (append uses doc.line_ending).
+
+    Refuses:
+      - parent with mixed content (`mixed_content_unsupported`)
+      - parent that is a text leaf (`mixed_content_unsupported`)
+      - malformed or multi-root fragment (`bad_fragment`)
+    """
+
+    name = "xml_append"
+    op = "write"
+    path_args: list[str] = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        parent: str = "",
+        fragment: str = "",
+        **_kwargs: Any,
+    ) -> Result:
+        if not file_path:
+            return Result(
+                status="error", action="xml_append",
+                error_code="bad_input", message="file_path required",
+            )
+        if not parent:
+            return Result(
+                status="error", action="xml_append",
+                error_code="bad_input", message="parent required",
+            )
+        if not fragment or not fragment.strip():
+            return Result(
+                status="error", action="xml_append",
+                error_code="bad_input", message="fragment required",
+            )
+
+        try:
+            segments = parse_address(parent)
+        except AddressError as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code="bad_address", message=str(e),
+            )
+
+        try:
+            data = _read_bytes(backend, file_path)
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_append",
+                error_code="not_found", message=f"file not found: {file_path}",
+            )
+        except Exception as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code="read_failed",
+                message=f"{type(e).__name__}: {e}",
+            )
+
+        try:
+            doc = parse(data)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            resolved = resolve_one(doc, segments, _xml_cfg(backend))
+        except ResolveError as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            new_bytes = append_child(doc, resolved.element, fragment)
+        except WriteError as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            parse(new_bytes)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_append",
+                error_code="result_syntax_error",
+                message=f"resulting XML is not well-formed: {e.message}",
+            )
+
+        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        if err is not None:
+            return Result(
+                status="error", action="xml_append",
+                error_code="write_failed", message=err,
+            )
+
+        delta = len(new_bytes) - len(data)
+        return Result(
+            status="ok", action="xml_append",
+            message=(
+                f"{file_path}  child appended under <{resolved.element.tag}>  "
+                f"({delta:+d} B)"
+            ),
+        )
 
 
 class XmlModifyTool:

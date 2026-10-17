@@ -32,7 +32,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .reader import XmlDocument, XmlElement
+from .reader import XmlDocument, XmlElement, is_mixed_content, parse
 
 
 class WriteError(ValueError):
@@ -162,6 +162,56 @@ def _find_close_tag_start(el_str: str, open_tag: _OpenTag) -> int:
 
 # --- write ops -------------------------------------------------------------
 
+# --- indentation helpers --------------------------------------------------
+
+def _leading_ws(s: str) -> str:
+    """Leading whitespace (spaces/tabs) of `s`."""
+    n = 0
+    while n < len(s) and s[n] in " \t":
+        n += 1
+    return s[:n]
+
+
+def _common_ws_prefix(a: str, b: str) -> str:
+    """Longest common prefix of whitespace (spaces/tabs) of two strings."""
+    n = min(len(a), len(b))
+    for i in range(n):
+        if a[i] != b[i] or a[i] not in " \t":
+            return a[:i]
+    return a[:n]
+
+
+def _reindent_fragment(fragment: str, child_indent: str) -> str:
+    """Strip common leading whitespace from `fragment` lines, then prefix
+    each with `child_indent`. Empty lines stay empty (no trailing whitespace).
+    """
+    lines = fragment.split("\n")
+    non_empty = [ln for ln in lines if ln.strip()]
+    if not non_empty:
+        return child_indent
+    common = _leading_ws(non_empty[0])
+    for ln in non_empty[1:]:
+        common = _common_ws_prefix(common, _leading_ws(ln))
+    n = len(common)
+    out: list[str] = []
+    for ln in lines:
+        if not ln.strip():
+            out.append("")
+        else:
+            out.append(child_indent + ln[n:])
+    return "\n".join(out)
+
+
+def _line_indent(doc: XmlDocument, el: XmlElement) -> str:
+    """Leading whitespace of the line on which `el.start` sits."""
+    line_start = doc.source_bytes.rfind(b"\n", 0, el.start) + 1
+    try:
+        raw = doc.source_bytes[line_start:el.start].decode(doc.encoding)
+    except UnicodeDecodeError:
+        return ""
+    return raw if raw.strip() == "" else ""
+
+
 def replace_text(doc: XmlDocument, el: XmlElement, new_text: str) -> bytes:
     """Replace `el`'s leaf text with `new_text`. Returns new source bytes.
 
@@ -211,6 +261,84 @@ def _wrap_new_text(_el_str: str, new_text: str) -> str:
     """For self-closing expansion: if text contains chars that need CDATA,
     still escape. Caller can't tell us it was CDATA (it wasn't)."""
     return escape_text(new_text)
+
+
+def append_child(doc: XmlDocument, parent_el: XmlElement, fragment: str) -> bytes:
+    """Append `fragment` (one well-formed element) as the last child of
+    `parent_el`. Reindents to match existing children. Refuses mixed content.
+
+    Layout rules:
+      - Parent already has children: insert `eol + child_indent + frag` right
+        after the last non-whitespace char of the between-content; the existing
+        trailing whitespace (which prefixes the close tag) is preserved.
+      - Parent between-content is whitespace-only / empty: rebuild it as
+        `eol + child_indent + frag + eol + parent_indent`.
+      - Self-closing parent `<a/>`: expand to `<a>...child...</a>`.
+
+    CDATA / comments in the fragment survive: we only shift leading whitespace
+    per line by a common prefix, never touching content bytes.
+    """
+    # Validate the fragment.
+    try:
+        parse(fragment.encode("utf-8"))
+    except Exception as e:
+        raise WriteError("bad_fragment", f"fragment is not well-formed XML: {e}")
+
+    # Mixed-content guard.
+    if parent_el.children and is_mixed_content(parent_el):
+        raise WriteError(
+            "mixed_content_unsupported",
+            f"<{parent_el.tag}> has mixed content; appending is unsafe",
+        )
+    elif parent_el.text and parent_el.text.strip():
+        raise WriteError(
+            "mixed_content_unsupported",
+            f"<{parent_el.tag}> is a text leaf; append would create mixed content",
+        )
+
+    el_str = _decode_span(doc, parent_el)
+    open_tag = _parse_open_tag(el_str)
+
+    # Parent's own line-indent.
+    parent_indent = _line_indent(doc, parent_el)
+
+    # Child-indent: mirror the first existing child; else parent_indent + 2 spaces.
+    child_indent = ""
+    if parent_el.children:
+        child_indent = _line_indent(doc, parent_el.children[0])
+    if not child_indent:
+        child_indent = parent_indent + "  "
+
+    reindented = _reindent_fragment(fragment, child_indent)
+    eol = doc.line_ending
+
+    if open_tag.self_closing:
+        head = el_str[:open_tag.gt_pos]
+        tail_tag = f"</{parent_el.tag}>"
+        new_el_str = (
+            head + ">" + eol + reindented + eol + parent_indent + tail_tag
+        )
+        return _splice(doc, parent_el, new_el_str)
+
+    close_start = _find_close_tag_start(el_str, open_tag)
+    between = el_str[open_tag.gt_pos + 1:close_start]
+
+    # Find last non-whitespace position in between.
+    i = len(between) - 1
+    while i >= 0 and between[i] in " \t\r\n":
+        i -= 1
+
+    if i < 0:
+        # Empty or whitespace-only between: rebuild clean.
+        new_between = eol + reindented + eol + parent_indent
+    else:
+        # Insert after last non-ws, before the existing trailing whitespace.
+        new_between = between[:i + 1] + eol + reindented + between[i + 1:]
+
+    new_el_str = (
+        el_str[:open_tag.gt_pos + 1] + new_between + el_str[close_start:]
+    )
+    return _splice(doc, parent_el, new_el_str)
 
 
 def set_attr(doc: XmlDocument, el: XmlElement, name: str, value: str) -> bytes:
