@@ -20,7 +20,10 @@ from ..xml.reader import XmlError, parse
 from ..xml.resolver import ResolveError, resolve_one
 from ..xml.discriminator import chain_for, match_value
 from ..xml.reader import is_mixed_content
-from ..xml.writer import WriteError, append_child, remove_attr, replace_text, set_attr
+from ..xml.writer import (
+    WriteError, append_child, delete_element, remove_attr, replace_element,
+    replace_text, set_attr,
+)
 
 
 def _xml_cfg(backend: Backend) -> dict | None:
@@ -137,6 +140,242 @@ def _matches_where(el, where: dict) -> bool:
 # under their depth-2 ancestor to keep the output compact even on big
 # trees. Depth-0 is the start itself, depth-1 immediate children, etc.
 _MAP_MAX_SAMPLE = 5
+
+
+class XmlDeleteTool:
+    """Delete one element from a file. Refuses to delete the root.
+
+    If the element is the only non-whitespace content on its line, the
+    whole line (including its newline) is removed. Otherwise only the
+    element span is removed.
+    """
+
+    name = "xml_delete"
+    op = "write"
+    path_args: list[str] = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: str = "",
+        occurrence: int | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        if not file_path:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="bad_input", message="file_path required",
+            )
+        if not address:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="bad_input", message="address required",
+            )
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or occurrence < 1
+        ):
+            return Result(
+                status="error", action="xml_delete",
+                error_code="bad_occurrence",
+                message=f"occurrence must be a positive int, got {occurrence!r}",
+            )
+
+        try:
+            segments = parse_address(address)
+        except AddressError as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="bad_address", message=str(e),
+            )
+
+        try:
+            data = _read_bytes(backend, file_path)
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="not_found", message=f"file not found: {file_path}",
+            )
+        except Exception as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="read_failed",
+                message=f"{type(e).__name__}: {e}",
+            )
+
+        try:
+            doc = parse(data)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            resolved = resolve_one(
+                doc, segments, _xml_cfg(backend), occurrence=occurrence,
+            )
+        except ResolveError as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code=e.code, message=e.message,
+            )
+
+        if resolved.element is doc.root:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="cannot_delete_root",
+                message="cannot delete the document root; use xml_replace to change it",
+            )
+
+        try:
+            new_bytes = delete_element(doc, resolved.element)
+        except WriteError as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            parse(new_bytes)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="result_syntax_error",
+                message=f"resulting XML is not well-formed: {e.message}",
+            )
+
+        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        if err is not None:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="write_failed", message=err,
+            )
+
+        delta = len(new_bytes) - len(data)
+        return Result(
+            status="ok", action="xml_delete",
+            message=f"{file_path}  <{resolved.element.tag}> deleted  ({delta:+d} B)",
+        )
+
+
+class XmlReplaceTool:
+    """Replace one element with a well-formed fragment.
+
+    Fragment is reindented to the target's line-indent. Works on the root
+    too (useful for whole-file rewrites where only the root differs).
+    """
+
+    name = "xml_replace"
+    op = "write"
+    path_args: list[str] = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: str = "",
+        fragment: str = "",
+        occurrence: int | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        if not file_path:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="bad_input", message="file_path required",
+            )
+        if not address:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="bad_input", message="address required",
+            )
+        if not fragment or not fragment.strip():
+            return Result(
+                status="error", action="xml_replace",
+                error_code="bad_input", message="fragment required",
+            )
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or occurrence < 1
+        ):
+            return Result(
+                status="error", action="xml_replace",
+                error_code="bad_occurrence",
+                message=f"occurrence must be a positive int, got {occurrence!r}",
+            )
+
+        try:
+            segments = parse_address(address)
+        except AddressError as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="bad_address", message=str(e),
+            )
+
+        try:
+            data = _read_bytes(backend, file_path)
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="not_found", message=f"file not found: {file_path}",
+            )
+        except Exception as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="read_failed",
+                message=f"{type(e).__name__}: {e}",
+            )
+
+        try:
+            doc = parse(data)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            resolved = resolve_one(
+                doc, segments, _xml_cfg(backend), occurrence=occurrence,
+            )
+        except ResolveError as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            new_bytes = replace_element(doc, resolved.element, fragment)
+        except WriteError as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code=e.code, message=e.message,
+            )
+
+        try:
+            parse(new_bytes)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="result_syntax_error",
+                message=f"resulting XML is not well-formed: {e.message}",
+            )
+
+        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        if err is not None:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="write_failed", message=err,
+            )
+
+        delta = len(new_bytes) - len(data)
+        return Result(
+            status="ok", action="xml_replace",
+            message=f"{file_path}  <{resolved.element.tag}> replaced  ({delta:+d} B)",
+        )
 
 
 class XmlAppendTool:

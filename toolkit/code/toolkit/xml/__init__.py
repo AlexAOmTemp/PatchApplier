@@ -22,9 +22,11 @@ from .discriminator import (
 from .writer import (
     WriteError,
     append_child,
+    delete_element,
     escape_attr,
     escape_text,
     remove_attr,
+    replace_element,
     replace_text,
     set_attr,
 )
@@ -43,9 +45,11 @@ __all__ = [
     "parse_spec",
     "WriteError",
     "append_child",
+    "delete_element",
     "escape_attr",
     "escape_text",
     "remove_attr",
+    "replace_element",
     "replace_text",
     "set_attr",
 ]

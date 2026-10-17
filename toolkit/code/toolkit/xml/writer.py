@@ -181,9 +181,15 @@ def _common_ws_prefix(a: str, b: str) -> str:
     return a[:n]
 
 
-def _reindent_fragment(fragment: str, child_indent: str) -> str:
+def _reindent_fragment(
+    fragment: str, child_indent: str, first_line_indent: str | None = None,
+) -> str:
     """Strip common leading whitespace from `fragment` lines, then prefix
     each with `child_indent`. Empty lines stay empty (no trailing whitespace).
+
+    `first_line_indent`: if not None, the first non-empty line uses this
+    prefix instead of `child_indent`. Used by replace_element, where the
+    splice point already supplies the leading indent before the first line.
     """
     lines = fragment.split("\n")
     non_empty = [ln for ln in lines if ln.strip()]
@@ -194,11 +200,16 @@ def _reindent_fragment(fragment: str, child_indent: str) -> str:
         common = _common_ws_prefix(common, _leading_ws(ln))
     n = len(common)
     out: list[str] = []
+    seen_non_empty = False
     for ln in lines:
         if not ln.strip():
             out.append("")
+            continue
+        if not seen_non_empty and first_line_indent is not None:
+            out.append(first_line_indent + ln[n:])
         else:
             out.append(child_indent + ln[n:])
+        seen_non_empty = True
     return "\n".join(out)
 
 
@@ -261,6 +272,62 @@ def _wrap_new_text(_el_str: str, new_text: str) -> str:
     """For self-closing expansion: if text contains chars that need CDATA,
     still escape. Caller can't tell us it was CDATA (it wasn't)."""
     return escape_text(new_text)
+
+
+def delete_element(doc: XmlDocument, el: XmlElement) -> bytes:
+    """Delete `el` and its surrounding line (if the element is the only
+    non-whitespace on that line). Otherwise, delete only the element span
+    and collapse any trailing blank line that would be left.
+
+    Invariants checked by caller: element must not be the document root
+    (the caller uses xml_replace for that case, or refuses).
+    """
+    start = el.start
+    end = el.end
+
+    # If the line containing start is whitespace-only before start, and
+    # whitespace-only after end (up to the next newline), delete the whole
+    # line including the newline. This is the common case for pretty-printed
+    # files: `<a/>\n` on its own line.
+    line_start = doc.source_bytes.rfind(b"\n", 0, start) + 1
+    line_end = doc.source_bytes.find(b"\n", end)
+    if line_end < 0:
+        line_end = len(doc.source_bytes)
+    else:
+        line_end += 1  # include the newline
+    before = doc.source_bytes[line_start:start]
+    after = doc.source_bytes[end:line_end]
+    if before.strip() == b"" and after.strip() in (b"", b"\r"):
+        return doc.source_bytes[:line_start] + doc.source_bytes[line_end:]
+
+    # Fallback: delete just the span, plus one adjacent whitespace rune
+    # on either side if present, to avoid `>\n\n<` artifacts.
+    return doc.source_bytes[:start] + doc.source_bytes[end:]
+
+
+def replace_element(
+    doc: XmlDocument, el: XmlElement, fragment: str,
+) -> bytes:
+    """Replace `el` with `fragment`. Fragment is reindented to el's line.
+
+    Fragment must be one well-formed element. Structural whitespace of the
+    original (indent before `<` on its own line) is preserved by using the
+    same rules as append_child.
+    """
+    try:
+        parse(fragment.encode("utf-8"))
+    except Exception as e:
+        raise WriteError("bad_fragment", f"fragment is not well-formed XML: {e}")
+
+    # Reindent fragment to match el's line-indent. First line keeps no
+    # additional prefix — the splice point already has the old element's
+    # leading indent before `el.start`.
+    el_indent = _line_indent(doc, el)
+    reindented = _reindent_fragment(fragment, el_indent, first_line_indent="")
+
+    # Splice in the reindented fragment bytes (encoding doc.encoding).
+    new_bytes = reindented.encode(doc.encoding)
+    return doc.source_bytes[:el.start] + new_bytes + doc.source_bytes[el.end:]
 
 
 def append_child(doc: XmlDocument, parent_el: XmlElement, fragment: str) -> bytes:
