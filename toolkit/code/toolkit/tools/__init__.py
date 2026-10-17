@@ -45,6 +45,7 @@ from .verify import VerifySyntaxTool
 from .xml import (
     XmlReadTool, XmlFindTool, XmlMapTool, XmlModifyTool, XmlAppendTool,
     XmlDeleteTool, XmlReplaceTool, XmlCopyTool, XmlMoveTool,
+    XmlInsertTool,
 )
 from .unit.tool import (
     ReadUnitTool, ListUnitsTool,
@@ -100,6 +101,7 @@ TOOL_MAP: dict[str, type] = {
     "xml_replace": XmlReplaceTool,
     "xml_copy": XmlCopyTool,
     "xml_move": XmlMoveTool,
+    "xml_insert": XmlInsertTool,
 }
 
 __all__ = [
@@ -132,4 +134,5 @@ __all__ = [
     "XmlReplaceTool",
     "XmlCopyTool",
     "XmlMoveTool",
+    "XmlInsertTool",
 ]

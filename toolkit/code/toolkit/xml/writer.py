@@ -275,7 +275,15 @@ def _wrap_new_text(_el_str: str, new_text: str) -> str:
 
 
 def apply_renames(text: str, renames: dict[str, str]) -> str:
-    """Plain text.replace() for each key, longest first.
+    """Plain text.replace() for each key, longest first. See apply_renames_report."""
+    out, _missed = apply_renames_report(text, renames)
+    return out
+
+
+def apply_renames_report(
+    text: str, renames: dict[str, str],
+) -> tuple[str, list[str]]:
+    """Apply renames longest-first; return (text, keys that matched nothing).
 
     Order matters: replacing `TM_WoodGolem` before `TM_WoodGolemLS` would
     turn `TM_WoodGolemLS` into `TM_BoneGolemLS` (correct), but if the user
@@ -285,11 +293,21 @@ def apply_renames(text: str, renames: dict[str, str]) -> str:
     Not regex, not word-boundary: the caller is expected to pass exact
     identifiers as they appear in the source. This is deliberate — an
     over-eager `\\bWood\\b` would rename unrelated text in `<description>`.
+
+    Returns missed keys so the caller can warn: a rename key that never
+    matched means either the source didn't have it, or a longer key ate
+    the occurrence first.
     """
+    if not renames:
+        return text, []
     items = sorted(renames.items(), key=lambda kv: -len(kv[0]))
+    missed: list[str] = []
     for src, dst in items:
+        if src not in text:
+            missed.append(src)
+            continue
         text = text.replace(src, dst)
-    return text
+    return text, missed
 
 
 def set_annotation(doc: XmlDocument, el: XmlElement, text: str) -> bytes:
@@ -409,6 +427,38 @@ def replace_element(
     # Splice in the reindented fragment bytes (encoding doc.encoding).
     new_bytes = reindented.encode(doc.encoding)
     return doc.source_bytes[:el.start] + new_bytes + doc.source_bytes[el.end:]
+
+
+def insert_sibling(
+    doc: XmlDocument, parent_el: XmlElement, target: XmlElement,
+    fragment: str, position: str,
+) -> bytes:
+    """Insert `fragment` as a sibling of `target` (before or after).
+
+    `parent_el` must be the direct parent of `target`. Reindent: each line
+    of the fragment gets `target`'s line-indent (via the same helper as
+    append_child). Position 'before' inserts at target.start with target's
+    indent; 'after' inserts at target.end with a preceding EOL.
+
+    Mixed content of parent_el must already be ruled out by the caller.
+    """
+    try:
+        parse(fragment.encode("utf-8"))
+    except Exception as e:
+        raise WriteError("bad_fragment", f"fragment is not well-formed XML: {e}")
+
+    indent = _line_indent(doc, target)
+    reindented = _reindent_fragment(fragment, indent, first_line_indent="")
+    eol = doc.line_ending
+
+    if position == "before":
+        # Splice at the start of target's line, prefixed with target's indent.
+        ins = (indent + reindented + eol).encode(doc.encoding)
+        return doc.source_bytes[:target.start] + ins + doc.source_bytes[target.start:]
+
+    # position == "after": insert after target.end, prefixed with eol + indent.
+    ins = (eol + indent + reindented).encode(doc.encoding)
+    return doc.source_bytes[:target.end] + ins + doc.source_bytes[target.end:]
 
 
 def append_child(doc: XmlDocument, parent_el: XmlElement, fragment: str) -> bytes:

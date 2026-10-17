@@ -21,8 +21,9 @@ from ..xml.resolver import ResolveError, resolve_one
 from ..xml.discriminator import chain_for, match_value
 from ..xml.reader import is_mixed_content
 from ..xml.writer import (
-    WriteError, append_child, apply_renames, delete_element, remove_attr,
-    replace_element, replace_text, set_annotation, set_attr,
+    WriteError, append_child, apply_renames, apply_renames_report,
+    delete_element, insert_sibling, remove_attr, replace_element,
+    replace_text, set_annotation, set_attr,
 )
 
 
@@ -64,6 +65,31 @@ def _read_bytes(backend: Backend, path: str) -> bytes:
     if phys is None:
         raise FileNotFoundError(path)
     return phys.read_bytes()
+
+
+def _hash_bytes(data: bytes) -> str:
+    """Short stable hash for stale-source protection (8 hex chars)."""
+    import hashlib
+    return hashlib.sha1(data).hexdigest()[:8]
+
+
+def _check_fresh(data: bytes, expected_hash: str | None) -> str | None:
+    """None if `expected_hash` matches `data`'s hash, or wasn't provided.
+    Otherwise returns a message for the `source_changed` error.
+
+    The hash is the short form emitted by `xml_read` in its header;
+    the client is expected to pass it back verbatim.
+    """
+    if expected_hash is None:
+        return None
+    actual = _hash_bytes(data)
+    if actual != expected_hash:
+        return (
+            f"source file changed since it was read: "
+            f"expected hash {expected_hash!r}, got {actual!r}; "
+            f"re-read and retry"
+        )
+    return None
 
 
 def _line_range(data: bytes, start: int, end: int) -> tuple[int, int]:
@@ -142,6 +168,146 @@ def _matches_where(el, where: dict) -> bool:
 _MAP_MAX_SAMPLE = 5
 
 
+class XmlInsertTool:
+    """Insert a fragment as sibling before/after an existing element.
+
+    `fragment` must be one well-formed element (multi-root refused).
+    `position` is 'before' or 'after'; the target's parent is used as
+    container. Sibling `[N]` indices of later siblings shift, but the
+    address you pass in is resolved *before* the insert, so no ambiguity.
+
+    Reindent: fragment lines get the target's line-indent. CRLF/EOL of
+    the file are preserved (doc.line_ending used for the inserted breaks).
+
+    Refuses:
+      - target is the document root (nothing to be sibling of)
+      - target's parent is mixed content (`mixed_content_unsupported`)
+      - malformed / multi-root fragment (`bad_fragment`)
+    """
+
+    name = "xml_insert"
+    op = "write"
+    path_args: list[str] = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: str = "",
+        fragment: str = "",
+        position: str = "before",
+        occurrence: int | None = None,
+        source_hash: str | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        if not file_path:
+            return Result(status="error", action="xml_insert",
+                          error_code="bad_input", message="file_path required")
+        if not address:
+            return Result(status="error", action="xml_insert",
+                          error_code="bad_input", message="address required")
+        if not fragment or not fragment.strip():
+            return Result(status="error", action="xml_insert",
+                          error_code="bad_input", message="fragment required")
+        if position not in ("before", "after"):
+            return Result(
+                status="error", action="xml_insert",
+                error_code="bad_position",
+                message=f"position must be 'before' or 'after', got {position!r}",
+            )
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or occurrence < 1
+        ):
+            return Result(
+                status="error", action="xml_insert",
+                error_code="bad_occurrence",
+                message=f"occurrence must be a positive int, got {occurrence!r}",
+            )
+
+        try:
+            segments = parse_address(address)
+        except AddressError as e:
+            return Result(status="error", action="xml_insert",
+                          error_code="bad_address", message=str(e))
+
+        try:
+            data = _read_bytes(backend, file_path)
+        except FileNotFoundError:
+            return Result(status="error", action="xml_insert",
+                          error_code="not_found", message=f"file not found: {file_path}")
+        except Exception as e:
+            return Result(status="error", action="xml_insert",
+                          error_code="read_failed",
+                          message=f"{type(e).__name__}: {e}")
+
+        stale = _check_fresh(data, source_hash)
+        if stale is not None:
+            return Result(status="error", action="xml_insert",
+                          error_code="source_changed", message=stale)
+
+        try:
+            doc = parse(data)
+        except XmlError as e:
+            return Result(status="error", action="xml_insert",
+                          error_code=e.code, message=e.message)
+
+        try:
+            resolved = resolve_one(doc, segments, _xml_cfg(backend),
+                                   occurrence=occurrence)
+        except ResolveError as e:
+            return Result(status="error", action="xml_insert",
+                          error_code=e.code, message=e.message)
+
+        target = resolved.element
+        if target is doc.root:
+            return Result(
+                status="error", action="xml_insert",
+                error_code="cannot_insert_root_sibling",
+                message="target is the document root; no sibling container exists",
+            )
+        parent = target.parent
+        if parent is None:
+            return Result(
+                status="error", action="xml_insert",
+                error_code="internal_error",
+                message="target has no parent element (inconsistent tree)",
+            )
+        if parent.children and is_mixed_content(parent):
+            return Result(
+                status="error", action="xml_insert",
+                error_code="mixed_content_unsupported",
+                message=f"<{parent.tag}> has mixed content; sibling insert is unsafe",
+            )
+
+        try:
+            new_bytes = insert_sibling(doc, parent, target, fragment, position)
+        except WriteError as e:
+            return Result(status="error", action="xml_insert",
+                          error_code=e.code, message=e.message)
+
+        try:
+            parse(new_bytes)
+        except XmlError as e:
+            return Result(status="error", action="xml_insert",
+                          error_code="result_syntax_error",
+                          message=f"resulting XML is not well-formed: {e.message}")
+
+        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        if err is not None:
+            return Result(status="error", action="xml_insert",
+                          error_code="write_failed", message=err)
+
+        delta = len(new_bytes) - len(data)
+        return Result(
+            status="ok", action="xml_insert",
+            message=(
+                f"{file_path}  <{target.tag}> {position} inserted  ({delta:+d} B)"
+            ),
+        )
+
+
 class XmlCopyTool:
     """Copy one element from one file/address to another.
 
@@ -178,6 +344,8 @@ class XmlCopyTool:
         target_address: str = "",
         target_occurrence: int | None = None,
         renames: dict | None = None,
+        register_in: str = "",
+        register_as: str = "",
         **_kwargs: Any,
     ) -> Result:
         return self._do(
@@ -187,7 +355,8 @@ class XmlCopyTool:
             target_file=target_file, position=position,
             target_parent=target_parent, target_address=target_address,
             target_occurrence=target_occurrence,
-            renames=renames, move=False,
+            renames=renames, register_in=register_in,
+            register_as=register_as, move=False,
         )
 
     @staticmethod
@@ -198,7 +367,8 @@ class XmlCopyTool:
         target_file: str, position: str,
         target_parent: str, target_address: str,
         target_occurrence: int | None,
-        renames: dict | None, move: bool,
+        renames: dict | None, register_in: str,
+        register_as: str, move: bool,
     ) -> Result:
         if not source_file:
             return Result(status="error", action=action,
@@ -235,6 +405,18 @@ class XmlCopyTool:
                 if not isinstance(v, str):
                     return Result(status="error", action=action,
                                   error_code="bad_input", message=f"rename value must be str, got {type(v).__name__}")
+        if register_in and not register_as:
+            return Result(
+                status="error", action=action,
+                error_code="bad_input",
+                message="register_as is required when register_in is set",
+            )
+        if not register_in and register_as:
+            return Result(
+                status="error", action=action,
+                error_code="bad_input",
+                message="register_in is required when register_as is set",
+            )
         if move and source_file == target_file:
             return Result(
                 status="error", action=action,
@@ -279,8 +461,9 @@ class XmlCopyTool:
                           error_code="encoding_error",
                           message=f"source fragment not decodable: {e}")
 
+        rename_missed: list[str] = []
         if renames:
-            fragment = apply_renames(fragment, renames)
+            fragment, rename_missed = apply_renames_report(fragment, renames)
             try:
                 parse(fragment.encode("utf-8"))
             except XmlError as e:
@@ -343,6 +526,42 @@ class XmlCopyTool:
                           error_code="result_syntax_error",
                           message=f"target would not be well-formed: {e.message}")
 
+        # --- optional: register the new defName in a container -----------
+        if register_in:
+            try:
+                reg_doc = parse(new_bytes)
+            except XmlError as e:
+                return Result(status="error", action=action,
+                              error_code="result_syntax_error", message=e.message)
+            try:
+                reg_segs = parse_address(register_in)
+            except AddressError as e:
+                return Result(status="error", action=action,
+                              error_code="bad_address",
+                              message=f"register_in: {e}")
+            try:
+                reg_parent = resolve_one(reg_doc, reg_segs, _xml_cfg(backend))
+            except ResolveError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code,
+                              message=f"register_in: {e.message}")
+            # Build a `<li>register_as</li>` fragment; append as last child.
+            reg_fragment = f"<li>{register_as}</li>"
+            try:
+                new_bytes = append_child(
+                    reg_doc, reg_parent.element, reg_fragment,
+                )
+            except WriteError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code,
+                              message=f"register_in: {e.message}")
+            try:
+                parse(new_bytes)
+            except XmlError as e:
+                return Result(status="error", action=action,
+                              error_code="result_syntax_error",
+                              message=f"after register_in: {e.message}")
+
         err = XmlModifyTool._write_bytes(backend, target_file, new_bytes)
         if err is not None:
             return Result(status="error", action=action,
@@ -354,6 +573,11 @@ class XmlCopyTool:
             f"<{src_el.tag}> from {source_file} → {target_file} "
             f"({verb}, {delta:+d} B)"
         )
+        if rename_missed:
+            msg += (
+                "  ⚠ rename keys with no match in source: "
+                + ", ".join(repr(k) for k in rename_missed)
+            )
 
         if not move:
             return Result(status="ok", action=action, message=msg)
@@ -415,6 +639,8 @@ class XmlMoveTool(XmlCopyTool):
         target_address: str = "",
         target_occurrence: int | None = None,
         renames: dict | None = None,
+        register_in: str = "",
+        register_as: str = "",
         **_kwargs: Any,
     ) -> Result:
         return self._do(
@@ -424,7 +650,8 @@ class XmlMoveTool(XmlCopyTool):
             target_file=target_file, position=position,
             target_parent=target_parent, target_address=target_address,
             target_occurrence=target_occurrence,
-            renames=renames, move=True,
+            renames=renames, register_in=register_in,
+            register_as=register_as, move=True,
         )
 
 
@@ -448,6 +675,7 @@ class XmlDeleteTool:
         file_path: str = "",
         address: str = "",
         occurrence: int | None = None,
+        source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
         if not file_path:
@@ -489,6 +717,13 @@ class XmlDeleteTool:
                 status="error", action="xml_delete",
                 error_code="read_failed",
                 message=f"{type(e).__name__}: {e}",
+            )
+
+        stale = _check_fresh(data, source_hash)
+        if stale is not None:
+            return Result(
+                status="error", action="xml_delete",
+                error_code="source_changed", message=stale,
             )
 
         try:
@@ -567,6 +802,7 @@ class XmlReplaceTool:
         address: str = "",
         fragment: str = "",
         occurrence: int | None = None,
+        source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
         if not file_path:
@@ -613,6 +849,13 @@ class XmlReplaceTool:
                 status="error", action="xml_replace",
                 error_code="read_failed",
                 message=f"{type(e).__name__}: {e}",
+            )
+
+        stale = _check_fresh(data, source_hash)
+        if stale is not None:
+            return Result(
+                status="error", action="xml_replace",
+                error_code="source_changed", message=stale,
             )
 
         try:
@@ -690,6 +933,7 @@ class XmlAppendTool:
         file_path: str = "",
         parent: str = "",
         fragment: str = "",
+        source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
         if not file_path:
@@ -728,6 +972,13 @@ class XmlAppendTool:
                 status="error", action="xml_append",
                 error_code="read_failed",
                 message=f"{type(e).__name__}: {e}",
+            )
+
+        stale = _check_fresh(data, source_hash)
+        if stale is not None:
+            return Result(
+                status="error", action="xml_append",
+                error_code="source_changed", message=stale,
             )
 
         try:
@@ -810,6 +1061,7 @@ class XmlModifyTool:
         address: str = "",
         ops: list | None = None,
         occurrence: int | None = None,
+        source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
         if not file_path:
@@ -866,6 +1118,13 @@ class XmlModifyTool:
                 status="error", action="xml_modify",
                 error_code="read_failed",
                 message=f"{type(e).__name__}: {e}",
+            )
+
+        stale = _check_fresh(data, source_hash)
+        if stale is not None:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="source_changed", message=stale,
             )
 
         try:
@@ -1444,7 +1703,11 @@ class XmlReadTool:
             text = src.decode("utf-8", errors="replace")
 
         first, last = _line_range(doc.source_bytes, el.start, el.end)
-        header = f"{file_path}  <{el.tag}>  L{first}-L{last}  ({len(src)} B)"
+        src_hash = _hash_bytes(data)
+        header = (
+            f"{file_path}  <{el.tag}>  L{first}-L{last}  "
+            f"({len(src)} B)  #{src_hash}"
+        )
         return Result(
             status="ok", action="xml_read",
             message=header + "\n\n" + text,

@@ -49,6 +49,7 @@ SCRIPTS = [
     ("xml append tool", HERE / "test_xml_append_tool.py"),
     ("xml delete replace", HERE / "test_xml_delete_replace.py"),
     ("xml copy move", HERE / "test_xml_copy_move.py"),
+    ("xml refinements", HERE / "test_xml_refinements.py"),
 ]
 
 
