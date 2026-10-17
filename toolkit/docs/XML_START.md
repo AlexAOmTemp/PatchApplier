@@ -188,10 +188,11 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 | `not_found` (дискриминатор) | Ни один ребёнок не матчит `[value]` по цепочке | Прочитай «tried: ...» в сообщении. Возможно, нужен конфиг `xml_discriminators`. |
 | `not_found` (тег) | Нет такого тега под parent | Проверь `xml_read` родителя. |
 | `attr_not_found` | `remove_attr` на отсутствующем | Не ошибка retry — атрибута реально нет. |
-| `bad_fragment` | Fragment в `xml_append` не парсится или multi-root | Fragment — ровно один well-formed элемент. Проверь `&`, `<`, `>`. |
+| `bad_fragment` | Fragment в `xml_append`/`xml_replace`/`xml_insert`/`xml_copy` не парсится или multi-root | Fragment — ровно один well-formed элемент. Проверь `&`, `<`, `>`. |
+| `cannot_insert_root_sibling` | `xml_insert` на корне документа | Вставить сиблинга корню нельзя (контейнера нет). Используй `xml_append` в корень. |
 | `dtd_unsupported` | В файле DTD с `<!ENTITY ...>` | Разверни entity вручную. ex. `&foo;` — в значение `bar` вручную. |
 | `xml_space_preserve_unsupported` | `xml:space="preserve"` в файле | Правка через `set_text` не поддерживается. |
-| `source_changed` | Файл изменился между read и write | **Пока не реализовано** (Step 4). При гонке `xml_modify` не поймает — читай аккуратнее. |
+| `source_changed` | Файл изменился между read и write | Передавай `source_hash` из `xml_read` в write-тул. Если хеш не совпал — `source_changed`, файл не тронут. Перечитай и повтори. |
 
 ## 7. Workflow: типичная задача
 <!-- summary: «Добавь SteelWall с рецептом» — шесть вызовов. Разведка → чтение образца → создание → добавление рецепта. -->

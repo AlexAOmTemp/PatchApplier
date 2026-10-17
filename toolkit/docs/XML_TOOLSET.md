@@ -507,12 +507,17 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 - `XML_START.md` — компактный операционный справочник для LLM.
 - §14 здесь — журнал отклонений от дизайна §3–5.
 
+### Шаг 3.75 — уточнения после теста на RWoM (закрыт)
+
+- **`source_changed`** — реализовано как `source_hash` в write-тулах.
+- **`xml_insert`** (`before`/`after` сиблинг) — реализован.
+- **`renames`-warnings** в `xml_copy` — `apply_renames_report` возвращает непопавшие ключи.
+- **`xml_copy register_in` / `register_as`** — авто-`<li>` в контейнер (для `<upgrades>`).
+
 ### Шаг 5 — остальное (открыт)
 
-- **`xml_insert`** — вставка сиблинга (before/after). Пока не начато.
 - **`xml_list`** — плоский список файла. Пока не начато; `xml_map` покрывает большинство кейсов.
 - **`xml_patch_op`** — генерация `<xpath>` из адреса тула. Пока не начато.
-- **`source_changed`** — stale-source protection. Пока не начато.
 - **Namespaces по URI** — только по префиксу.
 
 ## 12. Пример полного workflow
@@ -713,6 +718,42 @@ Multi-line fragment пересчитывается: общий whitespace-пре
 **`xml_delete`:** если элемент — единственное не-whitespace на своей строке, удаляется вся строка вместе с `\n`. Иначе удаляется только span. Отказ на корне — `cannot_delete_root` (для замены корня — `xml_replace`).
 
 **`xml_replace`:** fragment — ровно один элемент (`bad_fragment` иначе). Reindent: первая строка **без** дополнительного префикса (splice-точка уже имеет отступ старого элемента), остальные — с отступом старого элемента. Найдено багом: двойной отступ первой строки, если не передать `first_line_indent=""`.
+
+### 14.24 (Шаг 3.75) Тест на RWoM: `TM_BoneGolem` за 18 вызовов
+
+**Сценарий.** Добавить скелета-голема в `RWoM-main/v1.6`, по образцу Wood, из `DesecratedBone`, со сборкой на `DesecratedAltarOfNecromancy`.
+
+**Что покрыло.** `xml_copy + renames` заменил 18 копий; `xml_find` по `where={"@Name": ...}` нашёл abstract-базы (без `defName`); `grep_replace` (FS) заменил `WoodLog` на `DesecratedBone` в 4 рецептах; `xml_append` восстановил `<upgrades>` в `TM_GolemDef`.
+
+**Что вскрылось.** Голем в RWoM — не свободный ThingDef, а часть системы `TM_GolemUtility.GolemTypes()`, которая фильтрует `where upgrades.Count > 0`. Голем без апгрейдов не попадает в `GolemPawns`, `ShouldHaveNeed` не добавляет `TM_GolemEnergy`, `CompGolem.Energy` = null, тик падает NRE. Это не баг утилиты — это жёсткая зависимость мода. Апгрейды пришлось вернуть.
+
+**Отсюда — четыре уточнения в тулсете (Step 3.75).**
+
+### 14.25 (Шаг 3.75) `source_hash` — stale-source protection
+
+`xml_read` возвращает хеш в шапке (`#XXXXXXXX`, sha1[:8]). Write-тулы (`xml_modify`, `xml_append`, `xml_delete`, `xml_replace`, `xml_insert`) принимают опциональный `source_hash`. Не совпало — `error_code="source_changed"`, файл не тронут. Опциональность: без хеша пишем как раньше; с хешем — защита.
+
+Это не гонка-детектор (файл может измениться через 1 мс после проверки), но достаточная защита от «прочитал — человек сохранил в Studio — записал поверх».
+
+### 14.26 (Шаг 3.75) `renames`-warnings в `xml_copy`
+
+`apply_renames` теперь возвращает `(text, missed_keys)`. `missed` — ключи, не найденные в тексте фрагмента. `xml_copy` кладёт их в `message` как `⚠ rename keys with no match in source: …`. Статус остаётся `ok`.
+
+Причина: в RWoM-тесте `TM_Wood_Manipulator` чуть не проскочил, потому что `TM_Wood` был съеден более длинным `TM_WoodGolem`. Warning ловит такие вещи в ответе, а не в следующем `grep`.
+
+### 14.27 (Шаг 3.75) `xml_insert`
+
+Вставить один well-formed элемент как сиблинга цели (`before` или `after`). Родитель берётся из цели. Отказ: `cannot_insert_root_sibling` (цель — корень), `mixed_content_unsupported` (родитель смешанного типа), `bad_fragment`. Reindent по цели, EOL файла сохранён.
+
+### 14.28 (Шаг 3.75) `xml_copy register_in` / `register_as`
+
+После успешной копии — append `<li>{register_as}</li>` в контейнер по `register_in`. Для `<upgrades><li>…</li></upgrades>`. Оба или ни один (`bad_input`). Специфично для RimWorld-паттерна «список подкомпонентов», но в RWoM применяется 7 раз подряд — окупилось сразу.
+
+### 14.29 (Шаг 3.75) Разведка C#: `grep <symbol>`, не `<method>`
+
+В тесте на RWoM шесть вызовов (`grep HasEnergyForAbilities` → `grep Energy =>` → `grep NeedsTracker` → `read HarmonyPatches` → `grep GolemPawns` → `read TM_GolemUtility`) свелись бы к одному `grep 'TM_GolemEnergy'`. Причина — в `TM_GolemNeeds.xml` есть **комментарий** `<!-- Golem Needs are added using a harmony patch -->`, который `grep` нашёл бы вместе с определением need'а и harmony-патчем.
+
+Это правило поведения LLM, не тула. Записано в `XML_START.md §10`.
 
 ### 14.23 (Шаг 3.5) `set_annotation` как op внутри `xml_modify`
 
