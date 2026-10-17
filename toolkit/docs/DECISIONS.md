@@ -165,7 +165,7 @@ def find_text(haystack, needle, *,
 
 ### 2.1 Унификация тулов
 
-<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block / set_annotation) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы. -->
+<!-- summary: Миграция отменена. Новый тулсет структурных тулов (read_unit / list_units / replace_unit / insert_block) добавлен рядом со старыми. Старые символьные тулы вытеснены: 17 записей удалены из TOOL_MAP 2026-10-11. Позже replace_block / delete_block поглощены replace_unit(block=...); canonical address keys — qualname + title_match, старые section_number / section_title принимаются как алиасы. -->
 
 **Стратегия: расширение тулсета без миграции.** Старый план (объединить `replace_section` / `replace_symbol*` / `insert_symbol` в единый `replace_unit` / `insert_unit`) отменён. Причины:
 
@@ -195,10 +195,10 @@ def find_text(haystack, needle, *,
 - `replace_unit` — замена unit'а целиком или по частям (`part=head|annotation|body`). Заменяет `replace_symbol`, `replace_symbol_body`, `replace_symbol_signature`, `replace_section`.
 - `replace_unit(block=N)` — замена блоков в body (`block=3`, `block="1-4"`). Заменяет `replace_statement` (только Python), `replace_block`, `delete_block` (пустой `new_text` = удалить) и структурные случаи `replace_between`. Кросс-форматно. `part` и `block` взаимоисключающие и обязательные (`scope_required` / `scope_conflict`).
 - `insert_block` — вставка блока: `position=start|end|before|after` + `anchor` (индекс блока или qualname соседа). Заменяет `insert_symbol` и структурные случаи `insert_at_anchor`.
-- `set_annotation` — установить docstring / summary / `--[[ ]]` одной операцией. Заменяет `set_summary` и установку docstring через `replace_symbol`.
+- `replace_unit(part="annotation")` — установить docstring / summary / `--[[ ]]` одной операцией. Заменяет `set_summary` и установку docstring через `replace_symbol`. Внутри делегирует в `writer.set_annotation`, который применяет форматную обёртку (`\"\"\"` / `--[[ ]]` / `<!-- summary: -->`).
 - ~~`verify_annotation`~~ — подтвердить annotation без правки файла. Заменяет `verify_section`. **Не реализован**; остаётся открытой нишей после сворачивания `verify_section`.
 
-**Правило: новый тул даёт то, чего в старых НЕТ.** Не «то же самое, но иначе». `replace_unit` параллельно с `replace_symbol` для одного формата — не делаем. `set_annotation` — да, потому что кросс-форматный annotation в старых отсутствует.
+**Правило: новый тул даёт то, чего в старых НЕТ.** Не «то же самое, но иначе». `replace_unit` параллельно с `replace_symbol` для одного формата — не делаем. `part="annotation"` — да, потому что кросс-форматный annotation в старых отсутствует.
 
 **Не делать сейчас.** `move_unit` / `move_block` — покрываются комбинацией `replace_unit(block=N, new_text="")` + `insert_block`. Если комбинация окажется частой и неудобной — добавить отдельный тул по факту, не заранее.
 
@@ -332,7 +332,7 @@ RimWorld/Mods/1201382956/v1.6/**
 - `list_files`, `survey_dir`, `grep` — да.
 - `grep_replace`, `grep_replace_mcp` — да. Самый опасный mass-replace — забыть `directory=` и заменить по всему проекту; scope как страховка.
 - `read_file`, `read_unit`, `file_stat` — **нет**. Точечное чтение всегда явное: LLM назвала путь — хочет этот путь.
-- `replace_in_file`, `replace_unit`, `insert_block`, `set_annotation`, `delete_file`, `move_file` — **нет**. По той же логике явного адреса.
+- `replace_in_file`, `replace_unit`, `insert_block`, `delete_file`, `move_file` — **нет**. По той же логике явного адреса.
 - `get_index`, `get_status` — **нет**. Индекс уже собран по scope (см. выше), повторно фильтровать нечего. `get_status` показывает `## Scope` как контекст.
 
 `respect_scope=False` доступен во всех scope-aware тулах — если LLM осознанно хочет обойти scope, она может.
@@ -472,7 +472,7 @@ toolkit/code/toolkit/backends/  (3 files, 1691 строк)
 
 **Unused tools — inventory from the session.** Из 32 тулов в `TOOL_MAP` не использовались:
 
-- **`copy_unit`, `find_symbol`, `find_usages`, `symbol_graph`, `set_annotation`, `grep_lua`, `grep_replace_mcp`, `file_stat`** — не было задачи: рефакторинг шёл по горизонтали (вынос кода), не по графу (навигация, анализ, массовые замены). **Не удалять** — это резерв под другие задачи. См. TOOL_PRACTICE §3 «Ни разу не использовались» и §7 — список растёт, но по фактам это не мёртвый груз.
+- **`copy_unit`, `find_symbol`, `find_usages`, `symbol_graph`, `grep_lua`, `grep_replace_mcp`, `file_stat`** — не было задачи: рефакторинг шёл по горизонтали (вынос кода), не по графу (навигация, анализ, массовые замены). **Не удалять** — это резерв под другие задачи. См. TOOL_PRACTICE §3 «Ни разу не использовались» и §7 — список растёт, но по фактам это не мёртвый груз.
 - **Native Roblox tools** (`execute_luau`, `script_read`, `multi_edit`, `inspect_instance`, `search_game_tree`, генеративные) — не звал: всё делалось через унифицированные тулы, а `rebuild_lua_code_index` сам зовёт `execute_luau` под капотом. Единственный кандидат, где бы пригодился `inspect_instance` — диагностика дубля `ServerScriptService.Server.Main.server` в lua-индексе. Не стал тратить время.
 
 ### 2.4 Гигиена и хвосты

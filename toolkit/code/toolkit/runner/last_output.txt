@@ -1,21 +1,60 @@
-[smart-restart] ✓ insert_at_anchor: перед L429 в PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md — +8 стр., +2783 Б
+[cleanup-tmp] ✗ delete_file: Файл не найден: PatchAppliers/PatchApplier/tmpvwr7j59t.py
 
-[commit] ✓ run_python: exit=0  duration=147ms
+[git-commit-selective] ✓ run_python: exit=0  duration=493ms
 --- stdout ---
-[add rc=0]
-[commit rc=0]
-[master 2fd0c8a] DECISIONS: note smart session restart on settings save (open item)
- 5 files changed, 58 insertions(+), 24 deletions(-)
-[timing] user (2 actions): 0.15s
+toplevel: D:/Programs/UnityAiDevSystem/PatchAppliers/PatchApplier
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 52, без summary: 224) [v612] [~2, ⇅1]
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2. Открыто (L161–L513, 57.8 KB) — Три группы — унификация тулов, граф и анализ, инфраструктура; плюс гигиена сессии и её хвосты. — [decisions, open]
-  ~ PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md §2.3 Инфраструктура (L400–L477, 16.2 KB, ⚠ stale, ⚠ large) — sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning.
+=== git status (my files) ===
+ M toolkit/code/toolkit/backends/composite.py
+ M toolkit/code/toolkit/backends/filesystem.py
+ M toolkit/code/toolkit/backends/workspace.py
+ M toolkit/code/toolkit/tests/test_strictness.py
+ M toolkit/code/toolkit/tests/test_unit_model.py
+ M toolkit/code/toolkit/tools/__init__.py
+ M toolkit/code/toolkit/tools/read.py
+ M toolkit/code/toolkit/tools/shell.py
+ M toolkit/code/toolkit/tools/unit/tool.py
+ M toolkit/code/toolkit/tools/unit/writer.py
+ M toolkit/docs/LLM_START.ru.md
+?? toolkit/code/toolkit/tests/test_grep_paths.py
+?? toolkit/code/toolkit/tests/test_run_python_symmetry.py
+?? toolkit/code/toolkit/tests/test_tree_tool.py
+?? toolkit/code/toolkit/tools/tree.py
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 181, символов: 1228) [v689] [без изменений]
+=== staged ===
+ toolkit/code/toolkit/backends/composite.py         |  20 ++
+ toolkit/code/toolkit/backends/filesystem.py        |   7 +
+ toolkit/code/toolkit/backends/workspace.py         |  17 ++
+ toolkit/code/toolkit/tests/test_grep_paths.py      | 124 +++++++++++
+ .../code/toolkit/tests/test_run_python_symmetry.py | 174 +++++++++++++++
+ toolkit/code/toolkit/tests/test_strictness.py      |  19 +-
+ toolkit/code/toolkit/tests/test_tree_tool.py       | 140 ++++++++++++
+ toolkit/code/toolkit/tests/test_unit_model.py      |  73 ++++--
+ toolkit/code/toolkit/tools/__init__.py             |  19 +-
+ toolkit/code/toolkit/tools/read.py                 |  17 ++
+ toolkit/code/toolkit/tools/shell.py                | 105 ++++++---
+ toolkit/code/toolkit/tools/tree.py                 | 246 +++++++++++++++++++++
+ toolkit/code/toolkit/tools/unit/tool.py            |  47 +++-
+ toolkit/code/toolkit/tools/unit/writer.py          | 114 +++++++++-
+ toolkit/docs/LLM_START.ru.md                       |  67 +++---
+ 15 files changed, 1083 insertions(+), 106 deletions(-)
 
-[auto-lua] ✓ rebuild_lua_code_index: .patch_applier/CODE_INDEX_LUA.md + .patch_applier/CODE_INDEX_LUA.manifest.json (модулей: 267, символов: 861) [v441] [без изменений]
-[timing] auto-rebuild (3 actions): 2.27s
+=== commit ===
+rc: 0
+[master 70b627c] refactor(toolkit): split replace/create/remove, fix run_python, add tree
+ 15 files changed, 1083 insertions(+), 106 deletions(-)
+ create mode 100644 toolkit/code/toolkit/tests/test_grep_paths.py
+ create mode 100644 toolkit/code/toolkit/tests/test_run_python_symmetry.py
+ create mode 100644 toolkit/code/toolkit/tests/test_tree_tool.py
+ create mode 100644 toolkit/code/toolkit/tools/tree.py
 
-##RESULT:{"ok": 5, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
-[timing] total: 2.42s
+HEAD: 70b627c refactor(toolkit): split replace/create/remove, fix run_python, add tree
+[timing] user (2 actions): 0.50s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 27, без summary: 401) [v667] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 185, символов: 1264) [v725] [без изменений]
+[timing] auto-rebuild (2 actions): 0.85s
+
+##RESULT:{"ok": 3, "errors": 1, "skipped": 0, "failed": [1], "blocked": []}
+[timing] total: 1.35s

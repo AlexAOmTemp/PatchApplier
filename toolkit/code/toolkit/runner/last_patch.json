@@ -1,13 +1,51 @@
-[{"id": "sum-fix", "action": "replace_in_file",
-  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/docs/DECISIONS.md",
-    "search": "<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->",
-    "replace": "<!-- summary: sync CompositeBackend._state, пороги маркеров в конфиг, get_index overview, Rojo backend, умный рестарт сессии после Save в настройках, ремастер GUI (Functional Core). Закрыто: Passthrough MCP-инструментов, error_code hidden_path, verify_syntax как тул, LLM_START module= warning. -->"}}]
+[
+[{"id": "commit-broad",
+  "action": "run_python",
+  "arguments": {
+    "code": "import subprocess, sys\nfrom pathlib import Path\n\ndef run(cmd, cwd=None):\n    try:\n        return subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=cwd)\n    except Exception as e:\n        print(f'{type(e).__name__}: {e}')\n        return None\n\nout = run(['git', 'rev-parse', '--show-toplevel'])\nif out is None or out.returncode != 0:\n    print('no git repo'); sys.exit(1)\ntl = Path(out.stdout.strip())\nprint('toplevel:', tl)\n\ngitignore = tl / '.gitignore'\nexisting = gitignore.read_text(encoding='utf-8') if gitignore.exists() else ''\nprint('')\nprint('=== .gitignore before ===')\nprint(existing or '(empty)')\n\nnew_lines = [\n    'toolkit/code/bridge/bridge_timings.log',\n    'toolkit/code/toolkit/runner/last_diff.txt',\n    'toolkit/code/toolkit/runner/last_output.txt',\n    'toolkit/code/toolkit/runner/last_patch.json',\n    '__pycache__/',\n    '*.pyc',\n    '*.pyo',\n]\nto_add = [ln for ln in new_lines if ln not in existing]\nif to_add:\n    if existing and not existing.endswith('\\n'):\n        existing += '\\n'\n    existing += '\\n# runtime artifacts (session-local)\\n' + '\\n'.join(to_add) + '\\n'\n    gitignore.write_text(existing, encoding='utf-8')\n    print('')\n    print('=== .gitignore added ===')\n    for ln in to_add:\n        print(' ', ln)\nelse:\n    print('')\n    print('=== .gitignore unchanged (all present) ===')\n\nout = run(['git', 'status', '--short'], cwd=tl)\nprint('')\nprint('=== git status ===')\nprint(out.stdout.rstrip('\\n') or '(clean)')\n\nmsg = 'checkpoint before backend rename\\n\\n- refactor(toolkit): split replace/create/remove, fix run_python, add tree\\n- backends: resolve_physical in FilesystemBackend/WorkspaceBackend/CompositeBackend\\n- unit model: replace_unit replace-only; create_unit for annotation; remove_unit for part=all and block=N\\n- tools: new tree tool (DFS pre-order, max_dirs cap, frontier_unexpanded)\\n- grep: directory in paths -> bad_options\\n- docs: LLM_START.ru sync (sources model pending rename)\\n- tests: test_run_python_symmetry, test_tree_tool, test_grep_paths + unit_model create/remove\\n- .gitignore: ignore runtime artifacts\\n'\nout = run(['git', 'add', '-A'], cwd=tl)\nif out.returncode != 0:\n    print('git add failed:', out.stderr[:500]); sys.exit(1)\n\nout = run(['git', 'commit', '-m', msg], cwd=tl)\nprint('')\nprint('=== commit ===')\nprint('rc:', out.returncode)\nprint(out.stdout.rstrip('\\n'))\nif out.stderr.strip():\n    print('stderr:', out.stderr.strip()[:300])\n\nout = run(['git', 'log', '--oneline', '-1'], cwd=tl)\nprint('HEAD:', out.stdout.strip())\n"
+  }}],
 
-[{"id": "ss-session", "action": "replace_in_file",
-  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/docs/SESSION_STATE.md",
-    "search": "### Проверить в начале следующей сессии\n\n1. `get_status` — backend, версии индексов (`[vN]`), корни.\n2. `run_all.py` — exit=0.\n3. Открыть Project settings — визуально проверить: кнопки `FS ignore` / `MCP ignore`, редакторы с описанием и disable/enable, центрирование окон, крестик с подтверждением.\n4. `verify_syntax(paths=[...])` — на одном файле после правок.",
-    "replace": "### Пост-коммитные фиксы (продолжение, коммиты `417de98` … `2fd0c8a`)\n\nПосле закрытия записи нашли и починили ещё четыре бага в GUI настроек:\n\n- **Бесконечный цикл `luau_var.set`.** При регистрации трейсов до начального `_sync_all()` `luau_var.set(\"mcp\")` в `_sync_luau_state` вызывал write trace → `_defer(_sync_all)` → `_sync_all` → `luau_var.set`… Цикл запускался, только когда включён ровно один из MCP/Rojo. Чиним порядком: сначала `_sync_all()`, потом `trace_add`. Тот же паттерн описан в SO: «register traces after initial setup».\n- **`project_ok` — мёртвый код.** Первый `return bool(proj) and Path(proj).is_dir()` делал всю логику с `config.json` недостижимой. Убран; теперь «настроен» = есть `config.json` **и** хотя бы один источник включён.\n- **`_menu_new_project` утекал CONFIG от прошлого проекта.** Сбрасывали только `index_docs/py/lua`, а `index_rojo` / `luau_mode` / `exec` оставались. Теперь `CONFIG.clear()` + `DEFAULTS`, потом обнуляются все источники.\n- **Per-project `exec.enabled` и `index_rojo`.** `exec` был в `TOOL_FIELDS` — общий на все проекты. Убран; `exec.enabled` теперь per-project. Плюс новое поле `index_rojo` (не восстанавливается из агрегата `index_lua`).\n- **Roots panel симметрична.** При выключении FS-источников теперь `disabled`, не `pack_forget`. Симметрично «открыли с выключенными — панель видна, контролы недоступны».\n\nУмный рестарт сессии после Save в настройках — **открыто**, `DECISIONS §2.3`. Сейчас `_switch_project` пересоздаёт Session целиком на любое сохранение, включая переименование.\n\n### Проверить в начале следующей сессии\n\n1. `get_status` — backend, версии индексов (`[vN]`), корни.\n2. `run_all.py` — exit=0.\n3. Сценарий нового проекта: File → New project → настройки **все источники выключены** (включая `Lua files on disk`), статус «⚠ проект не настроен». Выбрать источники → OK → сессия поднимается, индекс собирается.\n4. Открыть Project settings на существующем проекте — визуально проверить: `FS ignore` / `MCP ignore`, редакторы с описанием и disable/enable, центрирование окон, крестик с подтверждением, Roots panel не исчезает при выключении FS-источников.\n5. `verify_syntax(paths=[...])` — на одном файле после правок."}}]
+[{"id": "recon-status",
+  "action": "read_unit",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/tools/status.py",
+                "address": {"qualname": "GetStatusTool"}, "part": "all"}}],
 
-[{"id": "commit", "action": "run_python",
-  "arguments": {"script": "toolkit/code/manual/_git.py",
-                "args": ["commit", "docs: session state — post-commit gui fixes, smart restart open item"]}}]
+[{"id": "recon-status-exec",
+  "action": "read_unit",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/tools/status.py",
+                "address": {"qualname": "GetStatusTool.execute"}, "part": "body"}}],
+
+[{"id": "recon-config-loader",
+  "action": "grep",
+  "arguments": {"pattern": "sources|docs_enabled|python_enabled|mcp_enabled|lua_enabled|luau_source|index_docs|index_python|index_lua",
+                "directory": "PatchAppliers/PatchApplier/toolkit/code/toolkit/config",
+                "regex": true, "max_results": 50}}],
+
+[{"id": "recon-gui-sources",
+  "action": "grep",
+  "arguments": {"pattern": "Documentation|Allow Python|Roblox bridge|Lua files on disk|Luau source",
+                "directory": "PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui",
+                "regex": true, "max_results": 30}}],
+
+[{"id": "recon-backends-init",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py"}}],
+
+[{"id": "recon-filesystem-py-head",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py", "start_line": 1, "end_line": 20}}],
+
+[{"id": "recon-workspace-py-head",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py", "start_line": 1, "end_line": 30}}],
+
+[{"id": "recon-composite-py-head",
+  "action": "read_file",
+  "arguments": {"file_path": "PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py", "start_line": 1, "end_line": 35}}],
+
+[{"id": "recon-backends-importers",
+  "action": "grep",
+  "arguments": {"pattern": "FilesystemBackend|WorkspaceBackend|CompositeBackend",
+                "directory": "PatchAppliers/PatchApplier/toolkit/code/toolkit",
+                "regex": true, "max_results": 100, "file_glob": "*.py", "fixed_strings": false, "word_boundary": true}}]
+]

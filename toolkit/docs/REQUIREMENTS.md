@@ -74,8 +74,8 @@ summary was last verified. The check runs on rebuild, using content
 hashes in a sidecar (`.index_meta.json`), so it does not depend on any
 write tool remembering to update state.
 
-- `set_annotation` clears it by changing the summary text (new
-  `summary_hash`).
+- `replace_unit(part="annotation")` clears it by changing the summary
+  text (new `summary_hash`).
 - Clearing it without touching the file (the old `verify_section`) is
   **not implemented** in the current unit model — an open task.
 

@@ -108,7 +108,7 @@
 **Роли:**
 
 - **read** — чтение (`read_file`, `read_unit`, `grep`, ...).
-- **write** — изменение (`replace_*`, `insert_block`, `set_annotation`, `create_file`, ...).
+- **write** — изменение (`replace_*`, `insert_block`, `create_file`, ...).
 - **index** — включение в `INDEX.md` / `CODE_INDEX.md` / `CODE_INDEX_LUA.md`.
 
 **Overrides** — dict `{path: bool}`:

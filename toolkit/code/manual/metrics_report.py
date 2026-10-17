@@ -27,7 +27,6 @@ from toolkit.config.loader import toolkit_runtime_state_dir  # noqa: E402
 UNIT_MODEL = {
     "list_units", "read_unit",
     "replace_unit", "replace_block", "delete_block", "insert_block",
-    "set_annotation",
 }
 
 TEXT_ESCAPE = {

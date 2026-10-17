@@ -28,7 +28,7 @@ LLM_START описывает тулы **принципиально** (что у�
 | `list_units` | 4 | карта секций md / символов py |
 | `read_unit` | 3 | чтение секции md |
 | `get_status` | 5 | проверка сессии |
-| `set_annotation` | 2 | обновление summary секции |
+| `replace_unit(part=annotation)` | 2 | обновление summary секции |
 | `symbol_graph` | 2 | проверка графа Lua vs Python |
 | `find_usages` | 1 | один reverse-граф для Lua |
 
@@ -42,7 +42,7 @@ LLM_START описывает тулы **принципиально** (что у�
 | `copy_unit` | Не копировал unit'ы между файлами |
 | `move_file` / `copy_file` | Не перемещал/копировал файлы (git делает это) |
 | `file_stat` | Размеры файлов видел через `read_file`/`list_files` |
-| `replace_section` / `set_summary` / `verify_section` | **Устаревшие** — заменены `replace_unit`/`set_annotation` |
+| `replace_section` / `set_summary` / `verify_section` | **Устаревшие** — заменены `replace_unit` (включая `part="annotation"`) |
 | `list_symbols` / `read_symbol` / `replace_symbol*` / `delete_symbol` / `insert_symbol` / `move_symbol` / `replace_statement` | **Устаревшие** — заменены unit-моделью |
 | `find_symbol` | Не искал символ по имени — знал qualname из read_file |
 | `grep_mcp` / `grep_replace_mcp` / `list_symbols_lua` / `read_symbol_lua` / `replace_function_lua` | Roblox-сторона не правила в этой сессии |
