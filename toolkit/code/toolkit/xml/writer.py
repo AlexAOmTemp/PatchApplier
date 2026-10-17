@@ -274,6 +274,24 @@ def _wrap_new_text(_el_str: str, new_text: str) -> str:
     return escape_text(new_text)
 
 
+def apply_renames(text: str, renames: dict[str, str]) -> str:
+    """Plain text.replace() for each key, longest first.
+
+    Order matters: replacing `TM_WoodGolem` before `TM_WoodGolemLS` would
+    turn `TM_WoodGolemLS` into `TM_BoneGolemLS` (correct), but if the user
+    meant `TM_WoodGolemLS` -> something different, the short key would
+    eat the prefix first. Longest-first avoids that cascade.
+
+    Not regex, not word-boundary: the caller is expected to pass exact
+    identifiers as they appear in the source. This is deliberate — an
+    over-eager `\\bWood\\b` would rename unrelated text in `<description>`.
+    """
+    items = sorted(renames.items(), key=lambda kv: -len(kv[0]))
+    for src, dst in items:
+        text = text.replace(src, dst)
+    return text
+
+
 def set_annotation(doc: XmlDocument, el: XmlElement, text: str) -> bytes:
     """Insert or replace `<summary>` comment as the first child of `el`.
 

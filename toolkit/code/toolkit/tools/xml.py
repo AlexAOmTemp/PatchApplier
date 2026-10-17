@@ -21,8 +21,8 @@ from ..xml.resolver import ResolveError, resolve_one
 from ..xml.discriminator import chain_for, match_value
 from ..xml.reader import is_mixed_content
 from ..xml.writer import (
-    WriteError, append_child, delete_element, remove_attr, replace_element,
-    replace_text, set_annotation, set_attr,
+    WriteError, append_child, apply_renames, delete_element, remove_attr,
+    replace_element, replace_text, set_annotation, set_attr,
 )
 
 
@@ -140,6 +140,292 @@ def _matches_where(el, where: dict) -> bool:
 # under their depth-2 ancestor to keep the output compact even on big
 # trees. Depth-0 is the start itself, depth-1 immediate children, etc.
 _MAP_MAX_SAMPLE = 5
+
+
+class XmlCopyTool:
+    """Copy one element from one file/address to another.
+
+    v1 supports two target positions:
+      - `end`: append fragment as last child of `target_parent` (via
+        append_child, so indentation and mixed-content checks apply).
+      - `replace`: replace the element at `target_address` (via
+        replace_element, so the fragment is reindented to the target's
+        line).
+
+    `renames` — plain str.replace on the whole fragment text, longest key
+    first. The caller passes exact identifiers (`TM_WoodGolem` →
+    `TM_BoneGolem`); no regex, no word-boundary — see writer.apply_renames.
+
+    `before` / `after` sibling insertion — not in v1. `xml_move` between
+    files uses the same pipeline + deletes the source after success.
+    """
+
+    name = "xml_copy"
+    op = "write"
+    path_args: list[str] = ["source_file", "target_file"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        source_file: str = "",
+        source_address: str = "",
+        source_occurrence: int | None = None,
+        target_file: str = "",
+        position: str = "end",
+        target_parent: str = "",
+        target_address: str = "",
+        target_occurrence: int | None = None,
+        renames: dict | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        return self._do(
+            backend=backend, action="xml_copy",
+            source_file=source_file, source_address=source_address,
+            source_occurrence=source_occurrence,
+            target_file=target_file, position=position,
+            target_parent=target_parent, target_address=target_address,
+            target_occurrence=target_occurrence,
+            renames=renames, move=False,
+        )
+
+    @staticmethod
+    def _do(
+        backend: Backend, action: str,
+        source_file: str, source_address: str,
+        source_occurrence: int | None,
+        target_file: str, position: str,
+        target_parent: str, target_address: str,
+        target_occurrence: int | None,
+        renames: dict | None, move: bool,
+    ) -> Result:
+        if not source_file:
+            return Result(status="error", action=action,
+                          error_code="bad_input", message="source_file required")
+        if not source_address:
+            return Result(status="error", action=action,
+                          error_code="bad_input", message="source_address required")
+        if not target_file:
+            return Result(status="error", action=action,
+                          error_code="bad_input", message="target_file required")
+        if position not in ("end", "replace"):
+            return Result(
+                status="error", action=action,
+                error_code="bad_position",
+                message=(
+                    f"position must be 'end' or 'replace' in v1, got {position!r}; "
+                    f"before/after sibling insertion is a future step"
+                ),
+            )
+        if position == "end" and not target_parent:
+            return Result(status="error", action=action,
+                          error_code="bad_input", message="target_parent required for position=end")
+        if position == "replace" and not target_address:
+            return Result(status="error", action=action,
+                          error_code="bad_input", message="target_address required for position=replace")
+        if renames is not None:
+            if not isinstance(renames, dict):
+                return Result(status="error", action=action,
+                              error_code="bad_input", message="renames must be a dict")
+            for k, v in renames.items():
+                if not isinstance(k, str) or not k:
+                    return Result(status="error", action=action,
+                                  error_code="bad_input", message=f"rename key must be non-empty str, got {k!r}")
+                if not isinstance(v, str):
+                    return Result(status="error", action=action,
+                                  error_code="bad_input", message=f"rename value must be str, got {type(v).__name__}")
+        if move and source_file == target_file:
+            return Result(
+                status="error", action=action,
+                error_code="same_file_move_unsupported",
+                message=(
+                    "xml_move within one file is not supported (byte offsets shift "
+                    "after deletion). Use xml_copy + xml_delete as two actions."
+                ),
+            )
+
+        # --- resolve source ----------------------------------------------
+        try:
+            segs = parse_address(source_address)
+        except AddressError as e:
+            return Result(status="error", action=action,
+                          error_code="bad_address", message=f"source_address: {e}")
+
+        try:
+            src_data = _read_bytes(backend, source_file)
+        except FileNotFoundError:
+            return Result(status="error", action=action,
+                          error_code="not_found", message=f"source file not found: {source_file}")
+        try:
+            src_doc = parse(src_data)
+        except XmlError as e:
+            return Result(status="error", action=action,
+                          error_code=e.code, message=f"source: {e.message}")
+
+        try:
+            resolved = resolve_one(src_doc, segs, _xml_cfg(backend),
+                                   occurrence=source_occurrence)
+        except ResolveError as e:
+            return Result(status="error", action=action,
+                          error_code=e.code, message=f"source: {e.message}")
+
+        src_el = resolved.element
+        fragment_bytes = src_doc.source_bytes[src_el.start:src_el.end]
+        try:
+            fragment = fragment_bytes.decode(src_doc.encoding)
+        except UnicodeDecodeError as e:
+            return Result(status="error", action=action,
+                          error_code="encoding_error",
+                          message=f"source fragment not decodable: {e}")
+
+        if renames:
+            fragment = apply_renames(fragment, renames)
+            try:
+                parse(fragment.encode("utf-8"))
+            except XmlError as e:
+                return Result(
+                    status="error", action=action,
+                    error_code="bad_fragment",
+                    message=f"fragment not parseable after renames: {e.message}",
+                )
+
+        # --- apply to target --------------------------------------------
+        try:
+            tgt_data = _read_bytes(backend, target_file)
+        except FileNotFoundError:
+            return Result(status="error", action=action,
+                          error_code="not_found", message=f"target file not found: {target_file}")
+        try:
+            tgt_doc = parse(tgt_data)
+        except XmlError as e:
+            return Result(status="error", action=action,
+                          error_code=e.code, message=f"target: {e.message}")
+
+        if position == "end":
+            try:
+                tgt_segs = parse_address(target_parent)
+            except AddressError as e:
+                return Result(status="error", action=action,
+                              error_code="bad_address", message=f"target_parent: {e}")
+            try:
+                tgt_resolved = resolve_one(tgt_doc, tgt_segs, _xml_cfg(backend))
+            except ResolveError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code, message=f"target: {e.message}")
+            try:
+                new_bytes = append_child(tgt_doc, tgt_resolved.element, fragment)
+            except WriteError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code, message=e.message)
+        else:  # position == "replace"
+            try:
+                tgt_segs = parse_address(target_address)
+            except AddressError as e:
+                return Result(status="error", action=action,
+                              error_code="bad_address", message=f"target_address: {e}")
+            try:
+                tgt_resolved = resolve_one(tgt_doc, tgt_segs, _xml_cfg(backend),
+                                           occurrence=target_occurrence)
+            except ResolveError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code, message=f"target: {e.message}")
+            try:
+                new_bytes = replace_element(tgt_doc, tgt_resolved.element, fragment)
+            except WriteError as e:
+                return Result(status="error", action=action,
+                              error_code=e.code, message=e.message)
+
+        try:
+            parse(new_bytes)
+        except XmlError as e:
+            return Result(status="error", action=action,
+                          error_code="result_syntax_error",
+                          message=f"target would not be well-formed: {e.message}")
+
+        err = XmlModifyTool._write_bytes(backend, target_file, new_bytes)
+        if err is not None:
+            return Result(status="error", action=action,
+                          error_code="write_failed", message=f"target: {err}")
+
+        delta = len(new_bytes) - len(tgt_data)
+        verb = "moved" if move else "copied"
+        msg = (
+            f"<{src_el.tag}> from {source_file} → {target_file} "
+            f"({verb}, {delta:+d} B)"
+        )
+
+        if not move:
+            return Result(status="ok", action=action, message=msg)
+
+        # --- move: delete source after successful target write ---------
+        # Re-read source from disk (it may have shifted? no, we haven't touched
+        # it). We parse again because src_doc was from before the target write.
+        # Actually we can just reuse src_doc because we did not modify the source
+        # file at all. Only delete_element(doc, el) matters.
+        try:
+            del_bytes = delete_element(src_doc, src_el)
+        except WriteError as e:
+            return Result(
+                status="ok", action=action,
+                message=msg + f"  ⚠ WARN source not deleted: {e.code} — {e.message}",
+            )
+        try:
+            parse(del_bytes)
+        except XmlError as e:
+            return Result(
+                status="ok", action=action,
+                message=msg + f"  ⚠ WARN source delete would break source file: {e.message}",
+            )
+        err = XmlModifyTool._write_bytes(backend, source_file, del_bytes)
+        if err is not None:
+            return Result(
+                status="ok", action=action,
+                message=msg + f"  ⚠ WARN source not deleted: {err}",
+            )
+
+        return Result(status="ok", action=action, message=msg + "  (source deleted)")
+
+
+class XmlMoveTool(XmlCopyTool):
+    """Move one element from source_file to target_file.
+
+    Same pipeline as xml_copy, then deletes the source element after the
+    target write succeeds. Same-file move is refused (byte offsets shift).
+    Cross-file partial failure: target is written first, source deletion is
+    best-effort — if it fails, the result reports ok with a WARN (duplicate
+    is safer than loss).
+    """
+
+    name = "xml_move"
+    op = "write"
+    path_args: list[str] = ["source_file", "target_file"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        source_file: str = "",
+        source_address: str = "",
+        source_occurrence: int | None = None,
+        target_file: str = "",
+        position: str = "end",
+        target_parent: str = "",
+        target_address: str = "",
+        target_occurrence: int | None = None,
+        renames: dict | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        return self._do(
+            backend=backend, action="xml_move",
+            source_file=source_file, source_address=source_address,
+            source_occurrence=source_occurrence,
+            target_file=target_file, position=position,
+            target_parent=target_parent, target_address=target_address,
+            target_occurrence=target_occurrence,
+            renames=renames, move=True,
+        )
 
 
 class XmlDeleteTool:
