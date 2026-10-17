@@ -41,6 +41,7 @@ SCRIPTS = [
     ("xml reader", HERE / "test_xml_reader.py"),
     ("xml resolver", HERE / "test_xml_resolver.py"),
     ("xml tool", HERE / "test_xml_tool.py"),
+    ("xml find", HERE / "test_xml_find.py"),
 ]
 
 
