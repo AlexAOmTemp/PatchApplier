@@ -396,12 +396,17 @@ class RunPythonTool:
         duration_ms = int((time.monotonic() - t0) * 1000)
         exit_code = proc.returncode if proc.returncode is not None else -1
 
-        # Cleanup inline-code tempfile.
+        # Cleanup inline-code tempfile. On Windows the file may still be
+        # held briefly by AV/indexer after the child exits; retry a few
+        # times with small sleeps to avoid leaking the file into the project.
         if temp_code is not None:
-            try:
-                temp_code.unlink()
-            except OSError:
-                pass
+            import time as _t
+            for _ in range(5):
+                try:
+                    temp_code.unlink()
+                    break
+                except OSError:
+                    _t.sleep(0.05)
 
         # -- 10. truncate ---------------------------------------------------
         out_b, out_tr = _clip(out_b or b"", cap)

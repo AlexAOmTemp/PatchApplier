@@ -1,60 +1,610 @@
-[cleanup-tmp] ✗ delete_file: Файл не найден: PatchAppliers/PatchApplier/tmpvwr7j59t.py
-
-[git-commit-selective] ✓ run_python: exit=0  duration=493ms
+[commit-broad] ✓ run_python: exit=0  duration=239ms
 --- stdout ---
-toplevel: D:/Programs/UnityAiDevSystem/PatchAppliers/PatchApplier
+toplevel: D:\Programs\UnityAiDevSystem\PatchAppliers\PatchApplier
 
-=== git status (my files) ===
- M toolkit/code/toolkit/backends/composite.py
- M toolkit/code/toolkit/backends/filesystem.py
- M toolkit/code/toolkit/backends/workspace.py
- M toolkit/code/toolkit/tests/test_strictness.py
- M toolkit/code/toolkit/tests/test_unit_model.py
- M toolkit/code/toolkit/tools/__init__.py
- M toolkit/code/toolkit/tools/read.py
- M toolkit/code/toolkit/tools/shell.py
- M toolkit/code/toolkit/tools/unit/tool.py
- M toolkit/code/toolkit/tools/unit/writer.py
- M toolkit/docs/LLM_START.ru.md
-?? toolkit/code/toolkit/tests/test_grep_paths.py
-?? toolkit/code/toolkit/tests/test_run_python_symmetry.py
-?? toolkit/code/toolkit/tests/test_tree_tool.py
-?? toolkit/code/toolkit/tools/tree.py
+=== .gitignore before ===
+# .patchignore — like .gitignore, but for the toolkit.
+#
+# Each line is a glob (*, ?, [seq]) matched against every directory
+# segment of a path. A path is hidden if any of its segments matches
+# a pattern. Prefix with ! to un-hide; the last matching pattern wins.
+#
+# Hidden paths are refused by the toolkit (read / write / index), and
+# not shown in the policy tree unless "show hidden" is on.
+#
+# To fully open a project, delete every non-comment line, or use
+# "Reset to default" / "Open all" in the toolkit settings dialog.
 
-=== staged ===
- toolkit/code/toolkit/backends/composite.py         |  20 ++
- toolkit/code/toolkit/backends/filesystem.py        |   7 +
- toolkit/code/toolkit/backends/workspace.py         |  17 ++
- toolkit/code/toolkit/tests/test_grep_paths.py      | 124 +++++++++++
- .../code/toolkit/tests/test_run_python_symmetry.py | 174 +++++++++++++++
- toolkit/code/toolkit/tests/test_strictness.py      |  19 +-
- toolkit/code/toolkit/tests/test_tree_tool.py       | 140 ++++++++++++
- toolkit/code/toolkit/tests/test_unit_model.py      |  73 ++++--
- toolkit/code/toolkit/tools/__init__.py             |  19 +-
- toolkit/code/toolkit/tools/read.py                 |  17 ++
- toolkit/code/toolkit/tools/shell.py                | 105 ++++++---
- toolkit/code/toolkit/tools/tree.py                 | 246 +++++++++++++++++++++
- toolkit/code/toolkit/tools/unit/tool.py            |  47 +++-
- toolkit/code/toolkit/tools/unit/writer.py          | 114 +++++++++-
- toolkit/docs/LLM_START.ru.md                       |  67 +++---
- 15 files changed, 1083 insertions(+), 106 deletions(-)
+# Dot-directories: .git, .venv, .pytest_cache, ...
+.*
+# ...and this file itself, so it stays readable in the tree.
+!.patchignore
+
+# Non-dot build noise.
+__pycache__
+node_modules
+venv
+_reference
+
+
+=== .gitignore added ===
+  toolkit/code/bridge/bridge_timings.log
+  toolkit/code/toolkit/runner/last_diff.txt
+  toolkit/code/toolkit/runner/last_output.txt
+  toolkit/code/toolkit/runner/last_patch.json
+  __pycache__/
+  *.pyc
+  *.pyo
+
+=== git status ===
+ M toolkit/code/bridge/bridge_timings.log
+ M toolkit/code/manual/metrics_report.py
+ M toolkit/code/toolkit/runner/last_diff.txt
+ M toolkit/code/toolkit/runner/last_output.txt
+ M toolkit/code/toolkit/runner/last_patch.json
+ M toolkit/code/toolkit/tools/unit/__init__.py
+ M toolkit/docs/CONFIG.md
+ M toolkit/docs/DECISIONS.md
+ M toolkit/docs/LLM_START.en.md
+ M toolkit/docs/MCPBridgeRules.md
+ M toolkit/docs/REQUIREMENTS.md
+ M toolkit/docs/TOOL_PRACTICE.md
+?? AUDIT.md
+?? tmpaitw17cr.py
+?? toolkit/code/manual/index_modes_demo.py
+?? toolkit/docs/FILE_GRAPH_MODEL.md
+?? toolkit/docs/INDEX_MODES.md
+?? toolkit/docs/LLMSCOPE.md
 
 === commit ===
 rc: 0
-[master 70b627c] refactor(toolkit): split replace/create/remove, fix run_python, add tree
- 15 files changed, 1083 insertions(+), 106 deletions(-)
- create mode 100644 toolkit/code/toolkit/tests/test_grep_paths.py
- create mode 100644 toolkit/code/toolkit/tests/test_run_python_symmetry.py
- create mode 100644 toolkit/code/toolkit/tests/test_tree_tool.py
- create mode 100644 toolkit/code/toolkit/tools/tree.py
+[master 4d8001e] checkpoint before backend rename
+ 18 files changed, 3450 insertions(+), 66 deletions(-)
+ create mode 100644 AUDIT.md
+ create mode 100644 tmpaitw17cr.py
+ create mode 100644 toolkit/code/manual/index_modes_demo.py
+ create mode 100644 toolkit/docs/FILE_GRAPH_MODEL.md
+ create mode 100644 toolkit/docs/INDEX_MODES.md
+ create mode 100644 toolkit/docs/LLMSCOPE.md
+HEAD: 4d8001e checkpoint before backend rename
 
-HEAD: 70b627c refactor(toolkit): split replace/create/remove, fix run_python, add tree
-[timing] user (2 actions): 0.50s
+[recon-status] ✓ read_unit: class GetStatusTool:
+    name = "get_status"
+    op = "read"
+    path_args: list[str] = []
+    path_list_args: list[str] = []
 
-[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 27, без summary: 401) [v667] [без изменений]
+    DEFAULT_SECTIONS = ("session", "indexes", "policy")
 
-[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 185, символов: 1264) [v725] [без изменений]
+    _context: dict = {}
+
+    @classmethod
+    def set_context(
+        cls,
+        *,
+        project_name: str = "",
+        backend: str = "",
+        luau_mode: str = "mcp",
+        format_preset: str = "",
+        exec_enabled: bool = False,
+        exec_interpreter: str | None = None,
+        native_tools_enabled: bool = False,
+        native_tools_allow: list | None = None,
+        index_paths: dict | None = None,
+        backends_enabled: set | None = None,
+        roots: list | None = None,
+    ) -> None:
+        cls._context = {
+            "project_name": project_name or "",
+            "roots": list(roots or []),
+            "backend": backend or "",
+            "luau_mode": luau_mode or "mcp",
+            "format_preset": format_preset or "default",
+            "exec_enabled": bool(exec_enabled),
+            "exec_interpreter": exec_interpreter or None,
+            "native_tools_enabled": bool(native_tools_enabled),
+            "native_tools_allow": list(native_tools_allow or []),
+            "index_paths": dict(index_paths or {
+                "docs": "INDEX.md",
+                "code": "CODE_INDEX.md",
+                "lua": "CODE_INDEX_LUA.md",
+            }),
+            "backends_enabled": set(backends_enabled or {"filesystem"}),
+        }
+
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        sections: str | list | None = None,
+        **_: Any,
+    ) -> Result:
+        if sections is None:
+            secs = list(self.DEFAULT_SECTIONS)
+        elif isinstance(sections, str):
+            secs = [sections]
+        elif isinstance(sections, list):
+            secs = sections
+        else:
+            return Result(
+                status="error",
+                message="`sections` must be a string or a list.",
+                error_code="bad_sections",
+                action="get_status",
+            )
+
+        unknown = [s for s in secs if s not in self.DEFAULT_SECTIONS]
+        if unknown:
+            return Result(
+                status="error",
+                message=(
+                    f"unknown section(s) {unknown}; valid: "
+                    f"{list(self.DEFAULT_SECTIONS)}"
+                ),
+                error_code="unknown_section",
+                action="get_status",
+            )
+
+        blocks: list[str] = []
+        if "session" in secs:
+            blocks.append(self._render_session())
+        if "indexes" in secs:
+            blocks.append(self._render_indexes(backend))
+        if "policy" in secs:
+            blocks.append(self._render_policy(backend))
+
+        return Result(
+            status="ok",
+            message="\n\n".join(b for b in blocks if b),
+            action="get_status",
+        )
+
+    # --- session ----------------------------------------------------------
+
+    def _render_session(self) -> str:
+            ctx = self._context
+            lines = ["## Session"]
+            lines.append(f"project:  {ctx.get('project_name') or '(unknown)'}")
+            _roots = ctx.get("roots") or []
+            if _roots:
+                lines.append(f"roots:    {', '.join(_roots)}")
+            lines.append(f"backend:  {ctx.get('backend') or '(unknown)'}")
+            lines.append(f"luau:     {ctx.get('luau_mode') or 'mcp'}")
+            enabled = ctx.get("backends_enabled") or {"filesystem"}
+            lines.append(f"format:   {ctx.get('format_preset') or 'default'}")
+            if ctx.get("exec_enabled"):
+                interp = ctx.get("exec_interpreter") or "sys.executable"
+                lines.append(f"exec:     enabled  ({interp})")
+            else:
+                lines.append("exec:     disabled")
+            if "mcp" in enabled:
+                if ctx.get("native_tools_enabled"):
+                    allow = ctx.get("native_tools_allow") or []
+                    allow_s = ", ".join(allow) if allow else "(no allowlist -> all)"
+                    lines.append(f"native:   enabled  ({allow_s})")
+                else:
+                    lines.append("native:   disabled")
+            return "\n".join(lines)
+
+    # --- indexes ----------------------------------------------------------
+
+    def _render_indexes(self, backend: Backend) -> str:
+        ctx = self._context
+        paths = ctx.get("index_paths") or {}
+        enabled = ctx.get("backends_enabled") or {"filesystem"}
+
+        # docs and code live on the filesystem; the lua index requires the
+        # MCP (Roblox) backend to rebuild. Hide kinds whose backend is off.
+        kind_to_owner = {"docs": "filesystem", "code": "filesystem", "lua": "mcp"}
+
+        entries: list[tuple[str, str]] = []
+        for kind in ("docs", "code", "lua"):
+            if kind_to_owner[kind] not in enabled:
+                continue
+            path = paths.get(kind)
+            if not path:
+                continue
+            entries.append((kind, path))
+
+        if not entries:
+            return "## Indexes\n(no indexes for enabled backends)"
+
+        from ..indexers.state import read_seq
+
+        rows: list[str] = []
+        for kind, path in entries:
+            try:
+                exists = backend.exists(path)
+            except Exception as e:
+                rows.append(f"{kind}  {path}  (exists error: {e})")
+                continue
+            if not exists:
+                rows.append(f"{kind}  {path}  (not built)")
+                continue
+            try:
+                text = backend.read(path)
+            except Exception as e:
+                rows.append(f"{kind}  {path}  (read error: {e})")
+                continue
+            try:
+                seq = read_seq(backend, path + ".version")
+            except Exception:
+                seq = 0
+            size_kb = len(text.encode("utf-8")) / 1024
+            items = self._count_items(kind, text)
+            rows.append(f"{kind}  {path}  [v{seq}]  {size_kb:.1f} KB  {items}")
+
+        return "## Indexes\n" + "\n".join(rows)
+
+    def _count_items(self, kind: str, text: str) -> str:
+        n = sum(1 for line in text.splitlines() if line.startswith("## "))
+        if kind == "docs":
+            return f"{n} files"
+        if kind in ("code", "lua"):
+            return f"{n} modules"
+        return f"{n} items"
+
+    # --- policy -----------------------------------------------------------
+
+    def _render_policy(self, backend: Backend) -> str:
+        ctx = self._context
+        enabled = ctx.get("backends_enabled") or {"filesystem"}
+
+        blocks: list[str] = []
+
+        if "filesystem" in enabled:
+            ws = getattr(backend, "ws", None)
+            if ws is None:
+                blocks.append("## Policy Filesystem")
+                blocks.append("(no workspace on this backend)")
+            else:
+                blocks.append("## Policy Filesystem")
+                blocks.extend(self._render_policy_rows(ws))
+                blocks.append("")
+                blocks.append("+ auto-closed: dotdirs, __pycache__, node_modules, .venv  (not shown)")
+                blocks.append("  to open a hidden path: set + on the dir itself or its named ancestor")
+
+        if "mcp" in enabled:
+            luau = ctx.get("luau_mode") or "mcp"
+            scope = "Roblox scene + Luau code" if luau == "mcp" else "Roblox scene"
+            blocks.append("## MCP")
+            blocks.append(f"scope:    {scope}")
+            blocks.append("access:   unrestricted (DataModel is not path-filtered)")
+
+        if not blocks:
+            return "## Policy\n(no backends enabled)"
+        return "\n".join(blocks)
+
+    def _render_policy_rows(self, ws) -> list[str]:
+        """One row per root: name and effective default flags.
+
+        Explicit per-path overrides (keys other than ".") are listed beneath
+        the root when present.
+        """
+        rows: list[str] = []
+        for name in ws.root_names():
+            root = ws.roots[name]
+            default = ws.policy_for(name, "")
+            rows.append(f"{name.ljust(24)}   {self._flags_for(default)}")
+            extras = [k for k in root.overrides.keys() if k != "."]
+            for p in sorted(extras):
+                pol = root.overrides[p]
+                rows.append(f"  {p.ljust(22)}   {self._flags_for(pol)}")
+        if not rows:
+            return ["(no roots)"]
+        return rows
+
+    def _flags_for(self, pol) -> str:
+        """[R W Id Ip Il] with letters present only for True flags."""
+        tokens = []
+        for letter, key in (("R", "read"), ("W", "write"),
+                            ("Id", "index_docs"), ("Ip", "index_py"),
+                            ("Il", "index_lua")):
+            try:
+                if bool(getattr(pol, key)):
+                    tokens.append(letter)
+            except Exception:
+                pass
+        return "[" + " ".join(tokens) + "]" if tokens else "[-]"
+
+[recon-status-exec] ✓ read_unit:         if sections is None:
+            secs = list(self.DEFAULT_SECTIONS)
+        elif isinstance(sections, str):
+            secs = [sections]
+        elif isinstance(sections, list):
+            secs = sections
+        else:
+            return Result(
+                status="error",
+                message="`sections` must be a string or a list.",
+                error_code="bad_sections",
+                action="get_status",
+            )
+
+        unknown = [s for s in secs if s not in self.DEFAULT_SECTIONS]
+        if unknown:
+            return Result(
+                status="error",
+                message=(
+                    f"unknown section(s) {unknown}; valid: "
+                    f"{list(self.DEFAULT_SECTIONS)}"
+                ),
+                error_code="unknown_section",
+                action="get_status",
+            )
+
+        blocks: list[str] = []
+        if "session" in secs:
+            blocks.append(self._render_session())
+        if "indexes" in secs:
+            blocks.append(self._render_indexes(backend))
+        if "policy" in secs:
+            blocks.append(self._render_policy(backend))
+
+        return Result(
+            status="ok",
+            message="\n\n".join(b for b in blocks if b),
+            action="get_status",
+        )
+
+[recon-config-loader] ✓ grep: Найдено 14 совпадений:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:70:     "index_docs_dir": "",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:76:     "index_docs": True,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:77:     "index_python": True,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:80:     # sources on save; never edited directly.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:81:     "index_lua": True,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:83:     # separate field because it cannot be reconstructed from `index_lua`:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/loader.py:84:     # with MCP-sourced Lua on, `index_lua` is True regardless of Rojo,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:12:   PathPolicy   — five independent flags (read, write, index_docs,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:13:                  index_py, index_lua) applied to a path and, by
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:24:               "index_docs": true, "index_py": true, "index_lua": true},
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:25:         "docs/generated": {"write": false, "index_docs": false}
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:45: ALL_FLAGS = ("read", "write", "index_docs", "index_py", "index_lua")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:57:     index_docs: bool = True
+PatchAppliers/PatchApplier/toolkit/code/toolkit/config/workspace.py:59:     index_lua: bool = True
+
+[recon-gui-sources] ✓ grep: Найдено 25 совпадений:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/app.py:728:     # user saw "Lua files on disk" pre-checked on a fresh project because
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:12:       [x] Documentation (.md)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:14:           [x] Allow Python scripts
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:16:       [x] Lua files on disk (.luau)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:17:           Luau source: ( ) MCP  ( ) Rojo
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:27:     Documentation nor Python is on.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:29:     off or Luau source is Rojo.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:32:   - Id shown only when Documentation is on
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:372:     # Row 1: Documentation + FS ignore (right-aligned)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:375:     tk.Checkbutton(r_docs, text="Documentation (.md)", variable=docs_var,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:391:     exec_cb = tk.Checkbutton(r_py_sub, text="Allow Python scripts (run_python)",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:399:     mcp_label_var = tk.StringVar(value="MCP (Roblox bridge)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:410:     # Row 4: Lua files on disk
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:413:     tk.Checkbutton(r_rojo, text="Lua files on disk (.luau)", variable=rojo_var,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:416:     # Row 5: Luau source radio
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:419:     tk.Label(radio_row, text="Luau source:").pack(side="left")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:442:     # changes when Documentation / Python / Lua-on-disk toggles; MCP and
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:634:             "Applies to disk roots: Documentation, Python, Lua-on-disk.\n"
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:656:             "Consulted only when Luau source is MCP.",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:683:             luau_hint.config(text="(no Luau source enabled)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:748:             mcp_label_var.set("MCP (Roblox bridge: scene + code)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:750:             mcp_label_var.set("MCP (Roblox bridge: scene only)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:752:             mcp_label_var.set("MCP (Roblox bridge)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/settings_window.py:754:             mcp_label_var.set("MCP (Roblox bridge)")
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/gui/tree_view.py:8:     index_docs  visible only when Documentation is enabled
+
+[recon-backends-init] ✓ read_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py
+1: '"""Backend implementations: filesystem, mcp, composite, workspace."""\n'
+2: '\n'
+3: 'from .filesystem import FilesystemBackend\n'
+4: 'from .mcp import MCPBackend\n'
+5: 'from .composite import CompositeBackend\n'
+6: 'from .workspace import WorkspaceBackend\n'
+7: '\n'
+8: '__all__ = [\n'
+9: '    "FilesystemBackend",\n'
+10: '    "MCPBackend",\n'
+11: '    "CompositeBackend",\n'
+12: '    "WorkspaceBackend",\n'
+13: ']\n'
+
+[recon-filesystem-py-head] ✓ read_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py L1–L20
+1: '"""Filesystem backend — reads/writes local files under one root directory.\r\n'
+2: '\r\n'
+3: 'All paths are relative to the root. Sandbox enforcement: any path that\r\n'
+4: 'resolves outside the root is rejected before I/O.\r\n'
+5: '\r\n'
+6: 'This class does **not** know about `.patchignore`. Hiding rules are a\r\n'
+7: 'workspace concern: `WorkspaceBackend` reads them from its own state_dir\r\n'
+8: 'and applies them in `filter_check` before delegating. A bare\r\n'
+9: 'FilesystemBackend driven directly (tests, ad-hoc tools) sees everything\r\n'
+10: 'inside its root and consults no policy.\r\n'
+11: '"""\r\n'
+12: 'from __future__ import annotations\r\n'
+13: '\r\n'
+14: 'import shutil\r\n'
+15: 'from pathlib import Path\r\n'
+16: '\r\n'
+17: 'from ..core.models import FileStat\r\n'
+18: '\r\n'
+19: '\r\n'
+20: 'class FilesystemBackend:\r\n'
+
+[recon-workspace-py-head] ✓ read_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py L1–L30
+1: '"""WorkspaceBackend — multi-root FS backend (read-only, step 3).\n'
+2: '\n'
+3: 'Spec: docs/WORKSPACE_BACKEND.md. Standalone skeleton — routes paths of\n'
+4: 'the form ``<basename>/<rel>`` to one of N internal FilesystemBackend\n'
+5: 'instances (one per workspace root). Read-only: write/delete/move/copy\n'
+6: 'raise NotImplementedError. Write is enabled in step 6.\n'
+7: '\n'
+8: 'Not wired into CompositeBackend yet — that is step 4. Nothing in the\n'
+9: 'runtime uses this class today.\n'
+10: '\n'
+11: 'Path forms:\n'
+12: '  ``<basename>/<rel>``  — file inside a named root, e.g. ``src/a.py``.\n'
+13: '  ``<basename>``        — a root itself (dir), resolved as ``rel=""``.\n'
+14: '  ``""``                — list all roots; only ``list`` accepts this.\n'
+15: '\n'
+16: 'State dir is workspace-level, one per workspace, not exposed here as a\n'
+17: 'routed path — see WORKSPACE_BACKEND.md §7.\n'
+18: '"""\n'
+19: 'from __future__ import annotations\n'
+20: '\n'
+21: 'from pathlib import Path\n'
+22: '\n'
+23: 'from ..config import patchignore\n'
+24: 'from ..config.workspace import Workspace\n'
+25: 'from ..core.models import FileStat\n'
+26: 'from .filesystem import FilesystemBackend\n'
+27: '\n'
+28: '\n'
+29: 'class WorkspaceBackend:\n'
+30: '    """Read-only multi-root FS backend."""\n'
+
+[recon-composite-py-head] ✓ read_file: PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py L1–L35
+1: '"""CompositeBackend -- routes operations across multiple backends by path.\r\n'
+2: '\r\n'
+3: 'Motivating case: one Session that edits both local docs/Python (Filesystem)\r\n'
+4: 'and Roblox code (MCP). Path domains are disjoint by construction:\r\n'
+5: '\r\n'
+6: '    - DataModel paths start with a Roblox service name:\r\n'
+7: '      ReplicatedStorage.X.Y, ServerScriptService.Services.CraftService, ...\r\n'
+8: '    - Filesystem paths look like file paths: toolkit/core/models.py, docs/README.md\r\n'
+9: '\r\n'
+10: 'Routing rule is unambiguous. The two backends have different semantics for\r\n'
+11: 'filter_check (FS = filesystem paths relative to working_dir; MCP = dotted\r\n'
+12: 'DataModel paths), so this class simply delegates to whichever sub-backend\r\n'
+13: 'owns the path.\r\n'
+14: '\r\n'
+15: "List(root) is also routed by root: FS list('') lists the project dir;\r\n"
+16: "MCP list('ReplicatedStorage') lists modules under that service. This lets\r\n"
+17: 'the same rebuild_* tools work against a composite without change.\r\n'
+18: '"""\r\n'
+19: 'from __future__ import annotations\r\n'
+20: '\r\n'
+21: 'import threading\r\n'
+22: 'import time\r\n'
+23: '\r\n'
+24: 'from ..core.errors import BackendUnavailable\r\n'
+25: 'from ..core.paths import is_mcp_path\r\n'
+26: '\r\n'
+27: '\r\n'
+28: '# Standard Roblox DataModel services. Any path whose first dotted segment is\r\n'
+29: '# one of these is treated as an MCP path.\r\n'
+30: '\r\n'
+31: '\r\n'
+32: 'class CompositeBackend:\r\n'
+33: '    """Routes each operation to the sub-backend that owns the path.\r\n'
+34: '\r\n'
+35: '    Constructor takes (name, backend) pairs. The two standard\r\n'
+
+[recon-backends-importers] ✓ grep: Найдено 100+ совпадений (обрезано):
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:3: from .filesystem import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:5: from .composite import CompositeBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:6: from .workspace import WorkspaceBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:9:     "FilesystemBackend",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:11:     "CompositeBackend",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/__init__.py:12:     "WorkspaceBackend",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py:1: """CompositeBackend -- routes operations across multiple backends by path.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py:32: class CompositeBackend:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py:36:     configurations are ('fs', FilesystemBackend) and ('mcp', MCPBackend),
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/composite.py:388:         MCPBackend has a dedicated create (via multi_edit); FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:7: workspace concern: `WorkspaceBackend` reads them from its own state_dir
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:9: FilesystemBackend driven directly (tests, ad-hoc tools) sees everything
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:20: class FilesystemBackend:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:162:     def copy_to(self, src_rel: str, other: "FilesystemBackend",
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:164:         """Copy a file into another FilesystemBackend's root.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:166:         Used by WorkspaceBackend to support cross-root copies without
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:185:         In the new model, FilesystemBackend is used as a sub-backend of
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:186:         WorkspaceBackend. Path policy is a Workspace concern (per-root,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:187:         per-path PathPolicy), enforced in WorkspaceBackend.filter_check.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/filesystem.py:188:         When FilesystemBackend is driven directly (tests, ad-hoc tools),
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:1: """WorkspaceBackend — multi-root FS backend (read-only, step 3).
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:4: the form ``<basename>/<rel>`` to one of N internal FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:8: Not wired into CompositeBackend yet — that is step 4. Nothing in the
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:26: from .filesystem import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:29: class WorkspaceBackend:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:35:         self.roots: dict[str, FilesystemBackend] = {}
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:36:         self._state_fs: FilesystemBackend | None = None
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:46:         # FilesystemBackend.open) is separate from the workspace-level one
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:49:             fb = FilesystemBackend(root.path)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:55:         self._state_fs = FilesystemBackend(self.state_dir)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:88:         indexing (RebuildLuaCodeIndexTool) and with CompositeBackend's
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:110:     def _resolve_root(self, path: str) -> tuple[str, str, FilesystemBackend]:
+PatchAppliers/PatchApplier/toolkit/code/toolkit/backends/workspace.py:307:         Delegates to the owning FilesystemBackend (or state FS for the
+PatchAppliers/PatchApplier/toolkit/code/toolkit/core/backend.py:4:   - FilesystemBackend (this release)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/core/session.py:42:         CompositeBackend opens the filesystem synchronously and any remote
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:36: from toolkit.backends import FilesystemBackend, MCPBackend, CompositeBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:137:     """FS side is a WorkspaceBackend loaded from workspace.json. Missing
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:145:         from toolkit.backends.workspace import WorkspaceBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:154:         return WorkspaceBackend(ws, state_dir)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:161:         return CompositeBackend([
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/cli.py:317:     from toolkit.backends import CompositeBackend as _CB, MCPBackend as _MB
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:266:     from ...backends import FilesystemBackend, MCPBackend, CompositeBackend  # noqa: F401
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:278:         from ...backends.workspace import WorkspaceBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:280:         return WorkspaceBackend(ws, state_dir), "filesystem"
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:321:         from ...backends.workspace import WorkspaceBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:323:         return CompositeBackend([
+PatchAppliers/PatchApplier/toolkit/code/toolkit/runner/presenters/main.py:324:             ("fs", WorkspaceBackend(ws, state_dir)),
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_code_indexer.py:16: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_code_indexer.py:69:     backend = FilesystemBackend(TOOLKIT_ROOT)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_code_indexer.py:83:         tmp_backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_backend.py:1: """Tests for CompositeBackend path routing + lifecycle delegation."""
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_backend.py:14: from toolkit.backends.composite import CompositeBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_backend.py:90:     comp = CompositeBackend([("fs", fs), ("mcp", mcp)])
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_death.py:21: from toolkit.backends.composite import CompositeBackend  # noqa: E402
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_death.py:74:     comp = CompositeBackend([("fs", a), ("mcp", b)])
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_death.py:103:     comp2 = CompositeBackend([("fs", SwitchableBackend()), ("mcp", bomb)])
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_degraded.py:3: Regression test: previously CompositeBackend.open() raised if *any*
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_degraded.py:21: from toolkit.backends.composite import CompositeBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_degraded.py:22: from toolkit.backends.filesystem import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_degraded.py:92:         fs = FilesystemBackend(str(tmp))
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_composite_degraded.py:94:         cb = CompositeBackend([("fs", fs), ("mcp", mcp)])
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_copy_unit.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_copy_unit.py:40:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_fileops.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_fileops.py:40:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_find_symbol.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_find_symbol.py:73:         backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_find_usages.py:14: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_find_usages.py:68:         be = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_index.py:16: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_index.py:42:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_status.py:3: Policy is read from backend.ws if it exists (WorkspaceBackend). With a
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_status.py:4: plain FilesystemBackend there is no workspace and the policy section
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_status.py:21: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_get_status.py:47:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_grep_paths.py:14: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_grep_paths.py:39:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_grep_replace.py:14: from toolkit.backends import FilesystemBackend  # noqa: E402
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_grep_replace.py:48:         be = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_index_version.py:16: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_index_version.py:43:         backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_indexer.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_indexer.py:41:     backend = FilesystemBackend(TOOLKIT_ROOT)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_live_studio.py:56:     from toolkit.backends import CompositeBackend, FilesystemBackend, MCPBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_live_studio.py:68:     fs = FilesystemBackend(wd)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_live_studio.py:89:     backend = CompositeBackend([("fs", fs), ("mcp", mcp)])
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_lua_indexer.py:20: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_lua_indexer.py:207:         with Session(FilesystemBackend(fs_root), fmt=fmt,
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_lua_symbols.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_lua_symbols.py:77:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_multi_root_smoke.py:9: WorkspaceBackend → Session → RebuildIndexTool → INDEX.md.
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_multi_root_smoke.py:23: from toolkit.backends.workspace import WorkspaceBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_multi_root_smoke.py:78:         wb = WorkspaceBackend(w, state)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_native_tools.py:15: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_native_tools.py:40: class FakeNativeBackend(FilesystemBackend):
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_native_tools.py:58: class NoNativeBackend(FilesystemBackend):
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_range_order.py:24: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_range_order.py:49:     backend = FilesystemBackend(root)
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_replace_in_file.py:29: from toolkit.backends import FilesystemBackend
+PatchAppliers/PatchApplier/toolkit/code/toolkit/tests/test_replace_in_file.py:54:     backend = FilesystemBackend(root)
+... обрезано на 100 строк
+[timing] user (10 actions): 0.29s
+
+[auto-md] ✓ rebuild_index: .patch_applier/INDEX.md (файлов: 27, без summary: 401) [v668] [без изменений]
+
+[auto-py] ✓ rebuild_code_index: .patch_applier/CODE_INDEX.md + .patch_applier/CODE_INDEX.manifest.json (модулей: 185, символов: 1264) [v726] [без изменений]
 [timing] auto-rebuild (2 actions): 0.85s
 
-##RESULT:{"ok": 3, "errors": 1, "skipped": 0, "failed": [1], "blocked": []}
-[timing] total: 1.35s
+##RESULT:{"ok": 12, "errors": 0, "skipped": 0, "failed": [], "blocked": []}
+[timing] total: 1.15s
