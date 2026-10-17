@@ -19,6 +19,8 @@ from ..xml.address import AddressError, parse_address
 from ..xml.reader import XmlError, parse
 from ..xml.resolver import ResolveError, resolve_one
 from ..xml.discriminator import chain_for, match_value
+from ..xml.reader import is_mixed_content
+from ..xml.writer import WriteError, remove_attr, replace_text, set_attr
 
 
 def _xml_cfg(backend: Backend) -> dict | None:
@@ -135,6 +137,233 @@ def _matches_where(el, where: dict) -> bool:
 # under their depth-2 ancestor to keep the output compact even on big
 # trees. Depth-0 is the start itself, depth-1 immediate children, etc.
 _MAP_MAX_SAMPLE = 5
+
+
+class XmlModifyTool:
+    """Atomic edits on a single XML element.
+
+    `ops` is a list of operations, applied in order; all-or-nothing: any
+    refusal (`has_children`, `attr_not_found`, `mixed_content_unsupported`,
+    ...) aborts the whole patch and the file is left untouched.
+
+    Supported ops:
+
+      {"op": "set_attr", "name": "...", "value": "..."}
+      {"op": "remove_attr", "name": "..."}
+      {"op": "set_text", "value": "..."}     # leaf only, refuses children
+
+    Not in v1 (Step 3.5): `set_annotation` (needs child-insertion logic),
+    `append_child` (needs indentation), `replace_self` (uses xml_replace).
+    """
+
+    name = "xml_modify"
+    op = "write"
+    path_args: list[str] = ["file_path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        file_path: str = "",
+        address: str = "",
+        ops: list | None = None,
+        occurrence: int | None = None,
+        **_kwargs: Any,
+    ) -> Result:
+        if not file_path:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="bad_input", message="file_path required",
+            )
+        if not address:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="bad_input", message="address required",
+            )
+        if not isinstance(ops, list) or not ops:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="bad_input", message="ops must be a non-empty list",
+            )
+        if occurrence is not None and (
+            not isinstance(occurrence, int) or occurrence < 1
+        ):
+            return Result(
+                status="error", action="xml_modify",
+                error_code="bad_occurrence",
+                message=f"occurrence must be a positive int, got {occurrence!r}",
+            )
+
+        # --- validate op shapes up front (all-or-nothing contract) -------
+        for i, op_spec in enumerate(ops):
+            bad = self._validate_op(i, op_spec)
+            if bad is not None:
+                return Result(
+                    status="error", action="xml_modify",
+                    error_code="bad_op", message=bad,
+                )
+
+        try:
+            segments = parse_address(address)
+        except AddressError as e:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="bad_address", message=str(e),
+            )
+
+        # --- read current bytes ------------------------------------------
+        try:
+            data = _read_bytes(backend, file_path)
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="not_found", message=f"file not found: {file_path}",
+            )
+        except Exception as e:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="read_failed",
+                message=f"{type(e).__name__}: {e}",
+            )
+
+        try:
+            doc = parse(data)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_modify",
+                error_code=e.code, message=e.message,
+            )
+        if doc.has_entities:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="dtd_unsupported",
+                message="DTD with <!ENTITY ...> declarations is not supported",
+            )
+
+        xml_cfg = _xml_cfg(backend)
+
+        try:
+            resolved = resolve_one(
+                doc, segments, xml_cfg, occurrence=occurrence,
+            )
+        except ResolveError as e:
+            return Result(
+                status="error", action="xml_modify",
+                error_code=e.code, message=e.message,
+            )
+
+        el = resolved.element
+
+        # --- apply ops on bytes; iterate the editor ----------------------
+        # After each op the tree is stale (byte offsets shift). For a small
+        # number of ops, the simplest correct approach is: apply op, reparse,
+        # re-resolve the address. It is slower but avoids offset drift and
+        # is easy to reason about.
+        current_bytes = data
+        for i, op_spec in enumerate(ops):
+            try:
+                if op_spec["op"] == "set_attr":
+                    current_bytes = set_attr(doc, el, op_spec["name"], op_spec["value"])
+                elif op_spec["op"] == "remove_attr":
+                    current_bytes = remove_attr(doc, el, op_spec["name"])
+                elif op_spec["op"] == "set_text":
+                    if is_mixed_content(el):
+                        return Result(
+                            status="error", action="xml_modify",
+                            error_code="mixed_content_unsupported",
+                            message=(
+                                f"<{el.tag}> has mixed content; "
+                                f"set_text is not safe, use xml_replace"
+                            ),
+                        )
+                    current_bytes = replace_text(doc, el, op_spec["value"])
+                else:  # pragma: no cover -- validate_op caught it
+                    raise WriteError("bad_op", f"unknown op {op_spec['op']!r}")
+            except WriteError as e:
+                return Result(
+                    status="error", action="xml_modify",
+                    error_code=e.code, message=f"op[{i}]: {e.message}",
+                )
+            # Reparse + reresolve for the next op (offsets have moved).
+            if i + 1 < len(ops):
+                try:
+                    doc = parse(current_bytes)
+                    resolved = resolve_one(
+                        doc, segments, xml_cfg, occurrence=occurrence,
+                    )
+                    el = resolved.element
+                except (XmlError, ResolveError) as e:
+                    return Result(
+                        status="error", action="xml_modify",
+                        error_code=getattr(e, "code", "result_parse_error"),
+                        message=(
+                            f"op[{i}]: after edit the address no longer "
+                            f"resolves: {getattr(e, 'message', str(e))}"
+                        ),
+                    )
+
+        # --- verify: new bytes are well-formed ---------------------------
+        try:
+            parse(current_bytes)
+        except XmlError as e:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="result_syntax_error",
+                message=f"resulting XML is not well-formed: {e.message}",
+            )
+
+        # --- write via backend write-bytes -------------------------------
+        err = self._write_bytes(backend, file_path, current_bytes)
+        if err is not None:
+            return Result(
+                status="error", action="xml_modify",
+                error_code="write_failed",
+                message=err,
+            )
+
+        delta = len(current_bytes) - len(data)
+        return Result(
+            status="ok", action="xml_modify",
+            message=(
+                f"{file_path}  <{el.tag}>  {len(ops)} op(s) applied  "
+                f"({delta:+d} B)"
+            ),
+        )
+
+    @staticmethod
+    def _validate_op(i: int, spec: Any) -> str | None:
+        if not isinstance(spec, dict):
+            return f"op[{i}] must be a dict, got {type(spec).__name__}"
+        kind = spec.get("op")
+        if kind not in ("set_attr", "remove_attr", "set_text"):
+            return f"op[{i}].op must be one of set_attr/remove_attr/set_text, got {kind!r}"
+        if kind in ("set_attr", "remove_attr"):
+            name = spec.get("name")
+            if not isinstance(name, str) or not name:
+                return f"op[{i}].name must be a non-empty string"
+        if kind == "set_attr":
+            if not isinstance(spec.get("value"), str):
+                return f"op[{i}].value must be a string"
+        if kind == "set_text":
+            if not isinstance(spec.get("value"), str):
+                return f"op[{i}].value must be a string"
+        return None
+
+    @staticmethod
+    def _write_bytes(backend: Backend, path: str, data: bytes) -> str | None:
+        resolver = getattr(backend, "resolve_physical", None)
+        if not callable(resolver):
+            return f"backend {type(backend).__name__} has no resolve_physical"
+        phys = resolver(path)
+        if phys is None:
+            return f"cannot resolve physical path: {path}"
+        try:
+            phys.parent.mkdir(parents=True, exist_ok=True)
+            phys.write_bytes(data)
+        except OSError as e:
+            return f"write failed: {type(e).__name__}: {e}"
+        return None
 
 
 class XmlMapTool:
