@@ -456,8 +456,9 @@ def _check_parses(new_source: str, path: str, unit, ext: str,
         except Exception as e:
             raise ValueError(f"result_parse_error: {e}")
         if unit.kind == UnitKind.SECTION:
-            if doc.find(number=unit.name) is None and doc.find(title=unit.name) is None:
-                raise ValueError(f"result_missing_section: {unit.name}")
+            if not expect_missing:
+                if doc.find(number=unit.name) is None and doc.find(title=unit.name) is None:
+                    raise ValueError(f"result_missing_section: {unit.name}")
             if old_source is not None:
                 old_doc = Format.load("default").parse(old_source)
                 old_ids = {str(s.number or s.title) for s in old_doc.flatten()}

@@ -52,6 +52,32 @@ def _run(root: Path, patches):
 
 def main():
     t = T()
+    # --- remove_unit: part=all on markdown section ---
+    # Regression: md branch of _check_parses ignored expect_missing and
+    # always demanded the target section survive, making remove_unit on
+    # any md section impossible (result_missing_section).
+    with tempfile.TemporaryDirectory() as td:
+        root = Path(td)
+        (root / 'doc.md').write_text(
+            '# T\n\n## 1. Alpha\n<!-- summary: a -->\n\nbody a\n\n'
+            '## 2. Beta\n<!-- summary: b -->\n\nbody b\n\n'
+            '## 3. Gamma\n<!-- summary: c -->\n\nbody c\n',
+            encoding='utf-8')
+        r = _run(root, [{'action': 'remove_unit', 'arguments': {
+            'file_path': 'doc.md',
+            'address': {'qualname': '2'},
+            'part': 'all',
+        }}])[0]
+        t.expect('remove_unit(part=all) deletes md section',
+                 r.status == 'ok',
+                 f'{r.status}/{r.error_code}: {r.message}')
+        remaining = (root / 'doc.md').read_text(encoding='utf-8')
+        t.expect('deleted md section is gone',
+                 '## 2. Beta' not in remaining and 'body b' not in remaining,
+                 repr(remaining))
+        t.expect('md siblings survive',
+                 '## 1. Alpha' in remaining and '## 3. Gamma' in remaining,
+                 repr(remaining))
 
     # --- create_file: .py syntax error ---
     with tempfile.TemporaryDirectory() as td:
