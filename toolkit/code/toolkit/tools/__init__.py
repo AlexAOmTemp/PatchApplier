@@ -42,7 +42,7 @@ from .find_usages import FindUsagesTool
 from .copy import CopyUnitTool
 from .shell import RunPythonTool
 from .verify import VerifySyntaxTool
-from .xml import XmlReadTool, XmlFindTool
+from .xml import XmlReadTool, XmlFindTool, XmlMapTool
 from .unit.tool import (
     ReadUnitTool, ListUnitsTool,
     ReplaceUnitTool, RemoveUnitTool, CreateUnitTool, InsertBlockTool,
@@ -90,6 +90,7 @@ TOOL_MAP: dict[str, type] = {
     "insert_block": InsertBlockTool,
     "xml_read": XmlReadTool,
     "xml_find": XmlFindTool,
+    "xml_map": XmlMapTool,
 }
 
 __all__ = [
@@ -115,4 +116,5 @@ __all__ = [
     "ReplaceUnitTool", "RemoveUnitTool", "CreateUnitTool", "InsertBlockTool",
     "XmlReadTool",
     "XmlFindTool",
+    "XmlMapTool",
 ]

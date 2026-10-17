@@ -131,6 +131,192 @@ def _matches_where(el, where: dict) -> bool:
     return True
 
 
+# Directories at depth >= 3 from the starting `path` are grouped
+# under their depth-2 ancestor to keep the output compact even on big
+# trees. Depth-0 is the start itself, depth-1 immediate children, etc.
+_MAP_MAX_SAMPLE = 5
+
+
+class XmlMapTool:
+    """Directory map: file counts and top-N child tags per directory.
+
+    Walks `path/*.xml`, parses each, aggregates (directory -> tag -> count).
+    Output is a compact tree with one line per directory:
+
+        Mods/MyMod/Defs/               12 files   ThingDef(234)  RecipeDef(89)
+          Items/                       12 files   ThingDef(156)
+          Recipes/                      9 files   RecipeDef(89)
+
+    Sample of up to `_MAP_MAX_SAMPLE` names per top tag uses the discriminator
+    chain; without one, prints `<tag>[N]`.
+
+    Scope: `path` required; `max_files` caps parse work (default 2000);
+    `max_tags` caps tags shown per line (default 5); `depth` groups deeper
+    directories under an ancestor.
+    """
+
+    name = "xml_map"
+    op = "read"
+    path_args: list[str] = ["path"]
+    path_list_args: list[str] = []
+
+    def execute(
+        self,
+        backend: Backend,
+        fmt: Any = None,
+        path: str = "",
+        max_files: int = 2000,
+        max_tags: int = 5,
+        depth: int = 2,
+        **_kwargs: Any,
+    ) -> Result:
+        if not path:
+            return Result(
+                status="error", action="xml_map",
+                error_code="bad_input", message="path required",
+            )
+        try:
+            max_files = int(max_files)
+            max_tags = int(max_tags)
+            depth = int(depth)
+        except (TypeError, ValueError):
+            return Result(
+                status="error", action="xml_map",
+                error_code="bad_options",
+                message="max_files / max_tags / depth must be ints",
+            )
+        if max_files < 1 or max_tags < 1 or depth < 0:
+            return Result(
+                status="error", action="xml_map",
+                error_code="bad_options",
+                message="max_files/max_tags must be >= 1; depth >= 0",
+            )
+
+        try:
+            st = backend.stat(path)
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_map",
+                error_code="not_found", message=f"path not found: {path}",
+            )
+        if st.is_file:
+            return Result(
+                status="error", action="xml_map",
+                error_code="bad_input",
+                message=f"path must be a directory, got a file: {path}",
+            )
+        try:
+            all_files = backend.list(path, "*.xml")
+        except FileNotFoundError:
+            return Result(
+                status="error", action="xml_map",
+                error_code="not_found", message=f"path not found: {path}",
+            )
+        if not all_files:
+            return Result(
+                status="ok", action="xml_map",
+                message=f"no .xml files under {path}",
+            )
+        if len(all_files) > max_files:
+            return Result(
+                status="error", action="xml_map",
+                error_code="too_many_files",
+                message=(
+                    f"{len(all_files)} xml files under {path}; "
+                    f"narrow path or raise max_files (now {max_files})"
+                ),
+            )
+
+        path_prefix = path.rstrip("/")
+        prefix_len = len(path_prefix) + 1 if path_prefix else 0
+
+        # dir_key -> {tag -> count}; dir_key -> {tag -> [names]}
+        tag_counts: dict[str, dict[str, int]] = {}
+        tag_samples: dict[str, dict[str, list[str]]] = {}
+        file_count: dict[str, int] = {}
+
+        xml_cfg = _xml_cfg(backend)
+        unparsed = 0
+
+        for fpath in all_files:
+            # Directory key relative to `path`.
+            rel = fpath[prefix_len:] if prefix_len else fpath
+            # Split off the file component.
+            slash = rel.rfind("/")
+            if slash < 0:
+                dir_rel = ""
+            else:
+                dir_rel = rel[:slash]
+            dir_key = self._group_dir(dir_rel, depth)
+            file_count[dir_key] = file_count.get(dir_key, 0) + 1
+
+            try:
+                data = _read_bytes(backend, fpath)
+                doc = parse(data)
+            except (XmlError, OSError, FileNotFoundError):
+                unparsed += 1
+                continue
+
+            counts = tag_counts.setdefault(dir_key, {})
+            samples = tag_samples.setdefault(dir_key, {})
+            # Only direct children of root: those are the Def/Operation
+            # elements the user cares about. Descendants (defName, label,
+            # verbProperties) are noise at the map level -- see §5.1.
+            root_tag_path = [doc.root.tag]
+            for el in doc.root.children:
+                counts[el.tag] = counts.get(el.tag, 0) + 1
+                lst = samples.setdefault(el.tag, [])
+                if len(lst) < _MAP_MAX_SAMPLE:
+                    chain = chain_for(root_tag_path + [el.tag], xml_cfg)
+                    name = match_value(el, chain)
+                    if name is not None:
+                        lst.append(name)
+
+        lines = [f"=== xml_map: {path} ({len(all_files)} files, {len(file_count)} dirs) ==="]
+        for dir_key in sorted(file_count):
+            n = file_count[dir_key]
+            counts = tag_counts.get(dir_key, {})
+            if counts:
+                ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+                shown = ordered[:max_tags]
+                rest = len(ordered) - len(shown)
+                parts: list[str] = []
+                for tag, c in shown:
+                    sample = tag_samples.get(dir_key, {}).get(tag, [])
+                    if sample:
+                        s = ", ".join(sample[:3])
+                        if c > len(sample):
+                            s += f", +{c - len(sample)}"
+                        parts.append(f"{tag}({c}: {s})")
+                    else:
+                        parts.append(f"{tag}({c})")
+                if rest > 0:
+                    parts.append(f"+{rest} more tags")
+                tags_str = "  ".join(parts)
+            else:
+                tags_str = "(no xml content parsed)"
+            label = dir_key or "."
+            lines.append(f"  {label:<30} {n:>4} files  {tags_str}")
+        if unparsed:
+            lines.append(f"  ... ({unparsed} unparseable file(s) skipped)")
+        return Result(status="ok", action="xml_map", message="\n".join(lines))
+
+    @staticmethod
+    def _group_dir(dir_rel: str, depth: int) -> str:
+        """Group a directory path to at most `depth` path segments.
+
+        Empty `dir_rel` -> "" (files directly under the start path).
+        "A" -> "A". "A/B/C" with depth=2 -> "A/B".
+        "A/B" with depth=0 -> "" (everything collapses to root).
+        """
+        if not dir_rel:
+            return ""
+        if depth == 0:
+            return ""
+        parts = dir_rel.split("/")
+        return "/".join(parts[:depth])
+
+
 class XmlFindTool:
     """Schema-aware search: find every element of `tag` under `path` whose
     `where` matches (child text or @attr).
