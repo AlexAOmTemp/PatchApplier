@@ -35,6 +35,7 @@ class MultiRootFsBackend:
         self.roots: dict[str, RootDirBackend] = {}
         self._state_fs: RootDirBackend | None = None
         self._patterns: list[tuple[str, bool]] = []
+        self._patterns_mtime: float = 0.0
         self._opened = False
 
     # --- lifecycle ---------------------------------------------------------
@@ -56,6 +57,7 @@ class MultiRootFsBackend:
         self._state_fs.open()
         patchignore.ensure_default(self.state_dir)
         self._patterns = patchignore.read(self.state_dir)
+        self._patterns_mtime = self._pi_mtime()
         self._opened = True
 
     def close(self) -> None:
@@ -76,9 +78,26 @@ class MultiRootFsBackend:
         """
         return self._opened
 
+    def _pi_mtime(self) -> float:
+        try:
+            return (self.state_dir / patchignore.PATCHIGNORE_NAME).stat().st_mtime
+        except OSError:
+            return 0.0
+
     def reload_patterns(self) -> None:
         """Re-read workspace-level `.patchignore` from state_dir."""
         self._patterns = patchignore.read(self.state_dir)
+        self._patterns_mtime = self._pi_mtime()
+
+    def _maybe_reload_patterns(self) -> None:
+        """Auto-reload if `.patchignore` changed on disk since last read.
+
+        One stat per filter_check call. Cheap enough on Windows (microseconds),
+        and avoids stale patterns: user edits `.patchignore`, expects effect
+        without restarting the GUI.
+        """
+        if self._pi_mtime() != self._patterns_mtime:
+            self.reload_patterns()
 
     @property
     def working_dir(self):
@@ -118,7 +137,11 @@ class MultiRootFsBackend:
             return name, rel, self._state_fs
         fb = self.roots.get(name)
         if fb is None:
-            raise FileNotFoundError(f"root '{name}' not in workspace")
+            valid = sorted(self.roots.keys())
+            raise FileNotFoundError(
+                f"root '{name}' not in workspace; "
+                f"valid roots: {valid}"
+            )
         return name, rel, fb
 
     # --- data --------------------------------------------------------------
@@ -337,7 +360,11 @@ class MultiRootFsBackend:
         if name == patchignore.STATE_DIR:
             return None
         if name not in self.roots:
-            return ("filter", f"root '{name}' not in workspace")
+            valid = sorted(self.roots.keys())
+            return ("filter",
+                    f"Корень '{name}' не в workspace; "
+                    f"путь должен начинаться с: {valid}")
+        self._maybe_reload_patterns()
         rel_norm = rel.replace("\\", "/")
         if rel_norm and patchignore.path_hidden(rel_norm, self._patterns):
             return ("hidden_path", f"Скрытая папка: {path}")

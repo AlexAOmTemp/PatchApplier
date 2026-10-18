@@ -371,7 +371,7 @@ class GetStatusTool:
         from .scope import read_scope
         scope, err = read_scope(backend)
         if err:
-            return f"## Scope\n(read error: {err})"
+            return f"## Scope\n(scope ERR: {err})"
         if not scope.rules:
             return ""
         lines = ["## Scope"]
