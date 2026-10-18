@@ -138,7 +138,8 @@ _LARGE_SYMBOL_LINES = 100
 
 
 def _module_markers(m, lines: int, size_kb: float,
-                    used_by, uses, in_cycle: bool = False) -> list[str]:
+                    used_by, uses, in_cycle: bool = False,
+                    dup_id: int | None = None) -> list[str]:
     """Factual markers for the module header line.
 
     Facts only — every entry is verifiable from the source or the import
@@ -162,8 +163,6 @@ def _module_markers(m, lines: int, size_kb: float,
         tests = sum(1 for p in used_by if _is_test_path(p))
         out.append(f"\u2192 {n} users" + (f" ({tests} tests)" if tests else ""))
     path_l = "/" + m.path.lower().lstrip("/")
-    if _on("tests") and _is_test_path(m.path):
-        out.append("[tests/]")
     if _on("vendor") and ("/vendor/" in path_l or "/_index/" in path_l
                             or "/node_modules/" in path_l):
         out.append("[vendor/]")
@@ -171,6 +170,8 @@ def _module_markers(m, lines: int, size_kb: float,
         out.append("\u26a0 large")
     if _on("cycle") and in_cycle:
         out.append("\u26a0 cycle")
+    if _on("dup") and dup_id is not None:
+        out.append(f"\u29c9dub:{dup_id}")
     return out
 
 
@@ -220,3 +221,79 @@ def _render_section(s: Section, depth: int, source: str, out: list[str]) -> None
 
     for child in s.children:
         _render_section(child, depth + 1, source, out)
+
+
+def _assign_dup_ids(modules) -> dict[int, int]:
+    """Map content_hash -> sequential dup_id for groups with >1 member.
+
+    Empty files (source_len == 0) are skipped: every empty file has the
+    same hash, and marking them all as duplicates is noise.
+    """
+    from collections import Counter
+    keys = [(getattr(m, "content_hash", 0), m.source_len)
+            for m in modules if m.source_len > 0]
+    counts = Counter(keys)
+    mapping: dict[int, int] = {}
+    next_id = 0
+    for m in modules:
+        if m.source_len == 0:
+            continue
+        key = (getattr(m, "content_hash", 0), m.source_len)
+        if counts[key] < 2:
+            continue
+        if key[0] not in mapping:
+            next_id += 1
+            mapping[key[0]] = next_id
+    return mapping
+
+
+def render_code_structure(
+    modules,
+    used_by_map: dict[str, list[str]] | None = None,
+    uses_map: dict[str, list[str]] | None = None,
+    cycles: set[str] | None = None,
+    *,
+    limit: int = 500,
+    path_prefix: str | None = None,
+    sort: str = "path",
+) -> tuple[str, int, int]:
+    """Render one line per module. Returns (text, shown, total).
+
+    `limit=0` means no cap (all modules). `path_prefix` filters by path
+    prefix (no leading slash). `sort` is 'path' or 'size' (size = desc).
+    """
+    pool = list(modules)
+    if path_prefix:
+        norm = path_prefix.rstrip("/")
+        pool = [m for m in pool if m.path == norm or m.path.startswith(norm + "/")]
+    if sort == "size":
+        pool.sort(key=lambda m: (-m.source_len, m.path))
+    else:
+        pool.sort(key=lambda m: m.path)
+    total = len(pool)
+    dup_map = _assign_dup_ids(modules)
+
+    shown = pool if limit <= 0 else pool[:limit]
+    lines: list[str] = []
+    for m in shown:
+        lines.append(_structure_line(m, used_by_map, uses_map, cycles, dup_map, path_prefix))
+    text = "\n".join(lines) + ("\n" if lines else "")
+    return text, len(shown), total
+
+
+def _structure_line(m, used_by_map, uses_map, cycles, dup_map,
+                    path_prefix: str | None = None) -> str:
+    lines_n = m.lines or (m.source.count("\n") + (1 if m.source and not m.source.endswith("\n") else 0))
+    size_kb = m.source_len / 1024
+    ub = used_by_map.get(m.path) if used_by_map else None
+    us = uses_map.get(m.path) if uses_map else None
+    in_cycle = bool(cycles and m.path in cycles)
+    dup_id = dup_map.get(getattr(m, "content_hash", 0))
+    markers = _module_markers(m, lines_n, size_kb, ub, us, in_cycle, dup_id=dup_id)
+    suffix = ("  " + " ".join(markers)) if markers else ""
+    disp = m.path
+    if path_prefix:
+        norm = path_prefix.rstrip("/") + "/"
+        if disp.startswith(norm):
+            disp = disp[len(norm):]
+    return f"## {disp}  ({lines_n} \u0441\u0442\u0440., {size_kb:.1f} KB){suffix}"

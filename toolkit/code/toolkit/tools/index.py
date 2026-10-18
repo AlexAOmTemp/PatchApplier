@@ -1,11 +1,14 @@
 """Index tools: rebuild_index (markdown), rebuild_code_index (Python)."""
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ..core.backend import Backend
 from ..core.models import Result
 from ..formats import Format
+from ..formats.renderer import render_code_structure
+from ..indexers.code import _build_import_graph, _find_cycles
 from pathlib import Path
 
 from ..indexers.doc import build_index
@@ -198,6 +201,9 @@ class GetIndexTool:
         "code": "CODE_INDEX.md",
         "csharp": "CODE_INDEX_CS.md",
         "lua": "CODE_INDEX_LUA.md",
+        "code_manifest": "CODE_INDEX.manifest.json",
+        "csharp_manifest": "CODE_INDEX_CS.manifest.json",
+        "lua_manifest": "CODE_INDEX_LUA.manifest.json",
     }
     _paths: dict[str, str] = dict(_default_paths)
 
@@ -214,6 +220,9 @@ class GetIndexTool:
             fmt: Any = None,
             kind: str | list | None = None,
             max_bytes: int | None = None,
+            limit: int | None = 500,
+            path: str | None = None,
+            sort: str = "path",
             **_: Any,
         ) -> Result:
             # -- 1. normalize kind ------------------------------------------
@@ -277,55 +286,17 @@ class GetIndexTool:
                 per_kind = max(cap // len(kinds), 256) if cap > 0 else None
 
             # -- 3. gather --------------------------------------------------
+            _MANIFEST = {"code": "code_manifest", "csharp": "csharp_manifest",
+                         "lua": "lua_manifest"}
             blocks: list[str] = []
             for k in kinds:
-                path = self._paths[k]
-                try:
-                    exists = backend.exists(path)
-                except Exception as e:
-                    blocks.append(f"{k}: {path}  (exists() failed: {e})")
+                if k in _MANIFEST:
+                    mpath = self._paths[_MANIFEST[k]]
+                    blocks.append(f"{k}: " + _get_structure(
+                        backend, k, mpath, limit, path, sort, per_kind))
                     continue
-                if not exists:
-                    rebuild_action = {
-                        "docs": "rebuild_index",
-                        "code": "rebuild_code_index",
-                        "csharp": "rebuild_csharp_index",
-                        "lua": "rebuild_lua_code_index",
-                    }[k]
-                    blocks.append(
-                        f"{k}: {path}  (not found; run {rebuild_action} first)"
-                    )
-                    continue
-
-                try:
-                    text = backend.read(path)
-                except Exception as e:
-                    blocks.append(f"{k}: {path}  (read failed: {e})")
-                    continue
-
-                from ..indexers.state import read_seq
-                ver = read_seq(backend, path + ".version")
-
-                raw_bytes = text.encode("utf-8")
-                total_b = len(raw_bytes)
-                lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
-
-                if per_kind is None or total_b <= per_kind:
-                    head = f"{k}: {path} [v{ver}] ({total_b / 1024:.1f} KB, {lines} lines)"
-                    blocks.append(head + "\n" + text.rstrip("\n"))
-                    continue
-
-                clipped = raw_bytes[:per_kind]
-                nl = clipped.rfind(b"\n")
-                if nl > per_kind // 2:
-                    clipped = clipped[:nl]
-                clipped_text = clipped.decode("utf-8", errors="replace")
-                head = (
-                    f"{k}: {path} [v{ver}] ({total_b / 1024:.1f} KB, {lines} lines, "
-                    f"clipped to {len(clipped)} of {total_b} bytes; "
-                    f"pass larger max_bytes for more)"
-                )
-                blocks.append(head + "\n" + clipped_text.rstrip("\n"))
+                spath = self._paths[k]
+                blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind))
 
             return Result(
                 status="ok",
@@ -465,6 +436,9 @@ def install_index_paths(cfg: dict) -> None:
         "code": paths["code"],
         "csharp": paths["csharp"],
         "lua":  paths["lua"],
+        "code_manifest": paths["code_manifest"],
+        "csharp_manifest": paths["csharp_manifest"],
+        "lua_manifest": paths["lua_manifest"],
     })
     from .find_symbol import FindSymbolTool
     from .find_usages import FindUsagesTool
@@ -557,3 +531,96 @@ class RebuildCsharpIndexTool:
                f"(модулей: {result.modules_count}, "
                f"символов: {result.symbols_count}) [v{seq}]{dr.render()}")
         return Result(status="ok", message=msg, action="rebuild_csharp_index")
+
+
+class _ModView:
+    """Duck-typed view of a manifest entry for structure rendering.
+
+    Only fields consumed by _module_markers / _structure_line / import
+    graph are populated. Symbols are dropped: structure does not render
+    them; symbol listings are handled by list_units / read_unit.
+    """
+    __slots__ = ("path", "source", "source_hash", "source_len",
+                 "content_hash", "lines", "symbols", "imports",
+                 "imported_modules", "suppress", "has_main",
+                 "calls", "import_bindings")
+
+    def __init__(self, e: dict) -> None:
+        self.path = e.get("path", "")
+        self.source = ""
+        self.source_hash = int(e.get("hash") or 0)
+        self.source_len = int(e.get("len") or 0)
+        self.content_hash = int(e.get("content_hash") or 0)
+        self.lines = int(e.get("lines") or 0)
+        self.symbols = []
+        self.imports = list(e.get("imports") or [])
+        self.imported_modules = list(e.get("imported_modules") or [])
+        self.suppress = frozenset(e.get("suppress") or ())
+        self.has_main = bool(e.get("has_main"))
+        self.calls = list(e.get("raw_calls") or [])
+        self.import_bindings = list(e.get("import_bindings") or [])
+
+
+def _get_snapshot(backend, path: str, per_kind: int | None) -> str:
+    """Read on-disk .md, optionally clip to per_kind bytes on a line boundary."""
+    from ..indexers.state import read_seq
+    if not backend.exists(path):
+        return f"{path}  (not found; run rebuild_index first)"
+    try:
+        text = backend.read(path)
+    except Exception as e:
+        return f"{path}  (read failed: {e})"
+    ver = read_seq(backend, path + ".version")
+    raw = text.encode("utf-8")
+    total_b = len(raw)
+    n_lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+    if per_kind is None or total_b <= per_kind:
+        head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines)"
+        return head + "\n" + text.rstrip("\n")
+    clipped = raw[:per_kind]
+    nl = clipped.rfind(b"\n")
+    if nl > per_kind // 2:
+        clipped = clipped[:nl]
+    clipped_text = clipped.decode("utf-8", errors="replace")
+    head = (f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines, "
+            f"clipped to {len(clipped)} of {total_b} bytes; pass larger max_bytes)")
+    return head + "\n" + clipped_text.rstrip("\n")
+
+
+def _get_structure(backend, k: str, manifest_path: str,
+                   limit: int | None, path_filter: str | None,
+                   sort: str, per_kind: int | None) -> str:
+    """Render one-line-per-module structure from the manifest."""
+    from ..indexers.state import read_seq
+    if not backend.exists(manifest_path):
+        return f"{manifest_path}  (not found; run rebuild_{k}_index first)"
+    try:
+        text = backend.read(manifest_path)
+        entries = json.loads(text)
+    except Exception as e:
+        return f"{manifest_path}  (read/parse failed: {e})"
+    if not isinstance(entries, list):
+        return f"{manifest_path}  (unexpected manifest shape)"
+    mods = [_ModView(e) for e in entries if isinstance(e, dict)]
+    used_by, uses = _build_import_graph(mods)
+    cycles = _find_cycles(uses)
+    lim = 500 if limit is None else int(limit)
+    body, shown, total = render_code_structure(
+        mods, used_by_map=used_by, uses_map=uses, cycles=cycles,
+        limit=lim, path_prefix=path_filter, sort=sort,
+    )
+    head = (f"structure ({shown} of {total} modules; "
+            f"limit={lim}, sort={sort}"
+            + (f", path={path_filter}" if path_filter else "")
+            + ")")
+    full = head + "\n" + body.rstrip("\n")
+    if per_kind is not None:
+        raw = full.encode("utf-8")
+        if len(raw) > per_kind:
+            clipped = raw[:per_kind]
+            nl = clipped.rfind(b"\n")
+            if nl > per_kind // 2:
+                clipped = clipped[:nl]
+            full = clipped.decode("utf-8", errors="replace").rstrip("\n")
+            full += f"\n... clipped to {len(clipped)} of {len(raw)} bytes"
+    return full

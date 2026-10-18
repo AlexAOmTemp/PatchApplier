@@ -42,6 +42,9 @@ from .find_usages import FindUsagesTool
 from .copy import CopyUnitTool
 from .shell import RunPythonTool
 from .verify import VerifySyntaxTool
+from .scope import (
+    GetScopeTool, ExcludeTool, IncludeTool, SetScopeTool, ClearScopeTool,
+)
 from .xml import (
     XmlReadTool, XmlFindTool, XmlMapTool, XmlModifyTool, XmlAppendTool,
     XmlDeleteTool, XmlReplaceTool, XmlCopyTool, XmlMoveTool,
@@ -87,6 +90,11 @@ TOOL_MAP: dict[str, type] = {
     "symbol_graph": SymbolGraphTool,
     "run_python": RunPythonTool,
     "verify_syntax": VerifySyntaxTool,
+    "get_scope": GetScopeTool,
+    "exclude": ExcludeTool,
+    "include": IncludeTool,
+    "set_scope": SetScopeTool,
+    "clear_scope": ClearScopeTool,
     "read_unit": ReadUnitTool,
     "list_units": ListUnitsTool,
     "replace_unit": ReplaceUnitTool,
@@ -125,6 +133,7 @@ __all__ = [
     "CopyUnitTool",
     "RunPythonTool",
     "VerifySyntaxTool",
+    "GetScopeTool", "ExcludeTool", "IncludeTool", "SetScopeTool", "ClearScopeTool",
     "ReadUnitTool", "ListUnitsTool",
     "ReplaceUnitTool", "RemoveUnitTool", "CreateUnitTool", "InsertBlockTool",
     "XmlReadTool",
