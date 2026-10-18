@@ -209,9 +209,9 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 | `read_file` | `file_path` + one of: `section_number` (`"4"`, `"4.1"`), `section_title` (substring), `start_line`+`end_line`; otherwise the whole file. Optional `numbered` (default `true`), `escape` (default `perline`), `max_bytes`. Legacy `raw` (`repr`/`text`/`numbered`) is accepted |
 | `file_stat` | `file_path` — size and section breakdown |
 | `file_exists` | `file_path` |
-| `list_files` | `directory`, optional `show_size`. Above 2000 files returns only a count and a hint to use `survey_dir` |
-| `survey_dir` | `path` (directory), optional `ext` (extension or list), `top` (default 20). Read-only: aggregate of "how many files and of which extensions" plus first-level subdir breakdown. For an **unfamiliar project** — first contact: see the shape of the tree without opening 30,000 paths |
-| `grep` | `pattern` + (`paths`: list / `directory`+`file_glob`); `regex=true` by default, `fixed_strings` for a literal substring; optional `ignore_case`, `word_boundary`, `before`, `after`, `max_results`, `exclude_glob`. **Filesystem only.** Roblox path → `wrong_domain` error, use `grep_mcp` |
+| `list_files` | `directory`, optional `show_size`, `scoped` (default `true`). Above 2000 files returns only a count and a hint to use `survey_dir` |
+| `survey_dir` | `path` (directory), optional `ext` (extension or list), `top` (default 20), `scoped` (default `true`). Read-only: aggregate of "how many files and of which extensions" plus first-level subdir breakdown. For an **unfamiliar project** — first contact: see the shape of the tree without opening 30,000 paths |
+| `grep` | `pattern` + (`paths`: list / `directory`+`file_glob`); `regex=true` by default, `fixed_strings` for a literal substring; optional `ignore_case`, `word_boundary`, `before`, `after`, `max_results`, `exclude_glob`, `scoped` (default `true`). **Filesystem only.** Roblox path → `wrong_domain` error, use `grep_mcp` |
 | `grep_mcp` | `pattern` + `directory` (Roblox path: **a module or a folder** — if it is the script itself, it is searched too); optional `fixed_strings` (default `false`), `ignore_case` (only with `fixed_strings=true`), `before`, `after`, `max_results` (default 200). **Roblox only.** Single `execute_luau` for the whole search. Pattern is **Lua patterns**, not Python regex: `%d`, `%w`, `%.`, `.-` (lazy). For `\d`, `\w`, `\b`, `|`, groups — use `grep` over exported code, or a simple literal |
 
 **`Result` fields.** `status` (`ok` / `error` / `skipped` / `blocked`), `message`, `delta` (for write tools, `None` for reads), `verified` (`bool` for write tools with read-after-write, `None` otherwise), `error_code`, `action`.
@@ -348,8 +348,8 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 
 | Action | Arguments |
 |---|---|
-| `find_symbol` | `query` (qualname substring or module path); optional `manifest_path` |
-| `find_usages` | `query` (module path substring); optional `manifest_path`, `limit`, `local`. **Module-level**: `imports` / `used by` |
+| `find_symbol` | `query` (qualname substring or module path); optional `manifest_path`, `scoped` (default `true`) |
+| `find_usages` | `query` (module path substring); optional `manifest_path`, `limit`, `local`, `scoped` (default `true`). **Module-level**: `imports` / `used by` |
 | `symbol_graph` | `qualname`; optional `occurrence`, `depth` (`1`), `max_nodes` (`300`), `manifest_path`, `kind` (`code`/`lua`), `local`. BFS: callees down to `depth`, callers — one level up |
 | `copy_unit` | `source_file`, `target_file`, `selector`, optional `position`, `anchor`, `container`. Copies a unit without touching source |
 
@@ -361,13 +361,36 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 
 | Action | Arguments |
 |---|---|
-| `get_index` | `kind` (`docs`/`code`/`lua`/list) — **required**; optional `max_bytes` (no default — the index is returned in full) |
-| `get_status` | optional `sections` (`session`/`indexes`/`policy`) |
+| `get_index` | `kind` (`docs`/`code`/`csharp`/`lua`/list) — **required**; optional `max_bytes`, `limit` (default 500; `0` = all), `path` (subtree), `sort` (`path`/`size`), `scoped` (default `true`) |
+| `get_status` | optional `sections` (`session`/`indexes`/`policy`/`scope`); `## Scope` is always shown when the scope is non-empty |
 | `rebuild_index` | optional `docs_dir`, `output`, `skip_files` |
 | `rebuild_code_index` | optional `code_dir`, `output`, `manifest_output`, `skip_files`, `skip_dirs` |
 | `rebuild_lua_code_index` | requires MCP (Roblox) |
 
 `rebuild_*` return `[vN]` — the index version — and a structured diff against what was on disk before the rebuild.
+
+**`get_index` in structure mode.** For `code`/`csharp`/`lua` returns one line per module with markers (`⧉dub:N`, `⚠ large`, `◉`, `← N imp`, `→ N users`). `limit=500` is the default, `limit=0` returns all. `path=` slices a subtree; an explicit `path=` **bypasses scope** for that directory itself, but rules on its subdirectories remain. `sort=size` puts the largest on top.
+
+**`⧉dub:N`** — the file is byte-identical to others (`N` is a group id). Every copy in a group carries the same id; `find_duplicates` (when available) lists paths. Empty files are not marked.
+
+### Scope
+<!-- summary: LLM-managed scope: exclude/include rules for review tools. Every rule carries a mandatory reason. `scoped=false` bypasses for one call. An explicit path bypasses for itself. -->
+
+**`.patch_applier/llmscope`** is a soft presentation filter, managed by the LLM. Not a security boundary; `.patchignore` (hard, user-managed) is a different thing. Format: `<pattern>  # <reason>` (reason required), `!<pattern>  # <reason>` — re-inclusion. Empty/missing = see everything.
+
+| Action | Arguments |
+|---|---|
+| `get_scope` | — ; current rules with reasons |
+| `exclude` | `patterns` (string or list), `reason` — append exclusions |
+| `include` | `patterns`, `reason` — append re-inclusions (`!pattern`) |
+| `set_scope` | `text` — replace entire file (format above) |
+| `clear_scope` | — ; empty file, see everything |
+
+**What is filtered.** `get_index`, `tree`, `grep` (with `directory=`), `list_files`, `survey_dir`, `find_symbol`, `find_usages` — with `scoped=true` (default). The footer reads `[N file(s) hidden by scope (tests 12, manual 3); pass scoped=false to include]`.
+
+**What is NOT filtered.** `read_file` / `read_unit` / `file_stat` / `file_exists` — an explicit path always works. `grep(paths=[...])` — explicit file list. `find_*` with an explicit `manifest_path`. An explicit `path=` in `get_index` / `tree` / `directory=` in `grep` / `list_files` bypasses rules matching that directory itself (or its direct children); rules on subdirectories remain.
+
+**`scoped=false`** — for one call, scope ignored, file not modified. Use it for a one-off look at the hidden, without resetting what's accumulated.
 
 **`⚠` at the end of the diff line** means there were **removals** (`-N`). Removals are the one type of change a write tool should not produce without intent: adding or editing is normal, dropping an unrelated unit is an anomaly. If you see `⚠` — check that what disappeared was meant to disappear before moving on. Normal rebuilds (only `~` and `+`) show no `⚠`.
 

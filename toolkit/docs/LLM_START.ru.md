@@ -108,10 +108,10 @@
 | `read_file` | `file_path` + одно из: `section_number` (`"4"`, `"4.1"`), `section_title` (подстрока), `start_line`+`end_line`; иначе весь файл. Опц. `numbered` (дефолт `true`), `escape` (дефолт `perline`), `max_bytes` |
 | `file_stat` | `file_path` — размер и разбивка по секциям |
 | `file_exists` | `file_path` |
-| `list_files` | `directory`, опц. `show_size`. >2000 файлов — вернёт счётчик и подсказку `survey_dir` |
-| `survey_dir` | `path` (каталог), опц. `ext`, `top` (20). Агрегат «сколько файлов и каких расширений» + разбивка по подкаталогам. Первый контакт с незнакомым проектом |
-| `tree` | `path`; опц. `max_dirs` (500), `max_types` (7), `max_depth` (50). **FS-only.** Только каталоги: size, число файлов, топ-типы. При обрыве — футер `stopped: ...`. Dotdirs скрыты |
-| `grep` | `pattern` + (`paths`: список **файлов** / `directory`+`file_glob`); опц. `regex` (дефолт `true`), `fixed_strings`, `ignore_case`, `word_boundary`, `before`, `after`, `max_results`, `exclude_glob`. **Только файловая система**; Roblox-путь → `wrong_domain` |
+| `list_files` | `directory`, опц. `show_size`, `scoped` (дефолт `true`). >2000 файлов — вернёт счётчик и подсказку `survey_dir` |
+| `survey_dir` | `path` (каталог), опц. `ext`, `top` (20), `scoped` (дефолт `true`). Агрегат «сколько файлов и каких расширений» + разбивка по подкаталогам. Первый контакт с незнакомым проектом |
+| `tree` | `path`; опц. `max_dirs` (500), `max_types` (7), `max_depth` (50), `scoped` (дефолт `true`). **FS-only.** Только каталоги: size, число файлов, топ-типы. При обрыве — футер `stopped: ...`. Dotdirs скрыты |
+| `grep` | `pattern` + (`paths`: список **файлов** / `directory`+`file_glob`); опц. `regex` (дефолт `true`), `fixed_strings`, `ignore_case`, `word_boundary`, `before`, `after`, `max_results`, `exclude_glob`, `scoped` (дефолт `true`). **Только файловая система**; Roblox-путь → `wrong_domain` |
 | `grep_mcp` | `pattern` + `directory` (Roblox-путь: модуль или каталог); опц. `fixed_strings`, `ignore_case`, `before`, `after`, `max_results` (200). **Только Roblox.** Паттерн — **Lua patterns** (`%d`, `%w`, `.-`), не Python regex |
 
 **Поля `Result`.** `status` (`ok`/`error`/`skipped`/`blocked`), `message`, `delta` (write), `verified`, `error_code`, `action`.
@@ -181,8 +181,8 @@
 
 | Действие | Аргументы |
 |---|---|
-| `find_symbol` | `query` (подстрока qualname или путь модуля) |
-| `find_usages` | `query` (подстрока пути модуля); опц. `limit`, `local`. Модульный: `imports` / `used by` |
+| `find_symbol` | `query` (подстрока qualname или путь модуля); опц. `scoped` (дефолт `true`), `manifest_path` |
+| `find_usages` | `query` (подстрока пути модуля); опц. `limit`, `local`, `scoped` (дефолт `true`), `manifest_path`. Модульный: `imports` / `used by` |
 | `symbol_graph` | `qualname`; опц. `occurrence`, `depth` (`1`), `max_nodes` (`300`), `kind` (`code`/`lua`), `local` |
 | `copy_unit` | `source_file`, `target_file`, `selector`, опц. `position`, `anchor`, `container` |
 
@@ -191,13 +191,35 @@
 
 | Действие | Аргументы |
 |---|---|
-| `get_index` | `kind` (`docs`/`code`/`lua`/список) — **обязателен**; опц. `max_bytes` |
-| `get_status` | опц. `sections` (`session`/`indexes`/`policy`) |
+| `get_index` | `kind` (`docs`/`code`/`csharp`/`lua`/список) — **обязателен**; опц. `max_bytes`, `limit` (дефолт 500; `0` = все), `path` (срез по поддереву), `sort` (`path`/`size`), `scoped` (дефолт `true`) |
+| `get_status` | опц. `sections` (`session`/`indexes`/`policy`/`scope`); секция `## Scope` показывается всегда, если scope непустой |
 | `rebuild_index` | опц. `docs_dir`, `output`, `skip_files` |
 | `rebuild_code_index` | опц. `code_dir`, `output`, `manifest_output`, `skip_files`, `skip_dirs` |
 | `rebuild_lua_code_index` | требует MCP (Roblox) |
 
 `rebuild_*` возвращают `[vN]` и diff. `⚠` в конце diff-строки = были удаления (`-N`); удаление соседнего unit'а без намерения — аномалия, разберись.
+
+**`get_index` в режиме structure.** Для `code`/`csharp`/`lua` возвращает по строке на модуль с метками (`⧉dub:N`, `⚠ large`, `◉`, `← N imp`, `→ N users`). `limit=500` — дефолт, `limit=0` — все. `path=` — срез по поддереву; явный `path=` **обходит scope** для самого этого каталога, но правила на его подкаталоги остаются. `sort=size` — крупные сверху.
+
+**`⧉dub:N`** — файл побайтово совпадает с другими (`N` — идентификатор группы). Все копии группы помечены одинаково; `find_duplicates` (если включён) — список путей. Пустые файлы не помечаются.
+### Scope
+<!-- summary: LLM-managed scope: excludes/includes для обзорных тулов. Каждое правило с обязательной причиной. `scoped=false` обходит на один вызов. Явный path обходит для себя. -->
+
+**`.patch_applier/llmscope`** — soft-фильтр представления, управляемый LLM. Не security-boundary; `.patchignore` (hard, user-managed) — другое. Формат: `<pattern>  # <reason>` (причина обязательна), `!<pattern>  # <reason>` — re-inclusion. Пустой/отсутствующий = видно всё.
+
+| Действие | Аргументы |
+|---|---|
+| `get_scope` | — ; текущие правила с причинами |
+| `exclude` | `patterns` (строка или список), `reason` — добавить исключения |
+| `include` | `patterns`, `reason` — re-inclusion (`!pattern`) |
+| `set_scope` | `text` — заменить целиком (формат файла) |
+| `clear_scope` | — ; пустой файл, видно всё |
+
+**Что фильтруется.** `get_index`, `tree`, `grep` (по `directory=`), `list_files`, `survey_dir`, `find_symbol`, `find_usages` — при `scoped=true` (дефолт). В футере — `[N file(s) hidden by scope (tests 12, manual 3); pass scoped=false to include]`.
+
+**Что НЕ фильтруется.** `read_file` / `read_unit` / `file_stat` / `file_exists` — явный путь всегда работает. `grep(paths=[...])` — явный список файлов. `find_*` с явным `manifest_path`. Явный `path=` в `get_index` / `tree` / `directory=` в `grep` / `list_files` — обходит правила, матчащие сам этот каталог (или его прямых детей); правила на подкаталоги остаются.
+
+**`scoped=false`** — на один вызов, scope игнорируется, файл не меняется. Используй, когда нужен разовый взгляд на скрытое, не сбрасывая накопленное.
 ### Исполнение
 
 | Действие | Аргументы |
