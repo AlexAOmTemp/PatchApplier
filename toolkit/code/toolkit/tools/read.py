@@ -256,25 +256,56 @@ class ListFilesTool:
         directory: str = "",
         glob: str = "*",
         show_size: bool = True,
+        scoped: bool = True,
         **_: Any,
     ) -> Result:
         directory = normalize_path(directory)
+        from .scope import read_scope as _rs_lf
+        scope_obj = None
+        hidden_by: dict[str, int] = {}
+        scope_err: str | None = None
+        if scoped:
+            scope_obj, scope_err = _rs_lf(backend)
+            if scope_err or (scope_obj and not scope_obj.rules):
+                scope_obj = None
+
+        def _filter(items: list[str]) -> list[str]:
+            if scope_obj is None:
+                return items
+            exempt = scope_obj.exemptions_for(directory)
+            visible, hid = scope_obj.partition(items, exempt=exempt)
+            for k, v in hid.items():
+                hidden_by[k] = hidden_by.get(k, 0) + v
+            keep = set(visible)
+            return [p for p in items if p in keep]
+
+        def _footer() -> str:
+            if scope_err:
+                return f"\n[scope ERR: {scope_err}]"
+            if not hidden_by:
+                return ""
+            n = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            return f"\n[{n} file(s) hidden by scope ({parts}); pass scoped=false to include]"
         # Prefer list_with_stat: for MCP backends it collapses N stat calls
         # into one execute_luau, avoiding per-file round-trips.
         fn = getattr(backend, "list_with_stat", None) if show_size else None
         if callable(fn):
-            rows = fn(directory or "", glob)
+            rows_all = fn(directory or "", glob)
+            keep = set(_filter([p for p, _, _ in rows_all]))
+            rows = [r for r in rows_all if r[0] in keep]
             if not rows:
-                return Result(status="ok", message="(пусто)", action="list_files")
+                return Result(status="ok", message="(пусто)" + _footer(), action="list_files")
             out = [f"{p}  ({ln} стр., {sz / 1024:.1f} KB)" for p, sz, ln in rows]
             if len(out) > _LIST_FILES_CAP:
                 return _list_too_many(directory, len(out))
             if len(out) > 100:
                 out = out[:100] + [f"... и ещё {len(rows) - 100}"]
-            return Result(status="ok", message="\n".join(out), action="list_files")
-        paths = backend.list(directory or "", glob)
+            return Result(status="ok", message="\n".join(out) + _footer(), action="list_files")
+        paths_all = backend.list(directory or "", glob)
+        paths = _filter(paths_all)
         if not paths:
-            return Result(status="ok", message="(пусто)", action="list_files")
+            return Result(status="ok", message="(пусто)" + _footer(), action="list_files")
         out: list[str] = []
         for p in paths:
             if not show_size:
@@ -290,7 +321,7 @@ class ListFilesTool:
             return _list_too_many(directory, len(out))
         if len(out) > 100:
             out = out[:100] + [f"... и ещё {len(paths) - 100}"]
-        return Result(status="ok", message="\n".join(out), action="list_files")
+        return Result(status="ok", message="\n".join(out) + _footer(), action="list_files")
 
 
 _LIST_FILES_CAP = 2000
@@ -327,9 +358,11 @@ class SurveyDirTool:
         ext: str | list[str] | None = None,
         top: int = 20,
         max_files: int = 200_000,
+        scoped: bool = True,
         **_: Any,
     ) -> Result:
         from collections import Counter
+        from .scope import read_scope as _rs_sd
         path = normalize_path(path) if path else ""
         try:
             all_paths = backend.list(path, "*")
@@ -352,6 +385,16 @@ class SurveyDirTool:
                 message=(f"survey_dir: {len(all_paths)} файлов > {max_files}. "
                          f"Уточни path."),
             )
+
+        hidden_by: dict[str, int] = {}
+        scope_err: str | None = None
+        if scoped:
+            scope_obj, scope_err = _rs_sd(backend)
+            if not scope_err and scope_obj and scope_obj.rules:
+                exempt = scope_obj.exemptions_for(path) if path else set()
+                visible, hidden_by = scope_obj.partition(all_paths, exempt=exempt)
+                keep = set(visible)
+                all_paths = [p for p in all_paths if p in keep]
 
         ext_set: set[str] | None = None
         if ext:
@@ -406,6 +449,15 @@ class SurveyDirTool:
                 lines.append(f"  {name:44s}  {c:8d}   [{sub_s}]")
         if top_files:
             lines.append(f"  {'(файлы в корне)':44s}  {top_files:8d}")
+
+        if scope_err:
+            lines.append("")
+            lines.append(f"[scope ERR: {scope_err}]")
+        elif hidden_by:
+            n = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            lines.append("")
+            lines.append(f"[{n} file(s) hidden by scope ({parts}); pass scoped=false to include]")
 
         return Result(status="ok", action="survey_dir", message="\n".join(lines))
 
