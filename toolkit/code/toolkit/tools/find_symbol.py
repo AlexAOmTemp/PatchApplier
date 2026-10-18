@@ -48,8 +48,10 @@ class FindSymbolTool:
         kind: str = "code",
         limit: int = DEFAULT_LIMIT,
         local: bool = False,
+        scoped: bool = True,
         **_,
     ):
+        _explicit_manifest = manifest_path is not None
         if manifest_path is None:
             if kind == "lua":
                 manifest_path = self._lua_manifest
@@ -113,12 +115,32 @@ class FindSymbolTool:
                 error_code='manifest_invalid',
             )
 
+        # Scope applies only to the default manifest path (a scan).
+        # Explicit manifest_path or local=True bypass it.
+        scope_obj = None
+        hidden_by: dict[str, int] = {}
+        scope_err: str | None = None
+        if scoped and not local and not _explicit_manifest:
+            from .scope import read_scope
+            scope_obj, scope_err = read_scope(backend)
+            if scope_err or (scope_obj and not scope_obj.rules):
+                scope_obj = None
+
         q = query.strip().lower()
         matches: list = []
         for mod in manifest:
             if not isinstance(mod, dict):
                 continue
             path = mod.get('path', '')
+            if scope_obj is not None and scope_obj.is_hidden(path):
+                for r in reversed(scope_obj.rules):
+                    if r.negated:
+                        continue
+                    from ..config.llmscope import _match_path
+                    if _match_path(path, r.glob):
+                        hidden_by[r.glob] = hidden_by.get(r.glob, 0) + 1
+                        break
+                continue
             for sym in mod.get('symbols', []):
                 if not isinstance(sym, dict):
                     continue
@@ -137,10 +159,19 @@ class FindSymbolTool:
             if len(matches) >= limit:
                 break
 
+        footer = ""
+        if hidden_by:
+            n = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            footer = (f"\n[{n} file(s) hidden by scope ({parts}); "
+                      f"pass scoped=false to include]")
+        if scope_err:
+            footer = f"\n[scope ERR: {scope_err}]"
+
         if not matches:
             return Result(
                 status='ok',
-                message=f'\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e: {query!r}',
+                message=f'\u0421\u043e\u0432\u043f\u0430\u0434\u0435\u043d\u0438\u0439 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u043e: {query!r}' + footer,
                 action='find_symbol',
             )
 
@@ -152,4 +183,4 @@ class FindSymbolTool:
             )
             if m['signature']:
                 lines.append(f"      {m['signature']}")
-        return Result(status='ok', message='\n'.join(lines), action='find_symbol')
+        return Result(status='ok', message='\n'.join(lines) + footer, action='find_symbol')

@@ -44,8 +44,10 @@ class FindUsagesTool:
         kind: str = "code",
         limit: int = DEFAULT_LIMIT,
         local: bool = False,
+        scoped: bool = True,
         **_: Any,
     ) -> Result:
+        _explicit_manifest = manifest_path is not None
         if manifest_path is None:
             manifest_path = (self._lua_manifest if kind == "lua"
                              else self._code_manifest)
@@ -105,6 +107,15 @@ class FindUsagesTool:
                 error_code="manifest_invalid",
             )
 
+        scope_obj = None
+        hidden_by: dict[str, int] = {}
+        scope_err: str | None = None
+        if scoped and not local and not _explicit_manifest:
+            from .scope import read_scope
+            scope_obj, scope_err = read_scope(backend)
+            if scope_err or (scope_obj and not scope_obj.rules):
+                scope_obj = None
+
         q = query.strip().lower()
         matches: list[dict] = []
         for mod in manifest:
@@ -113,14 +124,30 @@ class FindUsagesTool:
             path = mod.get("path", "")
             if q not in path.lower():
                 continue
+            if scope_obj is not None and scope_obj.is_hidden(path):
+                for r in reversed(scope_obj.rules):
+                    if r.negated:
+                        continue
+                    from ..config.llmscope import _match_path
+                    if _match_path(path, r.glob):
+                        hidden_by[r.glob] = hidden_by.get(r.glob, 0) + 1
+                        break
+                continue
             matches.append(mod)
             if len(matches) >= limit:
                 break
 
+        footer = ""
+        if hidden_by:
+            n = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            footer = (f"\n[{n} module(s) hidden by scope ({parts}); "
+                      f"pass scoped=false to include]")
+
         if not matches:
             return Result(
                 status="ok",
-                message=f"Модулей не найдено: {query!r}",
+                message=f"Модулей не найдено: {query!r}" + footer,
                 action="find_usages",
             )
 
@@ -139,4 +166,4 @@ class FindUsagesTool:
             else:
                 lines.append(f"      used by:  (none)")
 
-        return Result(status="ok", message="\n".join(lines), action="find_usages")
+        return Result(status="ok", message="\n".join(lines) + footer, action="find_usages")
