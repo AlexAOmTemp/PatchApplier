@@ -22,3 +22,7 @@ def normalize_body(text: str) -> str:
     while lines and not lines[-1]:
         lines.pop()
     return "\n".join(lines)
+
+def content_hash(data: bytes) -> int:
+    """Full-content hash for duplicate detection (blake2b-8, 64-bit)."""
+    return int.from_bytes(hashlib.blake2b(data, digest_size=8).digest(), "big")

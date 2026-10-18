@@ -19,6 +19,7 @@ import re
 from dataclasses import dataclass
 
 from ..core.models import Module, Symbol
+from .hashing import content_hash
 
 
 DOCSTRING_MAX = 200
@@ -42,7 +43,9 @@ class CodeFormat:
 
 def parse_module(text: str, path: str = "") -> Module:
     tree = ast.parse(text)
+    data = text.encode("utf-8")
     h, n = source_hash(text)
+    c_hash = content_hash(data)
     symbols: list[Symbol] = []
     imports: list[str] = []
     imported_modules: list[str] = []
@@ -62,6 +65,7 @@ def parse_module(text: str, path: str = "") -> Module:
         source=text,
         source_hash=h,
         source_len=n,
+        content_hash=c_hash,
         symbols=symbols,
         imports=imports,
         imported_modules=imported_modules,

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import zlib
+from ..formats.hashing import content_hash
 from dataclasses import dataclass
 
 from ..core.backend import Backend
@@ -79,7 +80,9 @@ def build_csharp_index(
         data = text.encode("utf-8")
         file_hash = zlib.crc32(data)
         cached = prev_by_path.get(path)
-        if cached is not None and cached.get("hash") == file_hash:
+        if (cached is not None
+                and cached.get("hash") == file_hash
+                and cached.get("content_hash")):
             modules.append(_module_from_manifest_entry(cached, path))
             continue
 
@@ -141,6 +144,7 @@ def _module_from_manifest_entry(entry: dict, path: str) -> Module:
         source="",
         source_hash=int(entry.get("hash") or 0),
         source_len=int(entry.get("len") or 0),
+        content_hash=int(entry.get("content_hash") or 0),
         symbols=symbols,
         imports=list(entry.get("imports") or []),
         lines=int(entry.get("lines") or 0),
@@ -163,6 +167,7 @@ def _module_from_unit(path: str, source: str, root: Unit) -> Module:
         source=source,
         source_hash=zlib.crc32(data),
         source_len=len(data),
+        content_hash=content_hash(data),
         symbols=symbols,
         imports=usings,
         lines=n_lines,
@@ -213,6 +218,7 @@ def _build_manifest(modules: list[Module]) -> list[dict]:
             "path": m.path,
             "hash": m.source_hash,
             "len": m.source_len,
+            "content_hash": m.content_hash,
             "lines": m.lines,
             "imports": list(m.imports),
             "used_by": [],

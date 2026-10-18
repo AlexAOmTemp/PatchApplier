@@ -127,8 +127,12 @@ def build_code_index(
         cached = prev_by_path.get(path)
         if (cached is not None
                 and cached.get("hash") == file_hash
-                and cached.get("len") == file_len):
-            modules.append(_module_from_manifest_entry(cached, path))
+                and cached.get("len") == file_len
+                and cached.get("content_hash")):
+            m = _module_from_manifest_entry(cached, path)
+            if not m.lines and text:
+                m.lines = _count_lines(text)
+            modules.append(m)
             continue
 
         try:
@@ -178,6 +182,7 @@ def _build_manifest(
             "path": m.path,
             "hash": m.source_hash,
             "len": m.source_len,
+            "content_hash": m.content_hash,
             # Cold modules carry source, so lines are computable here. Cached
             # modules have no source; the renderer needs a real count.
             "lines": m.lines or _count_lines(m.source),
@@ -262,6 +267,7 @@ def _module_from_manifest_entry(entry: dict, path: str) -> Module:
         source="",
         source_hash=int(entry.get("hash") or 0),
         source_len=int(entry.get("len") or 0),
+        content_hash=int(entry.get("content_hash") or 0),
         symbols=symbols,
         imports=list(entry.get("imports") or []),
         imported_modules=list(entry.get("imported_modules") or []),

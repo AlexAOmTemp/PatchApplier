@@ -116,14 +116,17 @@ class Symbol:
 class Module:
     """A parsed Python source file: symbols + imports + source metadata.
 
-    source_hash is a lightweight polynomial over the first 2048 bytes;
-    the same algorithm is used in the Lua-side code_index_regen so that
-    a hash mismatch between Python and Studio is directly comparable.
+    source_hash is a lightweight polynomial over the full source; the same
+    algorithm is used in the Lua-side code_index_regen so that a hash
+    mismatch between Python and Studio is directly comparable.
+    content_hash is blake2b-8 over full source bytes; used only for
+    duplicate detection across the tree (0 = not computed).
     """
     path: str
     source: str
     source_hash: int
     source_len: int
+    content_hash: int = 0
     symbols: list[Symbol] = field(default_factory=list)
     imports: list[str] = field(default_factory=list)
     imported_modules: list[str] = field(default_factory=list)
