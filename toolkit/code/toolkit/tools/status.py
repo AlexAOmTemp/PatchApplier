@@ -43,7 +43,7 @@ class GetStatusTool:
     path_args: list[str] = []
     path_list_args: list[str] = []
 
-    DEFAULT_SECTIONS = ("session", "indexes", "policy")
+    DEFAULT_SECTIONS = ("session", "indexes", "policy", "scope")
 
     _context: dict = {}
 
@@ -125,6 +125,13 @@ class GetStatusTool:
             blocks.append(self._render_indexes(backend))
         if "policy" in secs:
             blocks.append(self._render_policy(backend))
+        # Scope is always shown when non-empty (LLMSCOPE §5.4):
+        # an LLM starting a fresh session must see the current working
+        # area without having to guess. Only omitted when the file is
+        # absent or empty — i.e. "see everything".
+        scope_block = self._render_scope(backend)
+        if scope_block:
+            blocks.append(scope_block)
 
         return Result(
             status="ok",
@@ -355,3 +362,24 @@ class GetStatusTool:
             except Exception:
                 pass
         return "[" + " ".join(tokens) + "]" if tokens else "[-]"
+
+    def _render_scope(self, backend: Backend) -> str:
+        """`## Scope` dashboard: rules + reasons, with a working-set header.
+
+        Empty when `.patch_applier/llmscope` is absent or has no rules.
+        """
+        from .scope import read_scope
+        scope, err = read_scope(backend)
+        if err:
+            return f"## Scope\n(read error: {err})"
+        if not scope.rules:
+            return ""
+        lines = ["## Scope"]
+        ex = [r for r in scope.rules if not r.negated]
+        inc = [r for r in scope.rules if r.negated]
+        lines.append(f"rules: {len(scope.rules)}  (exclude {len(ex)}, include {len(inc)})")
+        lines.append("")
+        for r in scope.rules:
+            prefix = "!" if r.negated else " "
+            lines.append(f"  {prefix}{r.glob:44s}  # {r.reason}")
+        return "\n".join(lines)
