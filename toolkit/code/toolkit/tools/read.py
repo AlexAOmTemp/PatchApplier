@@ -439,9 +439,11 @@ class GrepTool:
         before: int = 0,
         after: int = 0,
         max_results: int = 200,
+        scoped: bool = True,
         **_: Any,
     ) -> Result:
         from ..core.paths import is_mcp_path
+        from .scope import read_scope as _read_scope
         if directory and is_mcp_path(directory) and not paths:
             return Result(
                 status="error", action="grep", error_code="wrong_domain",
@@ -494,6 +496,18 @@ class GrepTool:
             return any(fnmatch.fnmatch(name, e) or fnmatch.fnmatch(p, e) for e in excludes)
 
         candidates = [p for p in candidates if not _excluded(p)]
+
+        # Scope applies to directory scans only. Explicit `paths` bypass it:
+        # the caller named the files, hiding them would be unhelpful.
+        hidden_by: dict[str, int] = {}
+        scope_err: str | None = None
+        if scoped and not paths:
+            scope, scope_err = _read_scope(backend)
+            if not scope_err and scope.rules:
+                exempt = scope.exemptions_for(directory) if directory else set()
+                visible, hidden_by = scope.partition(candidates, exempt=exempt)
+                keep = set(visible)
+                candidates = [p for p in candidates if p in keep]
 
         try:
             pat = Pattern(
@@ -554,14 +568,29 @@ class GrepTool:
                 if len(results) >= max_results:
                     results.append(f"... обрезано на {max_results} строк")
                     header = f"Найдено {match_count}+ совпадений (обрезано):"
-                    return Result(status="ok", message=header + "\n" + "\n".join(results),
+                    tail = ""
+                    if hidden_by:
+                        n = sum(hidden_by.values())
+                        parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+                        tail = (f"\n[{n} file(s) hidden by scope ({parts}); "
+                                f"pass scoped=false to include]")
+                    return Result(status="ok", message=header + "\n" + "\n".join(results) + tail,
                                   action="grep")
+
+        scope_footer = ""
+        if scope_err:
+            scope_footer = f"\n[scope ERR: {scope_err}]"
+        elif hidden_by:
+            n = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            scope_footer = (f"\n[{n} file(s) hidden by scope ({parts}); "
+                            f"pass scoped=false to include]")
 
         if not results:
             msg = f"Совпадений не найдено: {pattern!r}"
             if skipped:
                 msg += f" (пропущено файлов: {skipped})"
-            return Result(status="ok", message=msg, action="grep")
+            return Result(status="ok", message=msg + scope_footer, action="grep")
 
         header = f"Найдено {match_count} совпадений:"
-        return Result(status="ok", message=header + "\n" + "\n".join(results), action="grep")
+        return Result(status="ok", message=header + "\n" + "\n".join(results) + scope_footer, action="grep")
