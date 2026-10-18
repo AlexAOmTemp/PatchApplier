@@ -9,6 +9,7 @@ from ..core.models import Result
 from ..formats import Format
 from ..formats.renderer import render_code_structure
 from ..indexers.code import _build_import_graph, _find_cycles
+from .scope import read_scope
 from pathlib import Path
 
 from ..indexers.doc import build_index
@@ -223,6 +224,7 @@ class GetIndexTool:
             limit: int | None = 500,
             path: str | None = None,
             sort: str = "path",
+            scoped: bool = True,
             **_: Any,
         ) -> Result:
             # -- 1. normalize kind ------------------------------------------
@@ -293,7 +295,7 @@ class GetIndexTool:
                 if k in _MANIFEST:
                     mpath = self._paths[_MANIFEST[k]]
                     blocks.append(f"{k}: " + _get_structure(
-                        backend, k, mpath, limit, path, sort, per_kind))
+                        backend, k, mpath, limit, path, sort, per_kind, scoped))
                     continue
                 spath = self._paths[k]
                 blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind))
@@ -589,9 +591,12 @@ def _get_snapshot(backend, path: str, per_kind: int | None) -> str:
 
 def _get_structure(backend, k: str, manifest_path: str,
                    limit: int | None, path_filter: str | None,
-                   sort: str, per_kind: int | None) -> str:
-    """Render one-line-per-module structure from the manifest."""
-    from ..indexers.state import read_seq
+                   sort: str, per_kind: int | None, scoped: bool = True) -> str:
+    """Render one-line-per-module structure from the manifest.
+
+    `scoped=True` (default) drops modules hidden by `.patch_applier/llmscope`
+    and reports the count in a footer. `scoped=False` sees everything.
+    """
     if not backend.exists(manifest_path):
         return f"{manifest_path}  (not found; run rebuild_{k}_index first)"
     try:
@@ -602,16 +607,49 @@ def _get_structure(backend, k: str, manifest_path: str,
     if not isinstance(entries, list):
         return f"{manifest_path}  (unexpected manifest shape)"
     mods = [_ModView(e) for e in entries if isinstance(e, dict)]
-    used_by, uses = _build_import_graph(mods)
+
+    # Subtree filter first: `path=` limits both what is rendered and which
+    # paths participate in scope partition.
+    pool = mods
+    if path_filter:
+        norm = path_filter.rstrip("/")
+        pool = [m for m in pool if m.path == norm or m.path.startswith(norm + "/")]
+
+    hidden_by: dict[str, int] = {}
+    exempt: set[str] = set()
+    scope_err: str | None = None
+    if scoped:
+        scope, scope_err = read_scope(backend)
+        if not scope_err and scope.rules:
+            if path_filter:
+                exempt = scope.exemptions_for(path_filter)
+            paths = [m.path for m in pool]
+            visible, hidden_by = scope.partition(paths, exempt=exempt)
+            visible_set = set(visible)
+            pool = [m for m in pool if m.path in visible_set]
+
+    used_by, uses = _build_import_graph(pool)
     cycles = _find_cycles(uses)
     lim = 500 if limit is None else int(limit)
     body, shown, total = render_code_structure(
-        mods, used_by_map=used_by, uses_map=uses, cycles=cycles,
-        limit=lim, path_prefix=path_filter, sort=sort,
+        pool, used_by_map=used_by, uses_map=uses, cycles=cycles,
+        limit=lim, path_prefix=None, sort=sort,
     )
+    scope_note = ""
+    if scope_err:
+        scope_note = f", scope ERR: {scope_err}"
+    else:
+        bits = []
+        if scoped and hidden_by:
+            bits.append(f"scoped: {sum(hidden_by.values())} hidden")
+        if exempt:
+            bits.append(f"bypass: {len(exempt)} rule(s)")
+        if bits:
+            scope_note = ", " + "; ".join(bits)
     head = (f"structure ({shown} of {total} modules; "
             f"limit={lim}, sort={sort}"
             + (f", path={path_filter}" if path_filter else "")
+            + scope_note
             + ")")
     full = head + "\n" + body.rstrip("\n")
     if per_kind is not None:
@@ -623,4 +661,7 @@ def _get_structure(backend, k: str, manifest_path: str,
                 clipped = clipped[:nl]
             full = clipped.decode("utf-8", errors="replace").rstrip("\n")
             full += f"\n... clipped to {len(clipped)} of {len(raw)} bytes"
+    if scoped and hidden_by and not scope_err:
+        parts = ", ".join(f"{k2} {v}" for k2, v in sorted(hidden_by.items()))
+        full += f"\n[{sum(hidden_by.values())} hidden by scope ({parts}); pass scoped=false to include]"
     return full

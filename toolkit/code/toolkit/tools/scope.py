@@ -21,7 +21,7 @@ from ..config import llmscope
 SCOPE_PATH = ".patch_applier/llmscope"
 
 
-def _read_scope(backend: Backend) -> tuple[llmscope.Scope, str | None]:
+def read_scope(backend: Backend) -> tuple[llmscope.Scope, str | None]:
     """Return (scope, error). Error is set when read/parse failed."""
     try:
         if not backend.exists(SCOPE_PATH):
@@ -35,7 +35,7 @@ def _read_scope(backend: Backend) -> tuple[llmscope.Scope, str | None]:
         return llmscope.Scope(), f"parse failed: {e}"
 
 
-def _write_scope(backend: Backend, scope: llmscope.Scope) -> str | None:
+def write_scope(backend: Backend, scope: llmscope.Scope) -> str | None:
     try:
         backend.write(SCOPE_PATH, llmscope.serialize(scope))
     except Exception as e:
@@ -58,7 +58,7 @@ class GetScopeTool:
     op = "read"
 
     def execute(self, backend: Backend, **_: Any) -> Result:
-        scope, err = _read_scope(backend)
+        scope, err = read_scope(backend)
         if err:
             return Result(status="error", message=err,
                           error_code="scope_read_failed", action="get_scope")
@@ -86,7 +86,7 @@ class ExcludeTool:
             return Result(status="error",
                           message="`reason` is required (brief explanation of why)",
                           error_code="reason_required", action="exclude")
-        scope, err = _read_scope(backend)
+        scope, err = read_scope(backend)
         if err:
             return Result(status="error", message=err,
                           error_code="scope_read_failed", action="exclude")
@@ -98,7 +98,7 @@ class ExcludeTool:
             scope.rules.append(llmscope.Rule(glob=pat, reason=reason.strip(),
                                              negated=False))
             added += 1
-        werr = _write_scope(backend, scope)
+        werr = write_scope(backend, scope)
         if werr:
             return Result(status="error", message=werr,
                           error_code="scope_write_failed", action="exclude")
@@ -123,7 +123,7 @@ class IncludeTool:
             return Result(status="error",
                           message="`reason` is required (brief explanation of why)",
                           error_code="reason_required", action="include")
-        scope, err = _read_scope(backend)
+        scope, err = read_scope(backend)
         if err:
             return Result(status="error", message=err,
                           error_code="scope_read_failed", action="include")
@@ -137,7 +137,7 @@ class IncludeTool:
             scope.rules.append(llmscope.Rule(glob=pat, reason=reason.strip(),
                                              negated=True))
             added += 1
-        werr = _write_scope(backend, scope)
+        werr = write_scope(backend, scope)
         if werr:
             return Result(status="error", message=werr,
                           error_code="scope_write_failed", action="include")
@@ -161,7 +161,7 @@ class SetScopeTool:
             return Result(status="error", message=str(e),
                           error_code="scope_parse_error", action="set_scope")
         scope = llmscope.Scope(rules)
-        werr = _write_scope(backend, scope)
+        werr = write_scope(backend, scope)
         if werr:
             return Result(status="error", message=werr,
                           error_code="scope_write_failed", action="set_scope")
@@ -176,7 +176,7 @@ class ClearScopeTool:
     op = "write"
 
     def execute(self, backend: Backend, **_: Any) -> Result:
-        werr = _write_scope(backend, llmscope.Scope())
+        werr = write_scope(backend, llmscope.Scope())
         if werr:
             return Result(status="error", message=werr,
                           error_code="scope_write_failed", action="clear_scope")

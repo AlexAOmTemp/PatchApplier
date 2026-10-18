@@ -58,17 +58,24 @@ class Scope:
                 hidden = not r.negated
         return hidden
 
-    def partition(self, paths: Iterable[str]) -> tuple[list[str], dict[str, int]]:
+    def partition(self, paths: Iterable[str],
+                  exempt: set[str] | None = None) -> tuple[list[str], dict[str, int]]:
         """Split into visible paths and per-pattern hidden counts.
 
         A path is attributed to the LAST matching rule's pattern. Negated
         rules re-include: the path goes to visible, not to hidden_by.
+        `exempt` is a set of glob strings to skip entirely — used by an
+        explicit `path=` request to override the rules hiding that subtree
+        root while keeping finer rules intact.
         """
+        exempt = exempt or set()
         visible: list[str] = []
         hidden_by: dict[str, int] = {}
         for p in paths:
             matched: Rule | None = None
             for r in self.rules:
+                if r.glob in exempt:
+                    continue
                 if _match_path(p, r.glob):
                     matched = r
             if matched is None or matched.negated:
@@ -77,6 +84,27 @@ class Scope:
                 key = ("!" if matched.negated else "") + matched.glob
                 hidden_by[key] = hidden_by.get(key, 0) + 1
         return visible, hidden_by
+
+    def exemptions_for(self, path_prefix: str) -> set[str]:
+        """Rules whose glob would hide `path_prefix` (either the entry
+        itself or any hypothetical child). Used to bypass scope on an
+        explicit `path=` without disabling rules for stricter subpaths.
+
+        Two probes: the path itself (catches `tests`, `tests/foo.py`) and
+        `path/__probe__` (catches `tests/*`). Subpath rules like
+        `tests/slow` match neither probe, so they keep applying.
+        """
+        norm = path_prefix.rstrip("/")
+        if not norm:
+            return set()
+        probes = (norm, norm + "/__probe__")
+        out: set[str] = set()
+        for r in self.rules:
+            if r.negated:
+                continue
+            if any(_match_path(pr, r.glob) for pr in probes):
+                out.add(r.glob)
+        return out
 
     def footer(self, hidden_by: dict[str, int], scoped: bool) -> str:
         if not scoped or not hidden_by:
@@ -94,9 +122,17 @@ def _match_path(path: str, pattern: str) -> bool:
     if "/" not in pattern:
         return any(fnmatch.fnmatchcase(seg, pattern)
                    for seg in path.split("/") if seg)
-    if fnmatch.fnmatchcase(path, pattern):
-        return True
-    return path == pattern or path.startswith(pattern + "/")
+    # Path pattern: try as prefix from the start, and on every segment
+    # boundary (so `Mods/1201382956` matches `RimWorld/Mods/1201382956/x`
+    # regardless of which workspace root sits in front of it).
+    parts = path.split("/")
+    for i in range(len(parts)):
+        suffix = "/".join(parts[i:])
+        if fnmatch.fnmatchcase(suffix, pattern):
+            return True
+        if suffix == pattern or suffix.startswith(pattern + "/"):
+            return True
+    return False
 
 
 def parse(text: str) -> list[Rule]:
