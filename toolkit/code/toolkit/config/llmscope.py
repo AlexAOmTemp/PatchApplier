@@ -58,6 +58,17 @@ class Scope:
                 hidden = not r.negated
         return hidden
 
+    def is_hidden_ex(self, path: str, exempt: set[str] | None = None) -> bool:
+        """Like is_hidden, but skips rules whose glob is in `exempt`."""
+        exempt = exempt or set()
+        hidden = False
+        for r in self.rules:
+            if r.glob in exempt:
+                continue
+            if _match_path(path, r.glob):
+                hidden = not r.negated
+        return hidden
+
     def partition(self, paths: Iterable[str],
                   exempt: set[str] | None = None) -> tuple[list[str], dict[str, int]]:
         """Split into visible paths and per-pattern hidden counts.

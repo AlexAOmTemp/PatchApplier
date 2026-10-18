@@ -23,6 +23,7 @@ from typing import Any
 
 from ..core.backend import Backend
 from ..core.models import Result
+from .scope import read_scope
 
 
 # Backend-supported extensions first, in this fixed order; remaining
@@ -99,6 +100,7 @@ class TreeTool:
         max_types: int = DEFAULT_MAX_TYPES,
         max_depth: int = DEFAULT_MAX_DEPTH,
         show_types: bool = True,
+        scoped: bool = True,
         **_: Any,
     ) -> Result:
         if not path:
@@ -118,6 +120,22 @@ class TreeTool:
                           message="max_dirs / max_types must be > 0; max_depth >= 0")
 
         rel = path.strip().strip("/")
+
+        # Scope: tree always has an explicit `path`. Rules matching that
+        # exact path (or its direct children) are exempt; finer rules
+        # (`tests/slow`, `path/sub/*`) still apply to discovered subdirs.
+        scope_obj = None
+        exempt: set[str] = set()
+        scope_err: str | None = None
+        hidden_count = 0
+        hidden_by: dict[str, int] = {}
+        if scoped:
+            scope_obj, scope_err = read_scope(backend)
+            if scope_err or (scope_obj and not scope_obj.rules):
+                scope_obj = None
+            elif scope_obj:
+                exempt = scope_obj.exemptions_for(rel)
+
         roots = _fs_roots(backend)
         if not roots:
             return Result(
@@ -197,7 +215,20 @@ class TreeTool:
                         n = e.name
                         if n.startswith("."):
                             continue
-                        subdirs.append((Path(e.path), f"{display}/{n}", depth + 1))
+                        child_display = f"{display}/{n}"
+                        if scope_obj is not None:
+                            if scope_obj.is_hidden_ex(child_display, exempt):
+                                hidden_count += 1
+                                # Attribute to the last matching rule.
+                                for r in reversed(scope_obj.rules):
+                                    if r.negated or r.glob in exempt:
+                                        continue
+                                    from ..config.llmscope import _match_path
+                                    if _match_path(child_display, r.glob):
+                                        hidden_by[r.glob] = hidden_by.get(r.glob, 0) + 1
+                                        break
+                                continue
+                        subdirs.append((Path(e.path), child_display, depth + 1))
                     elif e.is_file(follow_symlinks=False):
                         files += 1
                         try:
@@ -221,10 +252,15 @@ class TreeTool:
         max_seen = max((d["depth"] for d in visited), default=0)
 
         capped = len(stack) > 0
+        scope_bits = ""
+        if scope_err:
+            scope_bits = f", scope ERR: {scope_err}"
+        elif hidden_count:
+            scope_bits = f", scoped: {hidden_count} hidden"
         header = (
             f"=== tree: {rel or '[' + ', '.join(n or '.' for n, _ in roots) + ']'} "
             f"({len(visited)} dirs, {total_files} files, {_human(total_size)}"
-            f"{' (partial)' if capped else ''}) ==="
+            f"{' (partial)' if capped else ''}{scope_bits}) ==="
         )
         lines = [header]
         for d in visited:
@@ -242,5 +278,11 @@ class TreeTool:
             lines.append(
                 f"=== stopped: max_dirs={max_dirs} reached at depth {max_seen}; "
                 f"frontier_unexpanded={len(stack)} (deeper: >={len(stack)}) ==="
+            )
+        if hidden_by and not scope_err:
+            total_h = sum(hidden_by.values())
+            parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
+            lines.append(
+                f"[{total_h} dir(s) hidden by scope ({parts}); pass scoped=false to include]"
             )
         return Result(status="ok", action="tree", message="\n".join(lines))
