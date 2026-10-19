@@ -101,6 +101,7 @@ class TreeTool:
         max_depth: int = DEFAULT_MAX_DEPTH,
         show_types: bool = True,
         scoped: bool = True,
+        recursive_sizes: bool = True,
         **_: Any,
     ) -> Result:
         if not path:
@@ -121,9 +122,6 @@ class TreeTool:
 
         rel = path.strip().strip("/")
 
-        # Scope: tree always has an explicit `path`. Rules matching that
-        # exact path (or its direct children) are exempt; finer rules
-        # (`tests/slow`, `path/sub/*`) still apply to discovered subdirs.
         scope_obj = None
         exempt: set[str] = set()
         scope_err: str | None = None
@@ -144,11 +142,6 @@ class TreeTool:
                         "MCP-only backend не поддерживается",
             )
 
-        # Resolve `path` to a starting set of (physical, display, depth).
-        # Semantics mirror `read`/`list`: for a concrete path the first
-        # segment selects the root by name; only the empty path ("" / ".")
-        # means "all roots". RootDirBackend has an implicit root -- any
-        # path is root-relative.
         stack: list[tuple[Path, str, int]] = []
         implicit = roots[0][0] is None
         if implicit:
@@ -191,10 +184,57 @@ class TreeTool:
                     message=f"path not found or not a directory: {path}",
                 )
 
+        def _walk_recursive_totals(phys_root: Path) -> dict[str, dict]:
+            """Recursive totals per dir. Key: rel path ('' = root itself)."""
+            stats: dict[str, dict] = {}
+            def walk(phys: Path, relp: str) -> dict:
+                try:
+                    entries = list(os.scandir(phys))
+                except OSError:
+                    d = {"files": 0, "size": 0, "subdirs": 0, "types": Counter()}
+                    stats[relp] = d
+                    return d
+                files = size = sub = 0
+                types: Counter = Counter()
+                for e in entries:
+                    try:
+                        if e.is_symlink():
+                            continue
+                        n = e.name
+                        if e.is_dir(follow_symlinks=False):
+                            if n.startswith("."):
+                                continue
+                            sub += 1
+                            child = walk(Path(e.path), f"{relp}/{n}" if relp else n)
+                            files += child["files"]
+                            size += child["size"]
+                            types.update(child["types"])
+                        elif e.is_file(follow_symlinks=False):
+                            files += 1
+                            try:
+                                size += e.stat(follow_symlinks=False).st_size
+                            except OSError:
+                                pass
+                            ext = Path(n).suffix.lower()
+                            if ext:
+                                types[ext] += 1
+                    except OSError:
+                        continue
+                d = {"files": files, "size": size, "subdirs": sub, "types": types}
+                stats[relp] = d
+                return d
+            walk(phys_root, "")
+            return stats
+
+        totals_by_display: dict[str, dict] = {}
+        if recursive_sizes:
+            for phys, display, _depth in stack:
+                subtree = _walk_recursive_totals(phys)
+                for relp, stat in subtree.items():
+                    full = f"{display}/{relp}" if relp else display
+                    totals_by_display[full] = stat
+
         visited: list[dict] = []
-        # DFS pre-order (LIFO stack). Push in reverse so leftmost child is
-        # visited first, yielding an alphabetically-correct pre-order for a
-        # stable-looking tree.
         while stack and len(visited) < max_dirs:
             phys, display, depth = stack.pop()
             if depth > max_depth:
@@ -204,9 +244,9 @@ class TreeTool:
             except OSError:
                 continue
             subdirs: list[tuple[Path, str, int]] = []
-            files = 0
-            size = 0
-            types: Counter = Counter()
+            direct_files = 0
+            direct_size = 0
+            direct_types: Counter = Counter()
             for e in entries:
                 try:
                     if e.is_symlink():
@@ -219,7 +259,6 @@ class TreeTool:
                         if scope_obj is not None:
                             if scope_obj.is_hidden_ex(child_display, exempt):
                                 hidden_count += 1
-                                # Attribute to the last matching rule.
                                 for r in reversed(scope_obj.rules):
                                     if r.negated or r.glob in exempt:
                                         continue
@@ -230,27 +269,47 @@ class TreeTool:
                                 continue
                         subdirs.append((Path(e.path), child_display, depth + 1))
                     elif e.is_file(follow_symlinks=False):
-                        files += 1
+                        direct_files += 1
                         try:
-                            size += e.stat(follow_symlinks=False).st_size
+                            direct_size += e.stat(follow_symlinks=False).st_size
                         except OSError:
                             pass
                         ext = Path(e.name).suffix.lower()
                         if ext:
-                            types[ext] += 1
+                            direct_types[ext] += 1
                 except OSError:
                     continue
+
+            pre = totals_by_display.get(display)
+            if pre is not None:
+                rec_files = pre["files"]
+                rec_size = pre["size"]
+                rec_types = pre["types"]
+                n_subdirs = pre["subdirs"]
+            else:
+                rec_files = direct_files
+                rec_size = direct_size
+                rec_types = direct_types
+                n_subdirs = len(subdirs)
+
             visited.append({
                 "display": display, "depth": depth,
-                "files": files, "size": size, "types": types,
+                "files": direct_files, "size": direct_size,
+                "types": direct_types,
+                "rec_files": rec_files, "rec_size": rec_size,
+                "rec_types": rec_types, "subdirs_count": n_subdirs,
             })
             subdirs.sort(key=lambda x: x[0].name.lower())
             stack.extend(reversed(subdirs))
 
-        total_files = sum(d["files"] for d in visited)
-        total_size = sum(d["size"] for d in visited)
-        max_seen = max((d["depth"] for d in visited), default=0)
+        if not visited:
+            return Result(status="error", action="tree",
+                          error_code="not_found",
+                          message=f"no directories under {path!r}")
 
+        total_files = sum(d["rec_files"] for d in visited if d["depth"] == 0)
+        total_size = sum(d["rec_size"] for d in visited if d["depth"] == 0)
+        max_seen = max((d["depth"] for d in visited), default=0)
         capped = len(stack) > 0
         scope_bits = ""
         if scope_err:
@@ -266,13 +325,19 @@ class TreeTool:
         for d in visited:
             indent = "  " * d["depth"]
             types_str = ""
-            if show_types and d["types"]:
-                t = _format_types(d["types"], max_types)
+            show_t = d["rec_types"] if recursive_sizes else d["types"]
+            if show_types and show_t:
+                t = _format_types(show_t, max_types)
                 if t:
                     types_str = f", {t}"
+            sub_note = ""
+            if not recursive_sizes and d["subdirs_count"]:
+                sub_note = f", {d['subdirs_count']} subdirs"
+            size_n = d["rec_size"] if recursive_sizes else d["size"]
+            files_n = d["rec_files"] if recursive_sizes else d["files"]
             lines.append(
                 f"{indent}{d['display']}  "
-                f"({_human(d['size'])}, {d['files']} files{types_str})"
+                f"({_human(size_n)}, {files_n} files{sub_note}{types_str})"
             )
         if capped:
             lines.append(
