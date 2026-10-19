@@ -257,6 +257,8 @@ class ListFilesTool:
         glob: str = "*",
         show_size: bool = True,
         scoped: bool = True,
+        recursive: bool = False,
+        show_hidden: bool = False,
         **_: Any,
     ) -> Result:
         directory = normalize_path(directory)
@@ -287,23 +289,58 @@ class ListFilesTool:
             n = sum(hidden_by.values())
             parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
             return f"\n[{n} file(s) hidden by scope ({parts}); pass scoped=false to include]"
-        # Prefer list_with_stat: for MCP backends it collapses N stat calls
-        # into one execute_luau, avoiding per-file round-trips.
+
         fn = getattr(backend, "list_with_stat", None) if show_size else None
         if callable(fn):
             rows_all = fn(directory or "", glob)
-            keep = set(_filter([p for p, _, _ in rows_all]))
-            rows = [r for r in rows_all if r[0] in keep]
-            if not rows:
-                return Result(status="ok", message="(пусто)" + _footer(), action="list_files")
-            out = [f"{p}  ({ln} стр., {sz / 1024:.1f} KB)" for p, sz, ln in rows]
-            if len(out) > _LIST_FILES_CAP:
-                return _list_too_many(directory, len(out))
-            if len(out) > 100:
-                out = out[:100] + [f"... и ещё {len(rows) - 100}"]
-            return Result(status="ok", message="\n".join(out) + _footer(), action="list_files")
-        paths_all = backend.list(directory or "", glob)
+            stat_map = {p: (sz, ln) for p, sz, ln in rows_all}
+            paths_all = [p for p, _, _ in rows_all]
+        else:
+            stat_map = {}
+            paths_all = backend.list(directory or "", glob)
+
         paths = _filter(paths_all)
+        if not show_hidden:
+            paths = [p for p in paths
+                     if not any(part.startswith(".") for part in p.split("/") if part)]
+
+        if not recursive:
+            prefix = (directory.rstrip("/") + "/") if directory else ""
+            direct_files: list[str] = []
+            subdirs: set[str] = set()
+            for p in paths:
+                if prefix and not p.startswith(prefix):
+                    continue
+                rel = p[len(prefix):] if prefix else p
+                parts = rel.split("/")
+                if len(parts) == 1:
+                    direct_files.append(p)
+                else:
+                    subdirs.add((prefix + parts[0]) if prefix else parts[0])
+
+            out: list[str] = []
+            for d in sorted(subdirs):
+                out.append(f"{d}/")
+            for f in sorted(direct_files):
+                if not show_size:
+                    out.append(f)
+                    continue
+                if f in stat_map:
+                    sz, ln = stat_map[f]
+                    out.append(f"{f}  ({ln} стр., {sz / 1024:.1f} KB)")
+                else:
+                    try:
+                        st = backend.stat(f)
+                        out.append(f"{f}  ({st.lines} стр., {st.size_bytes / 1024:.1f} KB)")
+                    except Exception:
+                        out.append(f)
+
+            if not out:
+                return Result(status="ok", message="(пусто)" + _footer(), action="list_files")
+            if len(out) > 100:
+                out = out[:100] + [f"... и ещё {len(out) - 100}"]
+            return Result(status="ok", message="\n".join(out) + _footer(), action="list_files")
+
         if not paths:
             return Result(status="ok", message="(пусто)" + _footer(), action="list_files")
         out: list[str] = []
@@ -311,12 +348,15 @@ class ListFilesTool:
             if not show_size:
                 out.append(p)
                 continue
-            try:
-                st = backend.stat(p)
-                size_kb = st.size_bytes / 1024
-                out.append(f"{p}  ({st.lines} стр., {size_kb:.1f} KB)")
-            except Exception:
-                out.append(p)
+            if p in stat_map:
+                sz, ln = stat_map[p]
+                out.append(f"{p}  ({ln} стр., {sz / 1024:.1f} KB)")
+            else:
+                try:
+                    st = backend.stat(p)
+                    out.append(f"{p}  ({st.lines} стр., {st.size_bytes / 1024:.1f} KB)")
+                except Exception:
+                    out.append(p)
         if len(out) > _LIST_FILES_CAP:
             return _list_too_many(directory, len(out))
         if len(out) > 100:
@@ -332,8 +372,9 @@ def _list_too_many(directory: str, n: int) -> Result:
         status="ok", action="list_files",
         message=(
             f"{directory or '(root)'}: {n} файлов — слишком много для плоского списка.\n"
-            f"Используй `survey_dir` (агрегат по расширениям и подкаталогам) "
-            f"или уточни `directory=` / `file_glob=`."
+            f"Используй `recursive=False` (прямые дети) "
+            f"или `survey_dir` (агрегат по расширениям и подкаталогам), "
+            f"или уточни `directory=` / `glob=`."
         ),
     )
 
