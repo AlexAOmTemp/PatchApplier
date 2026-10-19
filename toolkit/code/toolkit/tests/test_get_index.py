@@ -82,13 +82,71 @@ def main():
 
         # --- 2b. no max_bytes -> full content, no clip marker ---
         print()
-        print("== no max_bytes -> full ==")
+        print("== no max_bytes, small file (under 32 KB) -> full ==")
         big = "line\n" * 5000  # ~25 KB, well past old default 12 KB
         (root / "INDEX.md").write_text(big, encoding="utf-8")
         r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs"}}])[0]
         t.expect("ok", r.status == "ok")
         t.expect("not clipped by default", "clipped" not in r.message)
         t.expect("full content present", r.message.count("line") >= 5000)
+
+        # --- 2c. no max_bytes: large file (over 32 KB) -> clipped ---
+        print()
+        print("== no max_bytes: large file (over 32 KB) -> clipped ==")
+        big = "line\n" * 10000  # ~50 KB, over new 32 KB default
+        (root / "INDEX.md").write_text(big, encoding="utf-8")
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs"}}])[0]
+        t.expect("large ok", r.status == "ok")
+        t.expect("large clipped", "clipped to" in r.message)
+        t.expect("large partial", r.message.count("line") < 10000)
+
+        # --- 2d. max_bytes=0 -> explicit opt-out: full even if > 32 KB ---
+        print()
+        print("== max_bytes=0 -> full (explicit opt-out) ==")
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "max_bytes": 0}}])[0]
+        t.expect("opt-out ok", r.status == "ok")
+        t.expect("opt-out not clipped", "clipped" not in r.message)
+        t.expect("opt-out full content", r.message.count("line") >= 10000)
+
+        # --- 2e. path= filter on docs ---
+        print()
+        print("== docs path= filter ==")
+        (root / "INDEX.md").write_text(
+            "# Index\n\n"
+            "## a/file.md  (10 lines, 1.0 KB)\n- 1. S1\n"
+            "## a/sub/file2.md  (10 lines, 1.0 KB)\n- 1. S2\n"
+            "## b/file3.md  (10 lines, 1.0 KB)\n- 1. S3\n",
+            encoding="utf-8")
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "path": "a"}}])[0]
+        t.expect("path ok", r.status == "ok")
+        t.expect("path includes a/file.md", "a/file.md" in r.message)
+        t.expect("path includes a/sub/file2.md", "a/sub/file2.md" in r.message)
+        t.expect("path excludes b/file3.md", "b/file3.md" not in r.message)
+        t.expect("path note shows", "path=a" in r.message)
+
+        # --- 2f. path= miss -> 0 files, hint ---
+        print()
+        print("== docs path= miss ==")
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "path": "nope"}}])[0]
+        t.expect("miss ok", r.status == "ok")
+        t.expect("miss says 0", "0 of 3 files" in r.message)
+        t.expect("miss hint", "check path" in r.message)
+
+        # --- 2g. limit on docs ---
+        print()
+        print("== docs limit ==")
+        (root / "INDEX.md").write_text(
+            "# Index\n\n"
+            "## x/1.md  (10 lines, 1.0 KB)\n- 1. S\n"
+            "## x/2.md  (10 lines, 1.0 KB)\n- 1. S\n"
+            "## x/3.md  (10 lines, 1.0 KB)\n- 1. S\n",
+            encoding="utf-8")
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "limit": 2}}])[0]
+        t.expect("limit ok", r.status == "ok")
+        t.expect("limit shows 2 of 3", "2 of 3 files" in r.message)
+        t.expect("limit keeps 1.md", "x/1.md" in r.message)
+        t.expect("limit keeps 2.md", "x/2.md" in r.message)
+        t.expect("limit drops 3.md", "x/3.md" not in r.message)
 
         # --- 3. explicit kind ---
         print()

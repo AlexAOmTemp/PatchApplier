@@ -28,6 +28,7 @@ class ReadUnitTool:
         address: dict | None = None,
         part: str | list | None = None,
         block: int | str | list | None = None,
+        max_bytes: int | None = None,
         **_: Any,
     ) -> Result:
         if not file_path:
@@ -72,6 +73,11 @@ class ReadUnitTool:
         except SyntaxError as e:
             return Result(status="error", message=f"syntax_error: {e}",
                           action="read_unit", error_code="syntax_error")
+        from ...core.limits import clip_with_marker, resolve_cap
+        cap = resolve_cap(max_bytes)
+        hint = ("Передай max_bytes=N для большего или читай по частям "
+                "(part= / block= / section_number).")
+        text, _ = clip_with_marker(text, cap, hint)
         return Result(status="ok", message=text, action="read_unit")
 
 
@@ -347,6 +353,7 @@ class ListUnitsTool:
         backend: Backend,
         fmt: Any = None,
         file_path: str = "",
+        max_bytes: int | None = None,
         **_: Any,
     ) -> Result:
         if not file_path:
@@ -368,4 +375,7 @@ class ListUnitsTool:
         except SyntaxError as e:
             return Result(status="error", message=f"syntax_error: {e}",
                           action="list_units", error_code="syntax_error")
+        from ...core.limits import clip_with_marker, resolve_cap
+        text, _ = clip_with_marker(text, resolve_cap(max_bytes),
+            "Читай по одному через read_unit(address={qualname: ...}) или передай max_bytes=0.")
         return Result(status="ok", message=text, action="list_units")

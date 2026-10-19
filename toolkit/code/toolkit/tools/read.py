@@ -157,14 +157,11 @@ class ReadFileTool:
 
     @staticmethod
     def _render(header: str, body: str, max_bytes: int | None, action: str) -> Result:
-        truncated = False
-        if max_bytes is not None and max_bytes > 0:
-            enc = body.encode("utf-8")
-            if len(enc) > max_bytes:
-                body = enc[:max_bytes].decode("utf-8", errors="ignore")
-                truncated = True
-        if truncated:
-            header += f" (обрезано до {max_bytes} байт)"
+        from ..core.limits import clip_with_marker, resolve_cap
+        cap = resolve_cap(max_bytes)
+        hint = ("Передай max_bytes=N для большего или читай секцией "
+                "(section_number / section_title / start_line+end_line).")
+        body, _ = clip_with_marker(body, cap, hint)
         return Result(status="ok", message=f"{header}\n{body}", action=action)
 
     def _slice_lines_keepends(self, text: str, start_line: int, end_line: int) -> str:

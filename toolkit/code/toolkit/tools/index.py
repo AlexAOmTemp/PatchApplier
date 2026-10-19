@@ -275,17 +275,11 @@ class GetIndexTool:
                     kinds.append(k)
 
             # -- 2. budget --------------------------------------------------
-            # No default cap: the index is returned in full unless the caller
-            # explicitly asks to clip it. A silent 12 KB default made the
-            # caller believe it had seen the map when it had seen 3%.
-            if max_bytes is None:
-                per_kind: int | None = None
-            else:
-                try:
-                    cap = int(max_bytes)
-                except (TypeError, ValueError):
-                    cap = 0
-                per_kind = max(cap // len(kinds), 256) if cap > 0 else None
+            # Default cap is loud, never silent: 32 KB shared across kinds.
+            # Pass max_bytes=0 to get the full index, or narrow with path=.
+            from ..core.limits import resolve_cap
+            cap = resolve_cap(max_bytes)
+            per_kind = max(cap // len(kinds), 256) if cap is not None else None
 
             # -- 3. gather --------------------------------------------------
             _MANIFEST = {"code": "code_manifest", "csharp": "csharp_manifest",
@@ -298,7 +292,7 @@ class GetIndexTool:
                         backend, k, mpath, limit, path, sort, per_kind, scoped))
                     continue
                 spath = self._paths[k]
-                blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind))
+                blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind, path, limit))
 
             return Result(
                 status="ok",
@@ -563,9 +557,22 @@ class _ModView:
         self.import_bindings = list(e.get("import_bindings") or [])
 
 
-def _get_snapshot(backend, path: str, per_kind: int | None) -> str:
+def _get_snapshot(backend, path: str, per_kind: int | None,
+                  path_filter: str | None = None,
+                  limit: int | None = None) -> str:
     """Read on-disk .md, optionally clip to per_kind bytes on a line boundary."""
     from ..indexers.state import read_seq
+
+    def _split_blocks(src: str) -> list[str]:
+        import re as _re
+        parts = _re.split(r"(?m)^(?=## )", src)
+        return [p.rstrip("\n") for p in parts if p.strip()]
+
+    def _block_path(block: str) -> str:
+        line = block.split("\n", 1)[0]
+        rest = line[2:].strip() if line.startswith("## ") else line.strip()
+        return rest.split("  ", 1)[0].strip()
+
     if not backend.exists(path):
         return f"{path}  (not found; run rebuild_index first)"
     try:
@@ -576,16 +583,48 @@ def _get_snapshot(backend, path: str, per_kind: int | None) -> str:
     raw = text.encode("utf-8")
     total_b = len(raw)
     n_lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
-    if per_kind is None or total_b <= per_kind:
-        head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines)"
-        return head + "\n" + text.rstrip("\n")
-    clipped = raw[:per_kind]
+
+    sliced = text
+    note = ""
+    if path_filter is not None or limit is not None:
+        blocks = _split_blocks(text)
+        preamble = ""
+        if blocks and blocks[0].startswith("# "):
+            preamble, blocks = blocks[0], blocks[1:]
+        matched_total = len(blocks)
+        if path_filter:
+            norm = path_filter.rstrip("/")
+            blocks = [b for b in blocks
+                      if _block_path(b) == norm
+                      or _block_path(b).startswith(norm + "/")]
+        matched = len(blocks)
+        lim = 500 if limit is None else int(limit)
+        shown = blocks if lim == 0 else blocks[:lim]
+        bits = [f"{len(shown)} of {matched_total} files"]
+        if path_filter:
+            bits.append(f"path={path_filter} ({matched} match)")
+        if lim:
+            bits.append(f"limit={lim}")
+        note = ", " + ", ".join(bits)
+        if path_filter and not shown:
+            head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note})"
+            return head + (f"\n(0 files match path={path_filter!r}; "
+                           f"check path or pass limit=0 for all)")
+        sliced = ((preamble + "\n\n" if preamble and not path_filter else "")
+                  + "\n\n".join(shown))
+
+    raw_s = sliced.encode("utf-8")
+    total_s = len(raw_s)
+    if per_kind is None or total_s <= per_kind:
+        head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note})"
+        return head + "\n" + sliced.rstrip("\n")
+    clipped = raw_s[:per_kind]
     nl = clipped.rfind(b"\n")
     if nl > per_kind // 2:
         clipped = clipped[:nl]
     clipped_text = clipped.decode("utf-8", errors="replace")
-    head = (f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines, "
-            f"clipped to {len(clipped)} of {total_b} bytes; pass larger max_bytes)")
+    head = (f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note}, "
+            f"clipped to {len(clipped)} of {total_s} bytes; pass larger max_bytes)")
     return head + "\n" + clipped_text.rstrip("\n")
 
 

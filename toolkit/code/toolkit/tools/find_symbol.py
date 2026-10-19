@@ -51,6 +51,7 @@ class FindSymbolTool:
         scoped: bool = True,
         **_,
     ):
+        max_bytes = _.pop("max_bytes", None)
         _explicit_manifest = manifest_path is not None
         if manifest_path is None:
             if kind == "lua":
@@ -183,4 +184,8 @@ class FindSymbolTool:
             )
             if m['signature']:
                 lines.append(f"      {m['signature']}")
-        return Result(status='ok', message='\n'.join(lines) + footer, action='find_symbol')
+        msg = '\n'.join(lines) + footer
+        from ..core.limits import clip_with_marker, resolve_cap
+        msg, _ = clip_with_marker(msg, resolve_cap(max_bytes),
+            "Сузь query, задай limit=N или передай max_bytes=0 для полного вывода.")
+        return Result(status='ok', message=msg, action='find_symbol')
