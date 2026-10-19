@@ -40,6 +40,7 @@ class Section:
     body_hash: str = ""
     summary_hash: str = ""
     stale: bool = False
+    suppress: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass

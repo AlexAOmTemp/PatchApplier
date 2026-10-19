@@ -24,8 +24,9 @@ _HEADING_ANY = re.compile(r"^(#{1,8})\s+(.+?)\s*$")
 
 
 def parse(text: str, fmt: Format) -> ParsedDoc:
+    file_suppress = _parse_file_suppress(text)
     headings = _find_headings(text, fmt)
-    sections = _build_tree(headings, text, fmt)
+    sections = _build_tree(headings, text, fmt, file_suppress=file_suppress)
     return ParsedDoc(source=text, sections=sections)
 
 
@@ -151,6 +152,30 @@ def _scan_top_region(text: str, pos: int, limit: int, fmt: Format) -> int:
     return pos
 
 
+_PA_SUPPRESS_RE = re.compile(r"<!--\s*pa:\s*suppress\s+([^>]+?)\s*-->")
+_PA_SUPPRESS_HEAD_LINES = 20
+
+
+def _parse_file_suppress(text: str) -> frozenset[str]:
+    """File-level suppression: `<!-- pa: suppress name1,name2 -->` in the
+    preamble (before the first heading). Applied to every section in the
+    document. Used for `no-summary` on docs that are meant to be read whole."""
+    if not text:
+        return frozenset()
+    names: set[str] = set()
+    for i, line in enumerate(text.splitlines()):
+        if i >= _PA_SUPPRESS_HEAD_LINES:
+            break
+        m = _PA_SUPPRESS_RE.search(line)
+        if not m:
+            continue
+        for token in m.group(1).split(","):
+            t = token.strip()
+            if t:
+                names.add(t)
+    return frozenset(names)
+
+
 def _extract_summary(top: str, fmt: Format) -> str | None:
     if not (fmt.ann_summary and fmt.ann_open and fmt.ann_close):
         return None
@@ -202,7 +227,8 @@ def _split_number(title_full: str, fmt: Format) -> tuple[str | None, str]:
     return number, rest
 
 
-def _build_tree(headings: list[dict], text: str, fmt: Format) -> list[Section]:
+def _build_tree(headings: list[dict], text: str, fmt: Format,
+                file_suppress: frozenset[str] = frozenset()) -> list[Section]:
     from .hashing import hash_text, normalize_body
 
     if not headings:
@@ -254,6 +280,7 @@ def _build_tree(headings: list[dict], text: str, fmt: Format) -> list[Section]:
             children=[],
             body_hash=hash_text(normalize_body(body_only)),
             summary_hash=hash_text(summary) if summary else "",
+            suppress=file_suppress,
         )
 
         while stack and stack[-1][1] >= level:

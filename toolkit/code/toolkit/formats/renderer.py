@@ -199,7 +199,7 @@ def _render_section(s: Section, depth: int, source: str, out: list[str]) -> None
     # project where the convention is "summary only on `##`", marking
     # every `###`/`####` produced 90% noise. A subsection is expected to
     # inherit context from its parent.
-    if s.summary is None and s.level <= 2:
+    if s.summary is None and s.level <= 2 and "no-summary" not in s.suppress:
         markers.append("\u26a0 no summary")
     elif s.stale:
         markers.append("\u26a0 stale")

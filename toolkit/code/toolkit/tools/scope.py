@@ -83,9 +83,7 @@ class ExcludeTool:
         if isinstance(patterns, str):
             patterns = [patterns]
         if not reason or not reason.strip():
-            return Result(status="error",
-                          message="`reason` is required (brief explanation of why)",
-                          error_code="reason_required", action="exclude")
+            reason = "llm-session"
         scope, err = read_scope(backend)
         if err:
             return Result(status="error", message=err,
@@ -120,9 +118,7 @@ class IncludeTool:
         if isinstance(patterns, str):
             patterns = [patterns]
         if not reason or not reason.strip():
-            return Result(status="error",
-                          message="`reason` is required (brief explanation of why)",
-                          error_code="reason_required", action="include")
+            reason = "llm-session"
         scope, err = read_scope(backend)
         if err:
             return Result(status="error", message=err,
