@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import tkinter as tk
 
-from .widgets import StatusLog
+from .widgets import StatusLog, ReadyLight
 
 
 class MainWindow:
@@ -121,13 +121,19 @@ class MainWindow:
                   text="\U0001F4CB \u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442",
                   command=self._cb["on_get_last_output"]).pack(fill="x", pady=(0, 4))
 
+        status_row = tk.Frame(left_panel)
+        status_row.pack(fill="x", pady=(8, 0))
+
+        self.ready_light = ReadyLight(status_row)
+        self.ready_light.pack(side="left", padx=(0, 6))
+
         self.project_label = tk.Label(
-            left_panel,
+            status_row,
             text="\u26a0 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043f\u0443\u0442\u044c \u043a \u043f\u0440\u043e\u0435\u043a\u0442\u0443",
-            anchor="w", fg="#c07000", wraplength=self._w_left - 10,
+            anchor="w", fg="#c07000", wraplength=self._w_left - 30,
             justify="left", cursor="hand2",
         )
-        self.project_label.pack(fill="x", pady=(8, 0))
+        self.project_label.pack(side="left", fill="x", expand=True)
         self.project_label.bind("<Button-1>",
                                 lambda _e: self._cb["on_copy_project_path"]())
         self._make_copyable(self.project_label)
@@ -204,6 +210,29 @@ class MainWindow:
         tk.Checkbutton(self.right_panel, text="\u041f\u043e\u0432\u0435\u0440\u0445 \u0432\u0441\u0435\u0445 \u043e\u043a\u043e\u043d",
                        variable=self.topmost_var,
                        command=_toggle_topmost).pack(anchor="w", pady=(0, 8))
+
+        self.auto_run_on_copy_var = tk.BooleanVar(
+            value=bool(self._config.get("auto_run_on_copy", False)))
+
+        def _toggle_auto_run() -> None:
+            enabled = bool(self.auto_run_on_copy_var.get())
+            self._config["auto_run_on_copy"] = enabled
+            try:
+                self._cb["save_config"](self._config)
+            except Exception:
+                pass
+            try:
+                self._cb["on_auto_run_toggle"](enabled)
+            except Exception:
+                pass
+
+        tk.Checkbutton(
+            self.right_panel,
+            text="\u26a1 \u0410\u0432\u0442\u043e-\u0437\u0430\u043f\u0443\u0441\u043a (Ctrl+Alt + \u043a\u043e\u043f\u0438\u044f)",
+            variable=self.auto_run_on_copy_var,
+            command=_toggle_auto_run,
+            justify="left",
+        ).pack(anchor="w", pady=(0, 8))
 
         tk.Button(self.right_panel,
                   text="\U0001F4CA \u041f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439 \u0434\u0438\u0444\u0444",

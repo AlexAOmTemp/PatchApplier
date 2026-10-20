@@ -35,6 +35,7 @@ TOOL_FIELDS = frozenset({
     "project_dir",
     "recent_projects",
     "ui_language",
+    "auto_run_on_copy",
     "format_preset",
     "format",
     "mcp",
@@ -91,8 +92,12 @@ DEFAULTS: dict = {
     # .version / .manifest.json sidecars do not match *.md, no entry needed.
     "skip_files": ["INDEX.md", "CODE_INDEX.md", "CODE_INDEX_LUA.md"],
     # Language of the LLM starter text (docs/LLM_START.<lang>.md).
-    # Falls back to "en" if the selected language file is missing.
+    # Falls back to any other available LLM_START.<lang>.md.
     "ui_language": "ru",
+    # Auto-run a patch when the user copies it while holding Ctrl+Alt.
+    # Handled by runner/gui/clipboard_watch.py. Tool-wide: the choice is
+    # about how the user works, not about a specific project.
+    "auto_run_on_copy": False,
     # Directory hiding is controlled by `.patchignore` in the project
     # root (see config/patchignore.py), not by config fields.
     # Python code index settings.
@@ -452,6 +457,26 @@ def load_workspace(cfg: dict):
     from .workspace import load as _ws_load
     state_dir = Path(project) / resolve_state_dir(cfg)
     return _ws_load(state_dir)
+
+
+def project_display_name(cfg: dict) -> str:
+    """Return the project's display name for UI and LLM starter text.
+
+    Reads ``Workspace.name`` from ``<project_dir>/<state>/workspace.json``.
+    Falls back to the project folder's basename if workspace.json is
+    missing or unreadable -- never to an empty string when project_dir
+    is set. Returns "" only when project_dir itself is empty.
+    """
+    project = (cfg.get("project_dir") or "").strip()
+    if not project:
+        return ""
+    try:
+        w = load_workspace(cfg)
+        if w is not None and getattr(w, "name", ""):
+            return str(w.name)
+    except Exception:
+        pass
+    return Path(project).name or project
 
 
 def resolve_index_paths(cfg: dict) -> dict:

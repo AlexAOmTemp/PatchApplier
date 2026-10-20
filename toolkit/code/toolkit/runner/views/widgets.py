@@ -109,3 +109,43 @@ class StatusLog(tk.Frame):
         self._text.configure(state="normal")
         self._text.delete("1.0", "end")
         self._text.configure(state="disabled")
+
+
+class ReadyLight(tk.Canvas):
+    """Big colored dot indicating whether the tool can accept a new patch.
+
+    States:
+      ready  -- green:  project configured, no patch running
+      busy   -- yellow: a patch is being applied
+      off    -- grey:   project not configured / not opened
+    """
+
+    _COLORS = {
+        "ready": "#2e9e44",
+        "busy":  "#e0a800",
+        "off":   "#9a9a9a",
+    }
+    _SIZE = 18
+
+    def __init__(self, parent, size: int = _SIZE, **kwargs):
+        super().__init__(parent, width=size, height=size,
+                         highlightthickness=0, borderwidth=0, **kwargs)
+        pad = 2
+        self._oval = self.create_oval(
+            pad, pad, size - pad, size - pad,
+            fill=self._COLORS["off"],
+            outline="#404040",
+            width=1,
+        )
+        self._state = "off"
+
+    def set_state(self, state: str) -> None:
+        if state not in self._COLORS:
+            state = "off"
+        if state == self._state:
+            return
+        self._state = state
+        try:
+            self.itemconfigure(self._oval, fill=self._COLORS[state])
+        except Exception:
+            pass

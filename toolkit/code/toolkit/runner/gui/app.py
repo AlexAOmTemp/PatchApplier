@@ -21,6 +21,7 @@ from ...core.router import plan_rebuilds
 from ...tools import TOOL_MAP
 
 from . import state as _state
+from .clipboard_watch import ClipboardWatcher
 from .state import (
     HERE, RUNNER_DIR, TOOLKIT_ROOT, PROJECT_ROOT,
     LAST_PATCH, LAST_OUTPUT, LAST_DIFF,
@@ -52,6 +53,16 @@ from ..views.widgets import StatusLog as _StatusLog
 last_applied_patch_norm = None
 last_output_text = None
 is_executing = False
+# True from session start until the init index rebuilds finish. The
+# project may already be configured (PROJECT_OK) while the session and
+# its indexes are still coming up; the readiness dot must stay yellow
+# for that whole window, not turn green on config alone.
+is_initializing = False
+# Monotonic token: each session start bumps it. _initialize_project echoes
+# the token it was started with, and poll_queue ignores a stale init_done
+# (one arriving after a newer session start). Without it, a slow init from
+# project A would clear the yellow dot of a freshly started project B.
+_init_gen = 0
 _last_mcp_ready = False
 _last_mcp_state: str = ""
 
@@ -60,6 +71,28 @@ PROJECT_OK = False
 
 mcp_status_var = None
 status_label = None
+
+
+# Clipboard watcher instance (Ctrl+Alt auto-run). Created in run(), stopped
+# after mainloop returns. None until then, and None when the feature is off.
+clipboard_watcher = None
+
+# Tk widgets are created in run(); placeholders let the helpers below
+# run before run() reaches the assignment without a NameError.
+ready_light = None
+auto_run_on_copy_var = None
+
+
+def update_ready_light() -> None:
+    """Refresh the big readiness dot. No-op before the widget exists."""
+    if ready_light is None:
+        return
+    if is_executing or is_initializing:
+        ready_light.set_state("busy")
+    elif PROJECT_OK:
+        ready_light.set_state("ready")
+    else:
+        ready_light.set_state("off")
 
 
 
@@ -99,7 +132,7 @@ def _validate_project() -> bool:
 
 
 
-def _initialize_project():
+def _initialize_project(gen: int = 0):
     try:
         with _state._session_lock:
             s = _state._session
@@ -129,6 +162,11 @@ def _initialize_project():
         _state.msg_queue.put(("status", "\u2713 \u041f\u0440\u043e\u0435\u043a\u0442 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d" if ok else "\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438"))
     except Exception as e:
         _state.msg_queue.put(("status", f"\u2717 \u041e\u0448\u0438\u0431\u043a\u0430 \u0438\u043d\u0438\u0446\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438: {e}"))
+    finally:
+        # Every exit path -- success, no indexes, failure -- must clear the
+        # initializing flag, or the dot stays yellow forever. The generation
+        # lets poll_queue drop a stale completion from a previous session.
+        _state.msg_queue.put(("init_done", gen))
 
 
 def worker(patch_text: str, normalized_patch: str):
@@ -197,34 +235,117 @@ def _run_patch(patch_text: str):
     is_executing = True
     btn.config(state="disabled")
     repeat_btn.config(state="disabled")
-    status_var.set("⏳ Выполняется...")
+    status_var.set("\u23f3 \u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f...")
     status_var.set_state("")
+    update_ready_light()
     t = threading.Thread(target=worker, args=(patch_text, normalized), daemon=True)
     t.start()
     root.after(100, poll_queue)
+
+
+def _try_run_patch_text(patch_text: str) -> None:
+    """Shared path for button, hotkey, and clipboard auto-run.
+
+    Checks for a duplicate, empties the clipboard *before* starting the
+    worker, then runs the patch. The clipboard is cleared so the user
+    cannot paste a stale patch while this one is still being applied;
+    ``worker`` writes the result back on completion.
+
+    The caller is responsible for ``is_executing`` and project checks.
+    """
+    global is_executing
+    normalized = normalize_patch(patch_text)
+    is_dup = (last_applied_patch_norm is not None
+              and normalized == last_applied_patch_norm)
+    if is_dup:
+        status_var.set("\u23f9 \u042d\u0442\u043e\u0442 \u043f\u0430\u0442\u0447 \u0443\u0436\u0435 \u043f\u0440\u0438\u043c\u0435\u043d\u0451\u043d. \u0418\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0439 \u00ab\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439\u00bb.")
+        return
+    try:
+        pyperclip.copy("")
+    except Exception:
+        pass
+    _run_patch(patch_text)
+
+
+def _set_auto_run_enabled(enabled: bool) -> None:
+    """Start or stop the Ctrl+Alt clipboard watcher.
+
+    Called once at startup (only if the option is on) and again when the
+    user toggles the checkbox. Idempotent. When disabled, no thread runs
+    at all -- the feature costs nothing until it is turned on.
+    """
+    global clipboard_watcher
+    if enabled:
+        if clipboard_watcher is None:
+            clipboard_watcher = ClipboardWatcher(_on_clipboard_trigger)
+            clipboard_watcher.start()
+    else:
+        if clipboard_watcher is not None:
+            try:
+                clipboard_watcher.stop()
+            except Exception:
+                pass
+            clipboard_watcher = None
+
+
+def _on_clipboard_trigger(patch_text: str) -> None:
+    """Called from ClipboardWatcher's worker thread.
+
+    Marshals to the Tk thread and freezes the text: the clipboard may
+    change again before the Tk callback fires, and we want to run the
+    patch that was actually copied, not whatever landed afterwards.
+    """
+    if root is None:
+        return
+    try:
+        root.after(0, lambda t=patch_text: _handle_clipboard_patch(t))
+    except Exception:
+        pass
+
+
+def _handle_clipboard_patch(patch_text: str) -> None:
+    """Tk-thread side of the Ctrl+Alt auto-run.
+
+    Runs only when the option is on and the text looks like a patch
+    (a JSON list). Silent on failure -- the auto-run must not spam the
+    log while the user is just browsing.
+    """
+    if not CONFIG.get("auto_run_on_copy"):
+        return
+    if is_executing:
+        return
+    if not patch_text or not patch_text.strip():
+        return
+    # A patch is one fence containing one or more JSON arrays (R-FMT-1).
+    # parse_patches already speaks that format and never raises; use it
+    # rather than json.loads, which only accepts a single array and would
+    # silently reject the canonical multi-group patch.
+    try:
+        parsed = parse_patches(patch_text)
+    except Exception:
+        return
+    if not getattr(parsed, "actions", None):
+        return
+    if not _validate_project():
+        return
+    _try_run_patch_text(patch_text)
 
 
 def on_button_click():
     if is_executing:
         return
     if not _validate_project():
-        status_var.set("⚠ укажите путь к проекту")
+        status_var.set("\u26a0 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043f\u0443\u0442\u044c \u043a \u043f\u0440\u043e\u0435\u043a\u0442\u0443")
         return
     try:
         clipboard_text = pyperclip.paste() or ""
     except Exception as e:
-        status_var.set(f"✗ Не могу прочитать буфер: {e}")
+        status_var.set(f"\u2717 \u041d\u0435 \u043c\u043e\u0433\u0443 \u043f\u0440\u043e\u0447\u0438\u0442\u0430\u0442\u044c \u0431\u0443\u0444\u0435\u0440: {e}")
         return
     if not clipboard_text.strip():
-        status_var.set("✗ Буфер пуст")
+        status_var.set("\u2717 \u0411\u0443\u0444\u0435\u0440 \u043f\u0443\u0441\u0442")
         return
-    normalized = normalize_patch(clipboard_text)
-    is_dup = (last_applied_patch_norm is not None
-              and normalized == last_applied_patch_norm)
-    if is_dup:
-        status_var.set("⏹ Этот патч уже применён. Используй «Повторить последний».")
-        return
-    _run_patch(clipboard_text)
+    _try_run_patch_text(clipboard_text)
 
 
 def on_repeat_click():
@@ -334,9 +455,11 @@ def update_project_status():
     text, color = _presenter.format_project_label(CONFIG)
     project_label.config(text=text, fg=color)
     PROJECT_OK = _presenter.project_ok(CONFIG)
+    update_ready_light()
 
 
 def update_button_state():
+    update_ready_light()
     if is_executing:
         return
     try:
@@ -503,7 +626,7 @@ def _on_mcp_reconnect():
 
 
 def poll_queue():
-    global is_executing, last_applied_patch_norm, last_output_text
+    global is_executing, is_initializing, last_applied_patch_norm, last_output_text
     with _state._session_lock:
         _s = _state._session
         _bn = _state._session_backend_name
@@ -537,9 +660,14 @@ def poll_queue():
             elif kind == "project_changed":
                 update_project_status()
                 update_button_state()
+            elif kind == "init_done":
+                if payload == _init_gen:
+                    is_initializing = False
+                    update_ready_light()
             elif kind == "done":
                 is_executing = False
                 update_button_state()
+                update_ready_light()
                 return
     except queue.Empty:
         pass
@@ -576,9 +704,13 @@ def _start_session_in_background():
     Reports via _state.msg_queue 'mcp_status' events. On success, assigns the global
     _state._session. Safe to call multiple times (restarts the session).
     """
-    global _last_mcp_ready, _last_mcp_state
+    global _last_mcp_ready, _last_mcp_state, is_initializing, _init_gen
     _last_mcp_ready = False
     _last_mcp_state = ""
+    _init_gen += 1
+    my_gen = _init_gen
+    is_initializing = True
+    update_ready_light()
 
     def _run():
         with _state._session_lock:
@@ -594,6 +726,7 @@ def _start_session_in_background():
             backend, name = _presenter.build_backend_for_config(CONFIG)
         except _presenter.BackendError as e:
             _state.msg_queue.put(("status", f"\u2717 {e}"))
+            _state.msg_queue.put(("init_done", my_gen))
             return
 
         try:
@@ -608,9 +741,11 @@ def _start_session_in_background():
                 _state.msg_queue.put(("status", "\u23f3 Session: mcp \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0430\u0435\u0442\u0441\u044f..."))
             else:
                 _state.msg_queue.put(("status", "\u2713 Session \u0433\u043e\u0442\u043e\u0432\u0430 (filesystem)"))
-            threading.Thread(target=_initialize_project, daemon=True).start()
+            threading.Thread(target=_initialize_project,
+                             args=(my_gen,), daemon=True).start()
         except Exception as e:
             _state.msg_queue.put(("status", f"\u2717 Session \u043d\u0435 \u0441\u0442\u0430\u0440\u0442\u043e\u0432\u0430\u043b\u0430 ({name}): {e}"))
+            _state.msg_queue.put(("init_done", my_gen))
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -677,13 +812,13 @@ def _switch_project(project_dir: str, project_name: str | None = None) -> None:
     except Exception:
         pass
     try:
-        _cfg.add_recent_file(str(p), project_name)
+        _cfg.add_recent_file(str(p), project_name or _cfg.project_display_name(CONFIG))
     except Exception:
         pass
     update_project_status()
     update_button_state()
     _refresh_recent_menu()
-    _state.msg_queue.put(("status", f"\u23f3 \u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043f\u0440\u043e\u0435\u043a\u0442: {p.name}..."))
+    _state.msg_queue.put(("status", f"\u23f3 \u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e \u043f\u0440\u043e\u0435\u043a\u0442: {CONFIG.get('project_dir') and _cfg.project_display_name(CONFIG) or p.name}..."))
     _start_session_in_background()
 
 
@@ -807,6 +942,7 @@ def run():
     global fs_status_var, mcp_status_var, fs_status_label, mcp_status_label
     global mcp_reconnect_btn
     global project_label, right_panel, toggle_btn
+    global ready_light, auto_run_on_copy_var, clipboard_watcher
     global _recent_menu
 
     CONFIG.update(_cfg.load())
@@ -849,6 +985,7 @@ def run():
             "on_new_project": _menu_new_project,
             "on_open_project": _menu_open_project,
             "on_project_settings": _menu_project_settings,
+            "on_auto_run_toggle": _set_auto_run_enabled,
             "next_language": _presenter.next_language,
             "save_config": _cfg.save,
         },
@@ -877,6 +1014,8 @@ def run():
     project_label = mw.project_label
     right_panel = mw.right_panel
     toggle_btn = mw.toggle_btn
+    ready_light = mw.ready_light
+    auto_run_on_copy_var = mw.auto_run_on_copy_var
     _recent_menu = mw.recent_menu
 
     keyboard.add_hotkey(HOTKEY, lambda: root.after(0, on_button_click))
@@ -890,7 +1029,15 @@ def run():
     root.attributes("-topmost", True)
 
     root.after(500, _start_session_in_background)
+
+    # Ctrl+Alt auto-run: only run the watcher thread when the option is on.
+    # Off by default; the user enables it from the collapsible right panel.
+    if bool(CONFIG.get("auto_run_on_copy")):
+        _set_auto_run_enabled(True)
+
     root.mainloop()
+
+    _set_auto_run_enabled(False)
 
     try:
         with _state._session_lock:
