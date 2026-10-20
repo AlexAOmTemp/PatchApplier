@@ -48,7 +48,7 @@ Patch Applier — правка проекта JSON-патчами. Один от
 4. Неясно — спросить, не гадать
 
 ## 5. Тулсет
-`?` — опционально. Блок ниже генерируется из `TOOL_MAP` скриптом `toolkit/code/manual/gen_toolset_doc.py` (источник истины — код). Правь код, затем перегенерируй; `--check` падает при расхождении. Редкие аргументы, XML и MCP — `REF_TOOLS.md`.
+`?` — опционально. Блок ниже генерируется из `TOOL_MAP` скриптом `toolkit/code/manual/gen_toolset_doc.py` (источник истины — код). Правь код, затем перегенерируй; `--check` падает при расхождении. XML-тулы — в `XML_START.md`, MCP-тулы — в `MCPBridgeRules.md` (подключаются отдельно); редкие аргументы — `REF_TOOLS.md`.
 
 <!-- tools:auto:begin -->
 **Чтение**
@@ -106,19 +106,15 @@ Patch Applier — правка проекта JSON-патчами. Один от
 - `grep_replace(pattern?, replacement?, mappings?, paths?, recursive?, file_glob?, exclude_glob?, regex?, fixed_strings?, ignore_case?, word_boundary?, max_replacements?, dry_run?, scoped?, filter?, force?)`
 
 > **Аргументы:** один путь — `path`, много — `paths`. Неверный аргумент — явная ошибка `unknown_arg` со списком валидных.
-
-**Условно включённые**
-- MCP (Roblox): `grep_mcp(pattern, directory?, ...)` · `grep_replace_mcp(...)` · `grep_lua(...)` — схемы в `REF_TOOLS.md`
-- XML: `xml_read`, `xml_find`, `xml_map`, `xml_insert`, `xml_replace`, `xml_modify`, `xml_append`, `xml_delete`, `xml_copy`, `xml_move` — `XML_START.md` / `REF_TOOLS.md`
 <!-- tools:auto:end -->
 
 ## 6. Пример
 Один фенс, три массива, `id` у каждого. `patterns` — строка или список; `reason` опционален (по умолчанию `llm-session`).
 
 ```json
-[{"id":1,"action":"read_unit","arguments":{"file_path":"PatchAppliers/PatchApplier/toolkit/core/patcher.py","address":{"qualname":"Patcher._apply_one"},"part":"head,annotation"}}]
+[{"id":1,"action":"read_unit","arguments":{"path":"PatchAppliers/PatchApplier/toolkit/code/toolkit/core/patcher.py","address":{"qualname":"Patcher._apply_one"},"part":"head,annotation"}}]
 
-[{"id":2,"action":"replace_unit","arguments":{"file_path":"PatchAppliers/PatchApplier/toolkit/core/patcher.py","address":{"qualname":"Patcher._apply_one"},"part":"body","new_text":"return self._dispatch(patch)"}}]
+[{"id":2,"action":"replace_unit","arguments":{"path":"PatchAppliers/PatchApplier/toolkit/code/toolkit/core/patcher.py","address":{"qualname":"Patcher._apply_one"},"part":"body","new_text":"return self._dispatch(patch)"}}]
 
 [{"id":3,"action":"exclude","arguments":{"patterns":["tests/","vendor/"],"reason":"правка core, тесты не нужны"}}]
 ```

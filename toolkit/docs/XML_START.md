@@ -270,3 +270,18 @@ Defs/ThingDef[Steel]/statBases/MarketValue
 - **`ambiguous_address` — не повторяй слепо.** Добавь `occurrence` или уточни значение.
 - **`too_many_files` — не поднимай лимит вслепую.** Сузь путь.
 - **`blocked` (policy) — не retry.** Сообщи пользователю.
+
+## 11. Сигнатуры тулов (генерируется)
+<!-- summary: Точные сигнатуры xml_* из TOOL_MAP. Генерируется gen_toolset_doc.py; не править вручную. -->
+<!-- tools:auto:begin -->
+- `xml_read(path?, address?, occurrence?)`
+- `xml_find(path?, tag?, where?, max_files?, max_results?)`
+- `xml_map(path?, max_files?, max_tags?, depth?)`
+- `xml_insert(path?, address?, fragment?, position?, occurrence?, source_hash?)`
+- `xml_replace(path?, address?, fragment?, occurrence?, source_hash?)`
+- `xml_modify(path?, address?, ops?, occurrence?, source_hash?)`
+- `xml_append(path?, parent?, fragment?, source_hash?)`
+- `xml_delete(path?, address?, occurrence?, source_hash?)`
+- `xml_copy(source_file?, source_address?, source_occurrence?, target_file?, position?, target_parent?, target_address?, target_occurrence?, renames?, register_in?, register_as?)`
+- `xml_move(source_file?, source_address?, source_occurrence?, target_file?, position?, target_parent?, target_address?, target_occurrence?, renames?, register_in?, register_as?)`
+<!-- tools:auto:end -->
