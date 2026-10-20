@@ -117,7 +117,7 @@ def main():
             print(f"  (Session __enter__ tried to reopen; {e})")
         r = s.apply_patches([
             {"action": "create_file",
-             "arguments": {"file_path": "new.txt", "file_content": "x"}},
+             "arguments": {"path": "new.txt", "file_content": "x"}},
         ])
         t.expect("fs patch applied", r and r[0].status == "ok",
                  r[0].message if r else "no result")
@@ -126,7 +126,7 @@ def main():
         # 4. MCP op fails with backend_not_ready
         r2 = s.apply_patches([
             {"action": "read_file",
-             "arguments": {"file_path": "Workspace.Foo"}},
+             "arguments": {"path": "Workspace.Foo"}},
         ])
         t.expect("mcp patch blocked",
                  r2 and r2[0].status == "error"

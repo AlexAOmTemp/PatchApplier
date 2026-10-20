@@ -77,7 +77,7 @@ def main():
     print("=" * 60)
     print("[tools doc] LLM_START toolset block vs TOOL_MAP")
     print("=" * 60)
-    gen = HERE.parent / "manual" / "gen_toolset_doc.py"
+    gen = HERE.parent.parent / "manual" / "gen_toolset_doc.py"
     rc = subprocess.call([sys.executable, str(gen), "--check"])
     if rc != 0:
         failures += 1

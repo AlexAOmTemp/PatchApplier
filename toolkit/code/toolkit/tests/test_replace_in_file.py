@@ -69,7 +69,7 @@ def main():
         root = Path(td)
         p = root / 'a.py'
         p.write_text('x = 1\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='a.py', search='x = 1', replace='y = 2')])[0]
+        r = _run(root, [_tool(path='a.py', search='x = 1', replace='y = 2')])[0]
         t.expect('tier1 ok', r.status == 'ok', r.message)
         t.expect('tier1 applied', p.read_text(encoding='utf-8') == 'y = 2\n')
         t.expect('tier1 no marker', 'normalisation' not in r.message)
@@ -79,7 +79,7 @@ def main():
         root = Path(td)
         p = root / 'b.py'
         p.write_text('foo()  \nbar()\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='b.py', search='foo()', replace='baz()')])[0]
+        r = _run(root, [_tool(path='b.py', search='foo()', replace='baz()')])[0]
         t.expect('tier1 substring ok', r.status == 'ok', r.message)
         body = p.read_text(encoding='utf-8')
         # trailing preserved: foo() -> baz() inside the line, two spaces stay
@@ -94,7 +94,7 @@ def main():
         p = root / 'c.py'
         p.write_text('def f():  \n    return 1\n', encoding='utf-8')
         # Two-line needle without trailing on first line -> no exact match
-        r = _run(root, [_tool(file_path='c.py',
+        r = _run(root, [_tool(path='c.py',
                               search='def f():\n    return 1',
                               replace='def g():\n    return 2')])[0]
         t.expect('tier2 ok', r.status == 'ok', r.message)
@@ -113,7 +113,7 @@ def main():
             'def a():  \n    pass\n\ndef b():  \n    pass\n',
             encoding='utf-8',
         )
-        r = _run(root, [_tool(file_path='d.py',
+        r = _run(root, [_tool(path='d.py',
                               search='def x():\n    pass',
                               replace='y')])[0]
         # Neither exact (no `x`) nor normalised (a/b != x) match
@@ -129,7 +129,7 @@ def main():
             'def a():  \n    return 1\n\ndef b():\n    return 2\n',
             encoding='utf-8',
         )
-        r = _run(root, [_tool(file_path='e.py',
+        r = _run(root, [_tool(path='e.py',
                               search='def a():\n    return 1',
                               replace='def A():\n    return 9')])[0]
         t.expect('tier2 unique ok', r.status == 'ok', r.message)
@@ -142,7 +142,7 @@ def main():
         root = Path(td)
         p = root / 'f.py'
         p.write_text('from .model import Block, Part, Unit, UnitKind  \n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='f.py',
+        r = _run(root, [_tool(path='f.py',
                               search='from .core import Something',
                               replace='x')])[0]
         t.expect('tier3 no_match',
@@ -158,7 +158,7 @@ def main():
         root = Path(td)
         p = root / 'r.py'
         p.write_text('x = 10\ny = 20\nz = 30\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='r.py',
+        r = _run(root, [_tool(path='r.py',
                               search=r'= \d+',
                               replace='= 0',
                               regex=True)])[0]
@@ -172,7 +172,7 @@ def main():
         root = Path(td)
         p = root / 's.py'
         p.write_text('x = 10\ny = 20\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='s.py',
+        r = _run(root, [_tool(path='s.py',
                               search=r'= \d+',
                               replace='= 0',
                               regex=True,
@@ -186,7 +186,7 @@ def main():
         root = Path(td)
         p = root / 't.py'
         p.write_text('foo_1 = 1\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='t.py',
+        r = _run(root, [_tool(path='t.py',
                               search=r'(foo)_(\d)',
                               replace=r'\2_\1',
                               regex=True)])[0]
@@ -199,7 +199,7 @@ def main():
         root = Path(td)
         p = root / 'u.py'
         p.write_text('x = 1\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='u.py', search=r'qq\d+',
+        r = _run(root, [_tool(path='u.py', search=r'qq\d+',
                               replace='x', regex=True)])[0]
         t.expect('regex no match',
                  r.status == 'error' and r.error_code == 'no_match',
@@ -210,7 +210,7 @@ def main():
         root = Path(td)
         p = root / 'v.py'
         p.write_text('x = 1\n', encoding='utf-8')
-        r = _run(root, [_tool(file_path='v.py', search=r'(unclosed',
+        r = _run(root, [_tool(path='v.py', search=r'(unclosed',
                               replace='x', regex=True)])[0]
         t.expect('regex bad pattern',
                  r.status == 'error' and r.error_code == 'bad_regex',

@@ -150,7 +150,7 @@ def main() -> int:
         # --- wrong_domain
         print()
         print("== wrong_domain ==")
-        r11 = repl.execute(be, None, pattern="x", directory="ReplicatedStorage.Foo",
+        r11 = repl.execute(be, None, pattern="x", paths="ReplicatedStorage.Foo",
                            replacement="y")
         t.expect("mcp path -> wrong_domain", r11.status == "error")
         t.expect("error_code == wrong_domain", r11.error_code == "wrong_domain",

@@ -86,65 +86,65 @@ with tempfile.TemporaryDirectory() as td:
     tool = XmlReadTool()
 
     # --- happy path ------------------------------------------------------
-    r = tool.execute(backend, file_path='proj/a.xml', address='Defs/ThingDef[Wood]')
+    r = tool.execute(backend, path='proj/a.xml', address='Defs/ThingDef[Wood]')
     t.expect('read Wood: status ok', r.status == 'ok', r.message)
     t.expect('read Wood: includes defName', '<defName>Wood</defName>' in r.message)
     t.expect('read Wood: excludes Steel', 'Steel' not in r.message)
     t.expect('read Wood: header tag', '<ThingDef>' in r.message)
 
     # Ambiguous without occurrence.
-    r = tool.execute(backend, file_path='proj/a.xml', address='Defs/ThingDef[Steel]')
+    r = tool.execute(backend, path='proj/a.xml', address='Defs/ThingDef[Steel]')
     t.expect_code('ambiguous Steel', r, 'ambiguous_address')
     # Header on L1, <Defs> on L2, so the two Steel ThingDefs are L3 and L5.
     t.expect('ambiguous: message lists L3 and L5',
              'L3' in r.message and 'L5' in r.message, r.message)
 
     # occurrence picks one.
-    r = tool.execute(backend, file_path='proj/a.xml',
+    r = tool.execute(backend, path='proj/a.xml',
                      address='Defs/ThingDef[Steel]', occurrence=1)
     t.expect('occurrence=1 ok', r.status == 'ok')
     t.expect('occurrence=1 has label', '<label>steel</label>' in r.message)
 
-    r = tool.execute(backend, file_path='proj/a.xml',
+    r = tool.execute(backend, path='proj/a.xml',
                      address='Defs/ThingDef[Steel]', occurrence=2)
     t.expect('occurrence=2 ok', r.status == 'ok')
     t.expect('occurrence=2 no label', '<label>' not in r.message)
 
     # occurrence out of range.
-    r = tool.execute(backend, file_path='proj/a.xml',
+    r = tool.execute(backend, path='proj/a.xml',
                      address='Defs/ThingDef[Steel]', occurrence=3)
     t.expect_code('occurrence out of range', r, 'occurrence_out_of_range')
 
     # Position selector.
-    r = tool.execute(backend, file_path='proj/a.xml', address='Defs/ThingDef[2]')
+    r = tool.execute(backend, path='proj/a.xml', address='Defs/ThingDef[2]')
     t.expect('position selector', r.status == 'ok' and 'Wood' in r.message, r.message)
 
     # --- BOM+CRLF --------------------------------------------------------
-    r = tool.execute(backend, file_path='proj/bom.xml', address='root/a')
+    r = tool.execute(backend, path='proj/bom.xml', address='root/a')
     t.expect('BOM: status ok', r.status == 'ok', r.message)
     t.expect('BOM: text includes a', '<a>x</a>' in r.message)
     # Slice of <a> shouldn't start with BOM.
     t.expect('BOM: slice clean of BOM', '\ufeff' not in r.message)
 
     # --- mixed content: read works, modify would refuse (not this tool) ---
-    r = tool.execute(backend, file_path='proj/mixed.xml', address='a')
+    r = tool.execute(backend, path='proj/mixed.xml', address='a')
     t.expect('mixed: read ok', r.status == 'ok', r.message)
     t.expect('mixed: text shows both texts', 'x' in r.message and 'z' in r.message)
 
     # --- errors ----------------------------------------------------------
-    r = tool.execute(backend, file_path='proj/a.xml', address='Defs/Nope[1]')
+    r = tool.execute(backend, path='proj/a.xml', address='Defs/Nope[1]')
     t.expect_code('not_found tag', r, 'not_found')
 
-    r = tool.execute(backend, file_path='proj/a.xml', address='Nope')
+    r = tool.execute(backend, path='proj/a.xml', address='Nope')
     t.expect_code('wrong root', r, 'not_found')
 
-    r = tool.execute(backend, file_path='proj/a.xml', address='')
+    r = tool.execute(backend, path='proj/a.xml', address='')
     t.expect_code('empty address', r, 'bad_input')
 
-    r = tool.execute(backend, file_path='proj/a.xml', address='Defs/RoofDef[')
+    r = tool.execute(backend, path='proj/a.xml', address='Defs/RoofDef[')
     t.expect_code('bad address', r, 'bad_address')
 
-    r = tool.execute(backend, file_path='proj/missing.xml', address='root')
+    r = tool.execute(backend, path='proj/missing.xml', address='root')
     t.expect_code('missing file', r, 'not_found')
 
     backend.close()
@@ -170,13 +170,13 @@ if RW.is_dir():
         backend.open()
         tool = XmlReadTool()
 
-        r = tool.execute(backend, file_path='RimWorld/Data/Anomaly/Defs/Misc/Roofs.xml',
+        r = tool.execute(backend, path='RimWorld/Data/Anomaly/Defs/Misc/Roofs.xml',
                          address='Defs/RoofDef[VoidmetalRoof]')
         t.expect('RW Roofs: ok', r.status == 'ok', r.message)
         t.expect('RW Roofs: content', '<label>void metal ceiling</label>' in r.message)
 
         r = tool.execute(backend,
-                         file_path='RimWorld/PatchApplier/AnotherXML/Cyberpunk.xml',
+                         path='RimWorld/PatchApplier/AnotherXML/Cyberpunk.xml',
                          address='tweakdb/record_update[gamedataStatModifierGroup_Record:PlayerBaseCarryCapacity]')
         # Discriminator not configured for record_update here → falls back.
         # Fallback chain on <record_update> won't find dbid → not_found.

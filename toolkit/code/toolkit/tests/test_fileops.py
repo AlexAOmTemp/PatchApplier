@@ -53,7 +53,7 @@ def main():
         print("== create_file ==")
         r = _run(root, [
             {"action": "create_file",
-             "arguments": {"file_path": "new.md", "file_content": "# New\n\nbody\n"}},
+             "arguments": {"path": "new.md", "file_content": "# New\n\nbody\n"}},
         ])[0]
         t.expect("create ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("file on disk", (root / "new.md").is_file())
@@ -62,7 +62,7 @@ def main():
         print("== create_file: already exists ==")
         r = _run(root, [
             {"action": "create_file",
-             "arguments": {"file_path": "new.md", "file_content": "x"}},
+             "arguments": {"path": "new.md", "file_content": "x"}},
         ])[0]
         t.expect("error on existing", r.status == "error")
         t.expect("error_code == already_exists", r.error_code == "already_exists")
@@ -72,7 +72,7 @@ def main():
         print("== overwrite_file ==")
         r = _run(root, [
             {"action": "overwrite_file",
-             "arguments": {"file_path": "new.md", "file_content": "# Replaced\n\nnew body\n"}},
+             "arguments": {"path": "new.md", "file_content": "# Replaced\n\nnew body\n"}},
         ])[0]
         t.expect("overwrite ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("content replaced", "Replaced" in (root / "new.md").read_text(encoding="utf-8"))
@@ -113,7 +113,7 @@ def main():
         print("== delete_file ==")
         r = _run(root, [
             {"action": "delete_file",
-             "arguments": {"file_path": "sub/moved.md"}},
+             "arguments": {"path": "sub/moved.md"}},
         ])[0]
         t.expect("delete ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("file gone", not (root / "sub" / "moved.md").exists())
@@ -122,7 +122,7 @@ def main():
         print("== delete_file: missing ==")
         r = _run(root, [
             {"action": "delete_file",
-             "arguments": {"file_path": "sub/moved.md"}},
+             "arguments": {"path": "sub/moved.md"}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == not_found", r.error_code == "not_found")

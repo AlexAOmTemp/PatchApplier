@@ -62,10 +62,10 @@ with tempfile.TemporaryDirectory() as td:
     (root / 'a.txt').write_text(SAMPLE, encoding='utf-8')
     r = _run(root, [
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.txt', 'start_line': 7, 'end_line': 8,
+            'path': 'a.txt', 'start_line': 7, 'end_line': 8,
             'new_content': 'NEWBOTTOM\n'}},
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.txt', 'start_line': 1, 'end_line': 2,
+            'path': 'a.txt', 'start_line': 1, 'end_line': 2,
             'new_content': 'NEWTOP\n'}},
     ])
     t.expect('bottom-up: first ok', r[0].status == 'ok',
@@ -84,10 +84,10 @@ with tempfile.TemporaryDirectory() as td:
     (root / 'a.txt').write_text(SAMPLE, encoding='utf-8')
     r = _run(root, [
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.txt', 'start_line': 1, 'end_line': 2,
+            'path': 'a.txt', 'start_line': 1, 'end_line': 2,
             'new_content': 'NEWTOP\n'}},
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.txt', 'start_line': 7, 'end_line': 8,
+            'path': 'a.txt', 'start_line': 7, 'end_line': 8,
             'new_content': 'NEWBOTTOM\n'}},
     ])
     t.expect('top-down: first ok', r[0].status == 'ok',
@@ -103,10 +103,10 @@ with tempfile.TemporaryDirectory() as td:
     (root / 'a.txt').write_text(SAMPLE, encoding='utf-8')
     r = _run(root, [
         {'action': 'replace_in_file', 'arguments': {
-            'file_path': 'a.txt', 'search': 'line3', 'replace': 'LINE3',
+            'path': 'a.txt', 'search': 'line3', 'replace': 'LINE3',
             'search_repr': False}},
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.txt', 'start_line': 7, 'end_line': 8,
+            'path': 'a.txt', 'start_line': 7, 'end_line': 8,
             'new_content': 'NEW\n'}},
     ])
     t.expect('replace_in_file ok', r[0].status == 'ok',
@@ -125,12 +125,12 @@ with tempfile.TemporaryDirectory() as td:
         encoding='utf-8')
     r = _run(root, [
         {'action': 'replace_unit', 'arguments': {
-            'file_path': 'a.py',
+            'path': 'a.py',
             'address': {'qualname': 'foo'},
             'part': 'body',
             'new_text': '    return 42\n'}},
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.py', 'start_line': 5, 'end_line': 6,
+            'path': 'a.py', 'start_line': 5, 'end_line': 6,
             'new_content': 'def bar():\n    return 99\n'}},
     ])
     t.expect('replace_unit ok', r[0].status == 'ok',
@@ -149,10 +149,10 @@ with tempfile.TemporaryDirectory() as td:
         encoding='utf-8')
     r = _run(root, [
         {'action': 'replace_range', 'arguments': {
-            'file_path': 'a.py', 'start_line': 5, 'end_line': 6,
+            'path': 'a.py', 'start_line': 5, 'end_line': 6,
             'new_content': 'def bar():\n    return 99\n'}},
         {'action': 'replace_unit', 'arguments': {
-            'file_path': 'a.py',
+            'path': 'a.py',
             'address': {'qualname': 'foo'},
             'part': 'body',
             'new_text': '    return 42\n'}},

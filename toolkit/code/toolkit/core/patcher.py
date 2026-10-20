@@ -111,7 +111,11 @@ class Patcher:
                             paths.append(item)
 
             if action == "replace_range":
-                fp = args.get("file_path")
+                # Read the path through the tool's declared path_args, not a
+                # hard-coded "file_path": the tools were renamed to `path`
+                # and this literal silently disabled the whole rule (fp was
+                # always None, so every range passed pre-validation).
+                fp = paths[0] if paths else None
                 if not isinstance(fp, str) or not fp:
                     continue  # the tool itself reports the missing path
                 if fp in writes_seen:

@@ -148,7 +148,8 @@ def replace_unit(source: str, path: str, address: dict,
 
       part="all"        — the whole unit (head + annotation + body)
       part="body"       — body only, head and annotation kept
-      part="own_body"   — body without subsections (section-only view)
+      part="own_body"   — body without subsections (section-only view;
+                          equals `body` for non-section units)
       part="head"       — declaration only
       part="annotation" — docstring / summary only
       part=["head","annotation"] — several parts
@@ -159,10 +160,9 @@ def replace_unit(source: str, path: str, address: dict,
     the whole body". `scope_required` if neither part nor block given;
     `scope_conflict` if both.
 
-    Empty `new_text` with `block` = delete those blocks. Empty
-    `new_text` with `part="all"` = delete the whole unit (head +
-    annotation + body). Other `part` values with empty `new_text`
-    empty that part in place, leaving the unit's structure intact.
+    Empty `new_text` is rejected (`empty_input`) — deletion is a separate
+    tool: `remove_unit(part="all")` for a whole unit, `remove_unit(block=N)`
+    for individual blocks.
     """
     if new_text is None:
         new_text = ""

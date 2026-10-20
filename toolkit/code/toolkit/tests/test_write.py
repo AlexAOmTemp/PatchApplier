@@ -64,7 +64,7 @@ def main():
         # --- file_stat ---
         print("== file_stat ==")
         r = _run_patches(root, [
-            {"action": "file_stat", "arguments": {"file_path": "a.md"}},
+            {"action": "file_stat", "arguments": {"path": "a.md"}},
         ])[0]
         t.expect("file_stat ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("file_stat has size", "KB" in r.message, r.message[:80])
@@ -75,7 +75,7 @@ def main():
         print()
         print("== list_files ==")
         r = _run_patches(root, [
-            {"action": "list_files", "arguments": {"directory": "", "glob": "*.md"}},
+            {"action": "list_files", "arguments": {"path": "", "glob": "*.md"}},
         ])[0]
         t.expect("list_files ok", r.status == "ok", r.status)
         t.expect("list shows a.md", "a.md" in r.message)
@@ -86,7 +86,7 @@ def main():
         print("== grep (plain) ==")
         r = _run_patches(root, [
             {"action": "grep", "arguments": {
-                "pattern": "AAA", "directory": "", "file_glob": "*.md"}},
+                "pattern": "AAA", "paths": "", "file_glob": "*.md"}},
         ])[0]
         t.expect("grep ok", r.status == "ok", r.status)
         t.expect("grep finds a.md hit", "a.md" in r.message)
@@ -98,7 +98,7 @@ def main():
         r = _run_patches(root, [
             {"action": "grep", "arguments": {
                 "pattern": "^BBB", "regex": True,
-                "directory": "", "file_glob": "*.md",
+                "paths": "", "file_glob": "*.md",
                 "before": 1, "after": 1}},
         ])[0]
         t.expect("grep regex ok", r.status == "ok", r.status)
@@ -110,7 +110,7 @@ def main():
         print("== replace_in_file #1 ==")
         r = _run_patches(root, [
             {"action": "replace_in_file", "arguments": {
-                "file_path": "b.md", "search": "AAA", "replace": "XXXYYY",
+                "path": "b.md", "search": "AAA", "replace": "XXXYYY",
                 "occurrence": 1}},
         ])[0]
         t.expect("replace #1 ok", r.status == "ok", f"{r.status}: {r.message}")
@@ -126,7 +126,7 @@ def main():
         print("== replace_in_file all ==")
         r = _run_patches(root, [
             {"action": "replace_in_file", "arguments": {
-                "file_path": "b.md", "search": "AAA", "replace": "ZZZ",
+                "path": "b.md", "search": "AAA", "replace": "ZZZ",
                 "occurrence": "all"}},
         ])[0]
         t.expect("replace all ok", r.status == "ok")
@@ -142,7 +142,7 @@ def main():
         print("== replace_in_file not found ==")
         r = _run_patches(root, [
             {"action": "replace_in_file", "arguments": {
-                "file_path": "b.md", "search": "NOPE", "replace": "x"}},
+                "path": "b.md", "search": "NOPE", "replace": "x"}},
         ])[0]
         t.expect("not-found is error", r.status == "error")
         t.expect("error_code == no_match", r.error_code == "no_match")
@@ -152,7 +152,7 @@ def main():
         print("== replace_range ==")
         r = _run_patches(root, [
             {"action": "replace_range", "arguments": {
-                "file_path": "a.md", "start_line": 7, "end_line": 9,
+                "path": "a.md", "start_line": 7, "end_line": 9,
                 "new_content": "NEW-BODY"}},
         ])[0]
         t.expect("replace_range ok", r.status == "ok", f"{r.status}: {r.message}")

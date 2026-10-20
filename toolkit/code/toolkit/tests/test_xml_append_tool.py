@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory() as td:
     tool = XmlAppendTool()
 
     # happy path
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch',
                      fragment='<Operation Class="Y"><success>Always</success></Operation>')
     t.expect('append: ok', r.status == 'ok', r.message)
     t.expect('append: +B delta', 'B)' in r.message or 'B' in r.message)
@@ -80,7 +80,7 @@ with tempfile.TemporaryDirectory() as td:
     t.expect('append: X untouched', 'Class="X"' in cur)
 
     # fragment with nested child is reindented
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch',
                      fragment='<Operation Class="Z">\n  <nested>v</nested>\n</Operation>')
     t.expect('multiline: ok', r.status == 'ok', r.message)
     cur = (proj / 'a.xml').read_text(encoding='utf-8')
@@ -88,37 +88,37 @@ with tempfile.TemporaryDirectory() as td:
     t.expect('multiline: nested at 4', '\n    <nested>v</nested>' in cur)
 
     # malformed fragment
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch',
                      fragment='<bad')
     t.expect_code('malformed', r, 'bad_fragment')
 
     # multi-root fragment
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch',
                      fragment='<a/><b/>')
     t.expect_code('multi-root', r, 'bad_fragment')
 
     # mixed content parent
-    r = tool.execute(backend, file_path='proj/mixed.xml', parent='root',
+    r = tool.execute(backend, path='proj/mixed.xml', parent='root',
                      fragment='<c/>')
     t.expect_code('mixed parent', r, 'mixed_content_unsupported')
 
     # text leaf parent
-    r = tool.execute(backend, file_path='proj/leaf.xml', parent='root',
+    r = tool.execute(backend, path='proj/leaf.xml', parent='root',
                      fragment='<c/>')
     t.expect_code('leaf parent', r, 'mixed_content_unsupported')
 
     # not found
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Nope',
+    r = tool.execute(backend, path='proj/a.xml', parent='Nope',
                      fragment='<x/>')
     t.expect_code('parent not found', r, 'not_found')
 
     # bad address
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch[',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch[',
                      fragment='<x/>')
     t.expect_code('bad address', r, 'bad_address')
 
     # empty fragment
-    r = tool.execute(backend, file_path='proj/a.xml', parent='Patch',
+    r = tool.execute(backend, path='proj/a.xml', parent='Patch',
                      fragment='  ')
     t.expect_code('empty fragment', r, 'bad_input')
 
@@ -147,7 +147,7 @@ if RW.is_dir():
         tool = XmlAppendTool()
 
         before = target.read_bytes()
-        r = tool.execute(backend, file_path='project/Roofs.xml', parent='Defs',
+        r = tool.execute(backend, path='project/Roofs.xml', parent='Defs',
                          fragment='<RoofDef><defName>TestRoof</defName></RoofDef>')
         t.expect('RW Roofs: ok', r.status == 'ok', r.message)
         after = target.read_bytes()

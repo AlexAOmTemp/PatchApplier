@@ -82,7 +82,7 @@ def main():
 
         patch = root / "patch.json"
         patch.write_text(_patch_text(
-            {"id": 1, "action": "read_file", "arguments": {"file_path": "x.md"}},
+            {"id": 1, "action": "read_file", "arguments": {"path": "x.md"}},
         ), encoding="utf-8")
 
         # Case 1: explicit --config with foreign project_dir + --working-dir

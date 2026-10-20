@@ -80,52 +80,52 @@ with tempfile.TemporaryDirectory() as td:
         return (proj / 'a.xml').read_text(encoding='utf-8')
 
     # --- set_attr existing --------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Steel]',
                      ops=[{'op': 'set_attr', 'name': 'x', 'value': 'NEW'}])
     t.expect('set_attr existing: ok', r.status == 'ok', r.message)
     t.expect('set_attr existing: in file', 'x="NEW"' in read())
 
     # --- set_attr new -------------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Wood]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Wood]',
                      ops=[{'op': 'set_attr', 'name': 'y', 'value': '2'}])
     t.expect('set_attr new: ok', r.status == 'ok', r.message)
     t.expect('set_attr new: in file', 'y="2"' in read())
 
     # --- remove_attr --------------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Steel]',
                      ops=[{'op': 'remove_attr', 'name': 'x'}])
     t.expect('remove_attr: ok', r.status == 'ok', r.message)
     t.expect('remove_attr: gone from file', 'x="NEW"' not in read())
 
     # --- set_text -----------------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf',
+    r = tool.execute(backend, path=path, address='Defs/Leaf',
                      ops=[{'op': 'set_text', 'value': 'A & B'}])
     t.expect('set_text: ok', r.status == 'ok', r.message)
     t.expect('set_text: escaped', '<Leaf>A &amp; B</Leaf>' in read())
 
     # --- set_text on Empty (self-closing) ----------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Empty',
+    r = tool.execute(backend, path=path, address='Defs/Empty',
                      ops=[{'op': 'set_text', 'value': 'v'}])
     t.expect('set_text empty: ok', r.status == 'ok', r.message)
     t.expect('set_text empty: expanded', '<Empty>v</Empty>' in read())
 
     # --- set_text on mixed-content -----------------------------------------
     before = read()
-    r = tool.execute(backend, file_path=path, address='Defs/Mixed',
+    r = tool.execute(backend, path=path, address='Defs/Mixed',
                      ops=[{'op': 'set_text', 'value': 'X'}])
     t.expect_code('set_text mixed', r, 'mixed_content_unsupported')
     t.expect('mixed: file untouched', read() == before)
 
     # --- set_text on element with children ---------------------------------
     before = read()
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Wood]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Wood]',
                      ops=[{'op': 'set_text', 'value': 'X'}])
     t.expect_code('set_text on children', r, 'has_children')
     t.expect('children: file untouched', read() == before)
 
     # --- atomic: two ops, second fails ------------------------------------
     before = read()
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Wood]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Wood]',
                      ops=[
                          {'op': 'set_attr', 'name': 'ok_attr', 'value': 'v'},
                          {'op': 'remove_attr', 'name': 'missing'},
@@ -135,7 +135,7 @@ with tempfile.TemporaryDirectory() as td:
              'ok_attr' not in read())
 
     # --- multiple ops all succeed -----------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Wood]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Wood]',
                      ops=[
                          {'op': 'set_attr', 'name': 'a', 'value': '1'},
                          {'op': 'set_attr', 'name': 'b', 'value': '2'},
@@ -146,35 +146,35 @@ with tempfile.TemporaryDirectory() as td:
     t.expect('multi-ops: b', 'b="2"' in cur)
 
     # --- bad_op: unknown kind ---------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf',
+    r = tool.execute(backend, path=path, address='Defs/Leaf',
                      ops=[{'op': 'nuke'}])
     t.expect_code('unknown op kind', r, 'bad_op')
 
     # --- bad_op: missing field -------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf',
+    r = tool.execute(backend, path=path, address='Defs/Leaf',
                      ops=[{'op': 'set_attr'}])
     t.expect_code('missing name', r, 'bad_op')
 
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf',
+    r = tool.execute(backend, path=path, address='Defs/Leaf',
                      ops=[{'op': 'set_attr', 'name': 'x'}])
     t.expect_code('missing value', r, 'bad_op')
 
     # --- empty ops -------------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf', ops=[])
+    r = tool.execute(backend, path=path, address='Defs/Leaf', ops=[])
     t.expect_code('empty ops', r, 'bad_input')
 
     # --- bad address -----------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Leaf[',
+    r = tool.execute(backend, path=path, address='Defs/Leaf[',
                      ops=[{'op': 'set_text', 'value': 'v'}])
     t.expect_code('bad address', r, 'bad_address')
 
     # --- not found -------------------------------------------------------
-    r = tool.execute(backend, file_path=path, address='Defs/Nope',
+    r = tool.execute(backend, path=path, address='Defs/Nope',
                      ops=[{'op': 'set_text', 'value': 'v'}])
     t.expect_code('not found', r, 'not_found')
 
     # --- missing file ----------------------------------------------------
-    r = tool.execute(backend, file_path='proj/missing.xml', address='x',
+    r = tool.execute(backend, path='proj/missing.xml', address='x',
                      ops=[{'op': 'set_text', 'value': 'v'}])
     t.expect_code('missing file', r, 'not_found')
 
@@ -182,7 +182,7 @@ with tempfile.TemporaryDirectory() as td:
     (proj / 'a.xml').write_text(
         '<Defs>\n  <ThingDef>\n    <defName>Steel</defName>\n  </ThingDef>\n</Defs>',
         encoding='utf-8')
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Steel]',
                      ops=[{'op': 'set_annotation', 'value': 'metal from steel'}])
     t.expect('set_annotation: ok', r.status == 'ok', r.message)
     cur = read()
@@ -196,7 +196,7 @@ with tempfile.TemporaryDirectory() as td:
     (proj / 'a.xml').write_text(
         '<Defs>\n  <ThingDef>\n    <!-- summary: old text -->\n    <defName>Steel</defName>\n  </ThingDef>\n</Defs>',
         encoding='utf-8')
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[Steel]',
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[Steel]',
                      ops=[{'op': 'set_annotation', 'value': 'new text'}])
     t.expect('set_annotation replace: ok', r.status == 'ok', r.message)
     cur = read()
@@ -207,7 +207,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # --- set_annotation: empty parent -----------------------------------
     (proj / 'a.xml').write_text('<Defs>\n  <A></A>\n</Defs>', encoding='utf-8')
-    r = tool.execute(backend, file_path=path, address='Defs/A',
+    r = tool.execute(backend, path=path, address='Defs/A',
                      ops=[{'op': 'set_annotation', 'value': 'ann'}])
     t.expect('set_annotation empty: ok', r.status == 'ok', r.message)
     cur = read()
@@ -215,7 +215,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # --- set_annotation on self-closing ---------------------------------
     (proj / 'a.xml').write_text('<Defs>\n  <A/>\n</Defs>', encoding='utf-8')
-    r = tool.execute(backend, file_path=path, address='Defs/A',
+    r = tool.execute(backend, path=path, address='Defs/A',
                      ops=[{'op': 'set_annotation', 'value': 'ann'}])
     t.expect_code('set_annotation self-closing', r, 'empty_element')
 
@@ -246,7 +246,7 @@ if RW.is_dir():
         tool = XmlModifyTool()
 
         before = target.read_bytes()
-        r = tool.execute(backend, file_path='project/Roofs.xml',
+        r = tool.execute(backend, path='project/Roofs.xml',
                          address='Defs/RoofDef[VoidmetalRoof]',
                          ops=[{'op': 'set_attr', 'name': 'test_attr', 'value': 'v'}])
         t.expect('RW Roofs: ok', r.status == 'ok', r.message)

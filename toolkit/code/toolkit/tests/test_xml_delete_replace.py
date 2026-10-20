@@ -76,7 +76,7 @@ with tempfile.TemporaryDirectory() as td:
     # Element on its own line: whole line + newline removed.
     path = write_and_read(
         '<Defs>\n  <ThingDef><defName>A</defName></ThingDef>\n  <ThingDef><defName>B</defName></ThingDef>\n</Defs>')
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[A]')
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[A]')
     t.expect('delete: ok', r.status == 'ok', r.message)
     cur = (proj / 'a.xml').read_text(encoding='utf-8')
     t.expect('delete: A gone', '<defName>A</defName>' not in cur)
@@ -84,19 +84,19 @@ with tempfile.TemporaryDirectory() as td:
     t.expect('delete: no double newline', '\n\n' not in cur, repr(cur))
 
     # Delete root -> refused.
-    r = tool.execute(backend, file_path=path, address='Defs')
+    r = tool.execute(backend, path=path, address='Defs')
     t.expect_code('delete root', r, 'cannot_delete_root')
 
     # Delete nonexistent.
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[C]')
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[C]')
     t.expect_code('delete missing', r, 'not_found')
 
     # Ambiguous.
     path = write_and_read(
         '<Defs>\n  <ThingDef><defName>A</defName></ThingDef>\n  <ThingDef><defName>A</defName></ThingDef>\n</Defs>')
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[A]')
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[A]')
     t.expect_code('delete ambiguous', r, 'ambiguous_address')
-    r = tool.execute(backend, file_path=path, address='Defs/ThingDef[A]', occurrence=1)
+    r = tool.execute(backend, path=path, address='Defs/ThingDef[A]', occurrence=1)
     t.expect('delete occurrence=1: ok', r.status == 'ok', r.message)
 
     backend.close()
@@ -115,7 +115,7 @@ with tempfile.TemporaryDirectory() as td:
     # Simple replace.
     path = write_and_read(
         '<Defs>\n  <ThingDef><defName>A</defName></ThingDef>\n</Defs>')
-    r = tool.execute(backend, file_path=path,
+    r = tool.execute(backend, path=path,
                      address='Defs/ThingDef[A]',
                      fragment='<ThingDef><defName>B</defName></ThingDef>')
     t.expect('replace: ok', r.status == 'ok', r.message)
@@ -127,7 +127,7 @@ with tempfile.TemporaryDirectory() as td:
     # Multi-line replace with reindent.
     path = write_and_read(
         '<Defs>\n  <A/>\n</Defs>')
-    r = tool.execute(backend, file_path=path, address='Defs/A',
+    r = tool.execute(backend, path=path, address='Defs/A',
                      fragment='<A>\n  <b>x</b>\n</A>')
     t.expect('replace multiline: ok', r.status == 'ok', r.message)
     cur = (proj / 'a.xml').read_text(encoding='utf-8')
@@ -136,7 +136,7 @@ with tempfile.TemporaryDirectory() as td:
 
     # Replace root (allowed).
     path = write_and_read('<Root><x/></Root>')
-    r = tool.execute(backend, file_path=path, address='Root',
+    r = tool.execute(backend, path=path, address='Root',
                      fragment='<NewRoot><y/></NewRoot>')
     t.expect('replace root: ok', r.status == 'ok', r.message)
     cur = (proj / 'a.xml').read_text(encoding='utf-8')
@@ -144,15 +144,15 @@ with tempfile.TemporaryDirectory() as td:
 
     # Malformed fragment.
     path = write_and_read('<r><a/></r>')
-    r = tool.execute(backend, file_path=path, address='r/a', fragment='<bad')
+    r = tool.execute(backend, path=path, address='r/a', fragment='<bad')
     t.expect_code('replace malformed', r, 'bad_fragment')
 
     # Multi-root fragment.
-    r = tool.execute(backend, file_path=path, address='r/a', fragment='<a/><b/>')
+    r = tool.execute(backend, path=path, address='r/a', fragment='<a/><b/>')
     t.expect_code('replace multi-root', r, 'bad_fragment')
 
     # Not found.
-    r = tool.execute(backend, file_path=path, address='r/nope', fragment='<x/>')
+    r = tool.execute(backend, path=path, address='r/nope', fragment='<x/>')
     t.expect_code('replace not_found', r, 'not_found')
 
     backend.close()
@@ -169,7 +169,7 @@ if RW.is_dir():
         shutil.copyfile(RW / 'Data/Anomaly/Defs/Misc/Roofs.xml', target)
 
         delete_tool = XmlDeleteTool()
-        r = delete_tool.execute(backend, file_path='proj/Roofs.xml',
+        r = delete_tool.execute(backend, path='proj/Roofs.xml',
                                 address='Defs/RoofDef[VoidmetalRoof]')
         t.expect('RW delete: ok', r.status == 'ok', r.message)
         after = target.read_bytes()
@@ -181,7 +181,7 @@ if RW.is_dir():
         shutil.copyfile(RW / 'Data/Anomaly/Defs/Misc/Roofs.xml', target)
         replace_tool = XmlReplaceTool()
         r = replace_tool.execute(
-            backend, file_path='proj/Roofs.xml',
+            backend, path='proj/Roofs.xml',
             address='Defs/RoofDef[VoidmetalRoof]',
             fragment='<RoofDef><defName>VoidmetalRoof</defName>'
                      '<label>edited</label></RoofDef>')

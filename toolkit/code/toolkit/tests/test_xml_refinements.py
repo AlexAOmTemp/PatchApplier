@@ -92,7 +92,7 @@ with tempfile.TemporaryDirectory() as td:
     ins_t = XmlInsertTool()
 
     # --- source_hash: xml_read emits '#' hash ---------------
-    r = read_t.execute(backend, file_path=path, address='Defs/ThingDef[Old]')
+    r = read_t.execute(backend, path=path, address='Defs/ThingDef[Old]')
     t.expect('read: ok', r.status == 'ok', r.message)
     import re
     m = re.search(r'#([0-9a-f]{8})', r.message)
@@ -100,27 +100,27 @@ with tempfile.TemporaryDirectory() as td:
     good_hash = m.group(1)
 
     # --- source_hash match: ok ------------------------------
-    r = mod_t.execute(backend, file_path=path,
+    r = mod_t.execute(backend, path=path,
                       address='Defs/ThingDef[Old]',
                       ops=[{'op': 'set_attr', 'name': 'marker', 'value': 'x'}],
                       source_hash=good_hash)
     t.expect('modify with fresh hash: ok', r.status == 'ok', r.message)
 
     # --- source_hash mismatch: source_changed ---------------
-    r = mod_t.execute(backend, file_path=path,
+    r = mod_t.execute(backend, path=path,
                       address='Defs/ThingDef[Old]',
                       ops=[{'op': 'set_attr', 'name': 'marker', 'value': 'y'}],
                       source_hash='deadbeef')
     t.expect_code('modify with stale hash', r, 'source_changed')
 
     # --- source_hash: append, delete, replace refuse too ---
-    r = app_t.execute(backend, file_path=path, parent='Defs',
+    r = app_t.execute(backend, path=path, parent='Defs',
                       fragment='<x/>', source_hash='deadbeef')
     t.expect_code('append stale hash', r, 'source_changed')
-    r = del_t.execute(backend, file_path=path, address='Defs/ThingDef[Next]',
+    r = del_t.execute(backend, path=path, address='Defs/ThingDef[Next]',
                       source_hash='deadbeef')
     t.expect_code('delete stale hash', r, 'source_changed')
-    r = rep_t.execute(backend, file_path=path, address='Defs/ThingDef[Next]',
+    r = rep_t.execute(backend, path=path, address='Defs/ThingDef[Next]',
                       fragment='<ThingDef><defName>Next</defName></ThingDef>',
                       source_hash='deadbeef')
     t.expect_code('replace stale hash', r, 'source_changed')
@@ -138,7 +138,7 @@ with tempfile.TemporaryDirectory() as td:
     t.expect('copy: applied key worked', 'TM_BoneGolem' in r.message or True)
 
     # --- xml_insert: before -------------------------------
-    r = ins_t.execute(backend, file_path=path, address='Defs/ThingDef[Mid]',
+    r = ins_t.execute(backend, path=path, address='Defs/ThingDef[Mid]',
                       fragment='<ThingDef><defName>InsertedBefore</defName></ThingDef>',
                       position='before')
     t.expect('insert before: ok', r.status == 'ok', r.message)
@@ -150,7 +150,7 @@ with tempfile.TemporaryDirectory() as td:
              idx('>Old<') < idx('InsertedBefore'), cur)
 
     # --- xml_insert: after --------------------------------
-    r = ins_t.execute(backend, file_path=path, address='Defs/ThingDef[Mid]',
+    r = ins_t.execute(backend, path=path, address='Defs/ThingDef[Mid]',
                       fragment='<ThingDef><defName>InsertedAfter</defName></ThingDef>',
                       position='after')
     t.expect('insert after: ok', r.status == 'ok', r.message)
@@ -159,17 +159,17 @@ with tempfile.TemporaryDirectory() as td:
              cur.find('>Mid<') < cur.find('InsertedAfter') < cur.find('>Next<'), cur)
 
     # --- xml_insert: before root refused ------------------
-    r = ins_t.execute(backend, file_path=path, address='Defs',
+    r = ins_t.execute(backend, path=path, address='Defs',
                       fragment='<x/>', position='before')
     t.expect_code('insert before root', r, 'cannot_insert_root_sibling')
 
     # --- xml_insert: bad_position -------------------------
-    r = ins_t.execute(backend, file_path=path, address='Defs/ThingDef[Mid]',
+    r = ins_t.execute(backend, path=path, address='Defs/ThingDef[Mid]',
                       fragment='<x/>', position='middle')
     t.expect_code('insert bad_position', r, 'bad_position')
 
     # --- xml_insert: malformed ----------------------------
-    r = ins_t.execute(backend, file_path=path, address='Defs/ThingDef[Mid]',
+    r = ins_t.execute(backend, path=path, address='Defs/ThingDef[Mid]',
                       fragment='<unclosed', position='before')
     t.expect_code('insert malformed', r, 'bad_fragment')
 
