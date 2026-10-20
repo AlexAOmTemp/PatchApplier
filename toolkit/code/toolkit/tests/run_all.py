@@ -73,6 +73,17 @@ def main():
             failures += 1
             print(f"[!] {script.name} exited with code {rc}")
         print()
+    # Consistency: LLM_START toolset block must match TOOL_MAP.
+    print("=" * 60)
+    print("[tools doc] LLM_START toolset block vs TOOL_MAP")
+    print("=" * 60)
+    gen = HERE.parent / "manual" / "gen_toolset_doc.py"
+    rc = subprocess.call([sys.executable, str(gen), "--check"])
+    if rc != 0:
+        failures += 1
+        print(f"[!] {gen.name} --check exited with code {rc}")
+    print()
+
     print("=" * 60)
     if failures:
         print(f"=== \u0418\u0422\u041e\u0413: {failures} script(s) failed ===")

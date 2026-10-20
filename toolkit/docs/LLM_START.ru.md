@@ -48,12 +48,15 @@ Patch Applier — правка проекта JSON-патчами. Один от
 4. Неясно — спросить, не гадать
 
 ## 5. Тулсет
-`?` — опционально. Сигнатуры сгенерированы из `TOOL_MAP` (источник истины — код); редкие аргументы, XML и MCP — `REF_TOOLS.md`.
+`?` — опционально. Блок ниже генерируется из `TOOL_MAP` скриптом `toolkit/code/manual/gen_toolset_doc.py` (источник истины — код). Правь код, затем перегенерируй; `--check` падает при расхождении. Редкие аргументы, XML и MCP — `REF_TOOLS.md`.
 
+<!-- tools:auto:begin -->
 **Чтение**
 - `read_file(path?, section_number?, section_title?, start_line?, end_line?, max_bytes?, numbered?, escape?, raw?)`
-- `read_unit(path?, address?, part?, block?, max_bytes?)` · `list_units(path?, max_bytes?)`
-- `file_stat(path?)` · `file_exists(path?)`
+- `read_unit(path?, address?, part?, block?, max_bytes?)`
+- `list_units(path?, max_bytes?)`
+- `file_stat(path?)`
+- `file_exists(path?)`
 - `list_files(path?, glob?, show_size?, scoped?, recursive?, show_hidden?, filter?)`
 - `survey_dir(path?, ext?, top?, max_files?, scoped?, filter?)`
 - `tree(path?, max_lines?, show_files?, max_types?, show_types?, scoped?, recursive_sizes?, filter?)`
@@ -62,9 +65,9 @@ Patch Applier — правка проекта JSON-патчами. Один от
 **Unit**
 - `replace_unit(path?, address?, new_text?, part?, block?)`
 - `insert_block(path?, address?, new_text?, position?, before_anchor?, after_anchor?)` — `position` = `start`\|`end`; якоря взаимоисключающие, `address` = контейнер, якорь = точка внутри
-- `remove_unit(path?, address?, part?, block?)` · `create_unit(path?, address?, part?, new_text?)` · `copy_unit(source_file, target_file, selector?, position?, anchor?, container?)`
-
-> **Аргументы:** один путь — `path`, много — `paths`. Неверный аргумент — явная ошибка `unknown_arg` со списком валидных.
+- `remove_unit(path?, address?, part?, block?)`
+- `create_unit(path?, address?, part?, new_text?)`
+- `copy_unit(source_file, target_file, selector?, position?, anchor?, container?)`
 
 **Запись (escape hatch)**
 - `replace_in_file(path, search, replace, occurrence?, search_repr?, regex?)`
@@ -73,8 +76,11 @@ Patch Applier — правка проекта JSON-патчами. Один от
 - `insert_at_anchor(path, anchor, position, new_content, occurrence?)`
 
 **Файлы**
-- `create_file(path, file_content, class_name?)` · `overwrite_file(path, file_content)`
-- `delete_file(path)` · `move_file(source_path, destination_path)` · `copy_file(source_path, destination_path)`
+- `create_file(path, file_content, class_name?)`
+- `overwrite_file(path, file_content)`
+- `delete_file(path)`
+- `move_file(source_path, destination_path)`
+- `copy_file(source_path, destination_path)`
 
 **Индекс**
 - `get_index(kind, max_bytes?, limit?, path?, sort?, scoped?, sections?)` — `kind` обязателен (в сигнатуре; без него `missing_arg`); по умолчанию overview, `sections=true` — полный список секций
@@ -92,12 +98,19 @@ Patch Applier — правка проекта JSON-патчами. Один от
 **Прочее**
 - `run_python(path\|module\|code, args?, cwd?, timeout?, max_bytes?, env?)` — ровно один из `path`/`module`/`code`
 - `verify_syntax(paths?, directory?)`
-- `get_scope()` · `exclude(patterns?, reason?)` · `include(patterns?, reason?)` · `set_scope(text?)` · `clear_scope()`
+- `get_scope()`
+- `exclude(patterns?, reason?)`
+- `include(patterns?, reason?)`
+- `set_scope(text?)`
+- `clear_scope()`
 - `grep_replace(pattern?, replacement?, mappings?, paths?, recursive?, file_glob?, exclude_glob?, regex?, fixed_strings?, ignore_case?, word_boundary?, max_replacements?, dry_run?, scoped?, filter?, force?)`
+
+> **Аргументы:** один путь — `path`, много — `paths`. Неверный аргумент — явная ошибка `unknown_arg` со списком валидных.
 
 **Условно включённые**
 - MCP (Roblox): `grep_mcp(pattern, directory?, ...)` · `grep_replace_mcp(...)` · `grep_lua(...)` — схемы в `REF_TOOLS.md`
 - XML: `xml_read`, `xml_find`, `xml_map`, `xml_insert`, `xml_replace`, `xml_modify`, `xml_append`, `xml_delete`, `xml_copy`, `xml_move` — `XML_START.md` / `REF_TOOLS.md`
+<!-- tools:auto:end -->
 
 ## 6. Пример
 Один фенс, три массива, `id` у каждого. `patterns` — строка или список; `reason` опционален (по умолчанию `llm-session`).
