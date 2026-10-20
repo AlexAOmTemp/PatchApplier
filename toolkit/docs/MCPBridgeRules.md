@@ -78,6 +78,6 @@
 <!-- summary: Сигнатуры grep_mcp / grep_lua / grep_replace_mcp из TOOL_MAP. Генерируется gen_toolset_doc.py; не править вручную. -->
 <!-- tools:auto:begin -->
 - `grep_mcp(pattern, directory?, fixed_strings?, ignore_case?, word_boundary?, max_results?, before?, after?)`
-- `grep_lua(...) — legacy-алиас `grep_mcp``
+- `grep_lua(...)` — legacy-алиас `grep_mcp`
 - `grep_replace_mcp(directory?, pattern?, replacement?, mappings?, fixed_strings?, ignore_case?, word_boundary?, max_replacements?, dry_run?)`
 <!-- tools:auto:end -->

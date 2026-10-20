@@ -56,7 +56,7 @@ ModMetaData/modDependencies/li[brrainz.harmony]
 ## 4. Десять тулов
 <!-- summary: read, find, map, modify, append, delete, replace, copy, move, insert. Что принимают, что возвращают, когда отказывают. rebuild для XML не нужен. -->
 
-### 4.1 `xml_read(file_path, address, occurrence?)`
+### 4.1 `xml_read(path, address, occurrence?)`
 
 Один элемент целиком как текст. Header: `<tag> L{first}-L{last} ({N} B)`.
 
@@ -77,7 +77,7 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 
 Когда использовать: незнакомый мод — «что вообще есть в дереве».
 
-### 4.4 `xml_modify(file_path, address, ops, occurrence?)`
+### 4.4 `xml_modify(path, address, ops, occurrence?)`
 
 Атомарные правки одного элемента. `ops` — список операций, применяются по порядку. **Любая ошибка откатывает всё, файл не тронут.**
 
@@ -90,7 +90,7 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 
 **Удаление children нет.** Для удаления ребёнка — `xml_delete` (см. §4.6).
 
-### 4.5 `xml_append(file_path, parent, fragment)`
+### 4.5 `xml_append(path, parent, fragment)`
 
 Добавить один well-formed элемент в конец детей `parent`. Fragment — строка. Многострочный пересчитывается под отступ родителя.
 
@@ -99,7 +99,7 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 - Self-closing parent раскрывается в пару.
 - CRLF/EOL файла сохраняется.
 
-### 4.6 `xml_delete(file_path, address, occurrence?)`
+### 4.6 `xml_delete(path, address, occurrence?)`
 
 Удалить один элемент.
 
@@ -108,7 +108,7 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 - Неоднозначность — через `occurrence`, как в `xml_read`.
 - BOM / CRLF / кодировка сохраняются.
 
-### 4.7 `xml_replace(file_path, address, fragment, occurrence?)`
+### 4.7 `xml_replace(path, address, fragment, occurrence?)`
 
 Заменить элемент целиком на `fragment`.
 
@@ -140,7 +140,7 @@ Schema-поиск по дереву. **`path` обязателен.** `tag` об
 
 Cross-file partial failure: target записан, source не удалён → `status=ok` с `⚠ WARN` в message (дубликат лучше потери).
 
-### 4.10 `xml_insert(file_path, address, fragment, position, occurrence?, source_hash?)`
+### 4.10 `xml_insert(path, address, fragment, position, occurrence?, source_hash?)`
 
 Вставить `fragment` как сиблинга целевого элемента. `position` — `before` или `after`. Родитель берётся из цели.
 

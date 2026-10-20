@@ -71,11 +71,12 @@ NOTES: dict[str, str] = {
                  "по умолчанию overview, `sections=true` — полный список секций",
     "run_python": " — ровно один из `path`/`module`/`code`",
     "rebuild_csharp_index": " — те же аргументы",
+    "grep_lua": " — legacy-алиас `grep_mcp`",
 }
 
 OVERRIDE: dict[str, str] = {
     "rebuild_csharp_index": "rebuild_csharp_index(...)",
-    "grep_lua": "grep_lua(...) — legacy-алиас `grep_mcp`",
+    "grep_lua": "grep_lua(...)",
 }
 
 
