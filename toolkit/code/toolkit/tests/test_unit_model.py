@@ -274,7 +274,7 @@ def main():
             r = run("insert_block", file_path="c.py",
                     address={"qualname": "f"},
                     new_text="first = True",
-                    position="before", anchor=1)
+                    before_anchor=1)
             t.expect("ok", r.status == "ok", r.message)
             after = (root / "c.py").read_text(encoding="utf-8")
             t.expect("inserted", "first = True" in after)
@@ -287,12 +287,19 @@ def main():
             t.expect("error", r.status == "error")
             t.expect("bad_position", r.error_code == "bad_position", r.error_code)
 
-            print("== insert_block: anchor_required ===")
+            print("== insert_block: position no longer accepts before/after ===")
             r = run("insert_block", file_path="c.py",
                     address={"qualname": "f"},
                     new_text="x", position="before")
             t.expect("error", r.status == "error")
-            t.expect("anchor_required", r.error_code == "anchor_required", r.error_code)
+            t.expect("bad_position", r.error_code == "bad_position", r.error_code)
+
+            print("== insert_block: both anchors rejected ===")
+            r = run("insert_block", file_path="c.py",
+                    address={"qualname": "f"},
+                    new_text="x", before_anchor=1, after_anchor=1)
+            t.expect("error", r.status == "error")
+            t.expect("bad_anchor", r.error_code == "bad_anchor", r.error_code)
 
             # --- replace_unit ---
             print("== replace_unit: body only ===")

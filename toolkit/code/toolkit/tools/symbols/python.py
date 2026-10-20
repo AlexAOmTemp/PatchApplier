@@ -23,31 +23,31 @@ from ._ast import (
 class ListSymbolsTool:
     name = "list_symbols"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         include_vars: bool = False,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
-            return _lua.lua_list_symbols(backend, file_path)
-        source = backend.read(file_path)
+            return _lua.lua_list_symbols(backend, path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="list_symbols",
                 error_code="syntax_error",
             )
-        out = [file_path]
+        out = [path]
         count = 0
         for qualname, node in _iter_defs(tree, include_vars=bool(include_vars)):
             kind = _kind_of(node)
@@ -65,28 +65,28 @@ class ListSymbolsTool:
 class ReadSymbolTool:
     name = "read_symbol"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         occurrence: int | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
-            return _lua.lua_read_symbol(backend, file_path, qualname, occurrence)
-        source = backend.read(file_path)
+            return _lua.lua_read_symbol(backend, path, qualname, occurrence)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="read_symbol",
                 error_code="syntax_error",
             )
@@ -96,16 +96,16 @@ class ReadSymbolTool:
             head_end = _module_head_end_line(tree)
             if head_end is None:
                 body = "\n".join(lines)
-                header = f"{file_path} [<module>] L1\u2013L{len(lines)}"
+                header = f"{path} [<module>] L1\u2013L{len(lines)}"
             elif head_end == 1:
                 return Result(
                     status="ok",
-                    message=f"{file_path} [<module>] (empty head)",
+                    message=f"{path} [<module>] (empty head)",
                     action="read_symbol",
                 )
             else:
                 body = "\n".join(lines[:head_end - 1])
-                header = f"{file_path} [<module>] L1\u2013L{head_end - 1}"
+                header = f"{path} [<module>] L1\u2013L{head_end - 1}"
             return Result(status="ok", message=f"{header}\n{body}", action="read_symbol")
 
         matches = _find_all_by_qualname(tree, qualname, include_vars=True)
@@ -115,21 +115,21 @@ class ReadSymbolTool:
         start = _start_line(node)
         end = node.end_lineno or node.lineno
         body = "\n".join(lines[start - 1:end])
-        header = f"{file_path} [{qualname}] L{start}\u2013L{end}"
+        header = f"{path} [{qualname}] L{start}\u2013L{end}"
         return Result(status="ok", message=f"{header}\n{body}", action="read_symbol")
 
 
 class ReplaceSymbolTool:
     name = "replace_symbol"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
             self,
             backend: Backend,
             fmt: Any,
-            file_path: str,
+            path: str,
             qualname: str,
             new_code: str,
             occurrence: int | None = None,
@@ -143,18 +143,21 @@ class ReplaceSymbolTool:
                 action="replace_symbol",
                 error_code="bad_part",
             )
+        from ...core.tool_call import call_tool
         if part == "body":
-            return ReplaceSymbolBodyTool().execute(
-                backend, fmt, file_path=file_path, qualname=qualname,
+            return call_tool(
+                ReplaceSymbolBodyTool, backend, fmt,
+                path=path, qualname=qualname,
                 new_body=new_code, occurrence=occurrence)
         if part == "signature":
-            return ReplaceSymbolSignatureTool().execute(
-                backend, fmt, file_path=file_path, qualname=qualname,
+            return call_tool(
+                ReplaceSymbolSignatureTool, backend, fmt,
+                path=path, qualname=qualname,
                 new_signature=new_code, occurrence=occurrence)
 
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
-            return _lua.lua_replace_symbol(backend, file_path, qualname,
+            return _lua.lua_replace_symbol(backend, path, qualname,
                                            new_code, occurrence)
         if not new_code or not new_code.strip():
             return Result(
@@ -163,13 +166,13 @@ class ReplaceSymbolTool:
                 action="replace_symbol",
                 error_code="empty_input",
             )
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="replace_symbol",
                 error_code="syntax_error",
             )
@@ -200,10 +203,10 @@ class ReplaceSymbolTool:
                 error_code=ec,
             )
 
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
         new_end = start + len(new_lines) - 1
-        msg = (f"{file_path}: {qualname} заменён "
+        msg = (f"{path}: {qualname} заменён "
                f"(L{start}\u2013L{end} \u2192 L{start}\u2013L{new_end}) \u2014 "
                f"{_sign(delta.lines)} стр., {_sign(delta.bytes)} Б")
         return Result(
@@ -218,22 +221,22 @@ class ReplaceSymbolTool:
 class ReplaceSymbolBodyTool:
     name = "replace_symbol_body"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         new_body: str,
         occurrence: int | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
-            return _lua.lua_replace_symbol_body(backend, file_path, qualname,
+            return _lua.lua_replace_symbol_body(backend, path, qualname,
                                                 new_body, occurrence)
         if not new_body or not new_body.strip():
             return Result(
@@ -242,13 +245,13 @@ class ReplaceSymbolBodyTool:
                 action="replace_symbol_body",
                 error_code="empty_input",
             )
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="replace_symbol_body",
                 error_code="syntax_error",
             )
@@ -309,10 +312,10 @@ class ReplaceSymbolBodyTool:
                 error_code=ec,
             )
 
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
         new_end = body_start + len(new_lines) - 1
-        msg = (f"{file_path}: тело {qualname} заменено "
+        msg = (f"{path}: тело {qualname} заменено "
                f"(L{body_start}\u2013L{body_end} \u2192 L{body_start}\u2013L{new_end}) \u2014 "
                f"{_sign(delta.lines)} стр., {_sign(delta.bytes)} Б")
         return Result(
@@ -327,23 +330,23 @@ class ReplaceSymbolBodyTool:
 class ReplaceSymbolSignatureTool:
     name = "replace_symbol_signature"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         new_signature: str,
         occurrence: int | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
             return _lua.lua_replace_symbol_signature(
-                backend, file_path, qualname, new_signature, occurrence)
+                backend, path, qualname, new_signature, occurrence)
         if not new_signature or not new_signature.strip():
             return Result(
                 status="error",
@@ -351,13 +354,13 @@ class ReplaceSymbolSignatureTool:
                 action="replace_symbol_signature",
                 error_code="empty_input",
             )
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="replace_symbol_signature",
                 error_code="syntax_error",
             )
@@ -408,10 +411,10 @@ class ReplaceSymbolSignatureTool:
                 error_code=ec,
             )
 
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
         new_end = start + len(new_lines) - 1
-        msg = (f"{file_path}: сигнатура {qualname} заменена "
+        msg = (f"{path}: сигнатура {qualname} заменена "
                f"(L{start}\u2013L{end} \u2192 L{start}\u2013L{new_end}) \u2014 "
                f"{_sign(delta.lines)} стр., {_sign(delta.bytes)} Б")
         return Result(
@@ -426,28 +429,28 @@ class ReplaceSymbolSignatureTool:
 class DeleteSymbolTool:
     name = "delete_symbol"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         occurrence: int | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             from . import lua as _lua
-            return _lua.lua_delete_symbol(backend, file_path, qualname, occurrence)
-        source = backend.read(file_path)
+            return _lua.lua_delete_symbol(backend, path, qualname, occurrence)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="delete_symbol",
                 error_code="syntax_error",
             )
@@ -476,9 +479,9 @@ class DeleteSymbolTool:
                 action="delete_symbol",
                 error_code="result_syntax_error",
             )
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
-        msg = (f"{file_path}: {qualname} удалён (L{start}\u2013L{end}) \u2014 "
+        msg = (f"{path}: {qualname} удалён (L{start}\u2013L{end}) \u2014 "
                f"{_sign(delta.lines)} стр., {_sign(delta.bytes)} Б")
         return Result(
             status="ok",
@@ -492,21 +495,21 @@ class DeleteSymbolTool:
 class InsertSymbolTool:
     name = "insert_symbol"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         new_code: str,
         container: str | None = None,
         position: str = "end",
         anchor: str | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             if container is not None:
                 return Result(
                     status="error",
@@ -515,7 +518,7 @@ class InsertSymbolTool:
                     error_code="container_not_supported",
                 )
             from . import lua as _lua
-            return _lua.lua_insert_symbol(backend, file_path, new_code,
+            return _lua.lua_insert_symbol(backend, path, new_code,
                                           position, anchor)
         if not new_code or not new_code.strip():
             return Result(
@@ -546,13 +549,13 @@ class InsertSymbolTool:
                 action="insert_symbol",
                 error_code="anchor_not_allowed",
             )
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="insert_symbol",
                 error_code="syntax_error",
             )
@@ -580,10 +583,10 @@ class InsertSymbolTool:
                 action="insert_symbol",
                 error_code="result_syntax_error",
             )
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
         where = f"{container} ({position})" if container else f"module ({position})"
-        msg = (f"{file_path}: вставлено в {where} "
+        msg = (f"{path}: вставлено в {where} "
                f"(+{len(new_lines)} стр., {_sign(delta.bytes)} Б)")
         return Result(
             status="ok",
@@ -597,14 +600,14 @@ class InsertSymbolTool:
 class MoveSymbolTool:
     name = "move_symbol"
     op = "write"
-    path_args = ["file_path", "target_file"]
+    path_args = ["path", "target_file"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         occurrence: int | None = None,
         target_file: str | None = None,
@@ -613,7 +616,7 @@ class MoveSymbolTool:
         anchor: str | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             if container is not None:
                 return Result(
                     status="error",
@@ -622,7 +625,7 @@ class MoveSymbolTool:
                     error_code="container_not_supported",
                 )
             from . import lua as _lua
-            return _lua.lua_move_symbol(backend, file_path, qualname,
+            return _lua.lua_move_symbol(backend, path, qualname,
                                         occurrence, target_file,
                                         position, anchor)
         if position not in ("start", "end", "before", "after"):
@@ -648,13 +651,13 @@ class MoveSymbolTool:
                 error_code="anchor_not_allowed",
             )
 
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="move_symbol",
                 error_code="syntax_error",
             )
@@ -669,7 +672,7 @@ class MoveSymbolTool:
         node_indent = " " * node.col_offset
         block = _dedent_block(src_lines[start - 1:end], node_indent)
 
-        same_file = (target_file is None) or (target_file == file_path)
+        same_file = (target_file is None) or (target_file == path)
 
         if same_file:
             mid = _delete_symbol_lines(source, start, end)
@@ -711,10 +714,10 @@ class MoveSymbolTool:
             ok, ec, msg = _check_target_survives(final, expected_qn)
             if not ok:
                 return Result(status="error", action="move_symbol", error_code=ec, message=msg)
-            backend.write(file_path, final)
+            backend.write(path, final)
             delta = _delta(source, final)
             where = f"{container} ({position})" if container else f"module ({position})"
-            msg = (f"{file_path}: {qualname} перемещён (L{start}\u2013L{end}) "
+            msg = (f"{path}: {qualname} перемещён (L{start}\u2013L{end}) "
                    f"\u2192 {where} \u2014 {_sign(delta.lines)} стр., "
                    f"{_sign(delta.bytes)} Б")
             return Result(status="ok", message=msg, delta=delta,
@@ -770,7 +773,7 @@ class MoveSymbolTool:
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Новый {file_path} не парсится: {e}. Патч отменен.",
+                message=f"Новый {path} не парсится: {e}. Патч отменен.",
                 action="move_symbol",
                 error_code="result_syntax_error",
             )
@@ -781,10 +784,10 @@ class MoveSymbolTool:
         if not ok:
             return Result(status="error", action="move_symbol", error_code=ec, message=msg)
         backend.write(target_file, new_tgt)
-        backend.write(file_path, new_src)
+        backend.write(path, new_src)
         delta = _delta(source, new_src)
         where = f"{container} ({position})" if container else f"module ({position})"
-        msg = (f"{file_path} \u2192 {target_file}: {qualname} перемещён "
+        msg = (f"{path} \u2192 {target_file}: {qualname} перемещён "
                f"\u2192 {where} \u2014 {_sign(delta.lines)} стр. в источнике, "
                f"+{len(new_lines)} стр. в цели")
         return Result(status="ok", message=msg, delta=delta,
@@ -898,21 +901,21 @@ class ReplaceStatementTool:
 
     name = "replace_statement"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         qualname: str,
         index: int,
         new_code: str = "",
         occurrence: int | None = None,
         **_: Any,
     ) -> Result:
-        if _is_lua_path(file_path):
+        if _is_lua_path(path):
             return Result(
                 status="error",
                 message=("replace_statement is Python-only; for Lua use "
@@ -920,13 +923,13 @@ class ReplaceStatementTool:
                 action="replace_statement",
                 error_code="lua_not_supported",
             )
-        source = backend.read(file_path)
+        source = backend.read(path)
         try:
             tree = ast.parse(source)
         except SyntaxError as e:
             return Result(
                 status="error",
-                message=f"Синтаксическая ошибка в {file_path}: {e}",
+                message=f"Синтаксическая ошибка в {path}: {e}",
                 action="replace_statement",
                 error_code="syntax_error",
             )
@@ -994,10 +997,10 @@ class ReplaceStatementTool:
         if not ok:
             return Result(status="error", message=msg,
                           action="replace_statement", error_code=ec)
-        backend.write(file_path, new_source)
+        backend.write(path, new_source)
         delta = _delta(source, new_source)
         verb = "удалён" if deleting else "заменён"
-        msg = (f"{file_path}: statement #{idx} в {qualname} {verb} "
+        msg = (f"{path}: statement #{idx} в {qualname} {verb} "
                f"(L{start}\u2013L{end}) \u2014 "
                f"{_sign(delta.lines)} стр., {_sign(delta.bytes)} Б")
         return Result(

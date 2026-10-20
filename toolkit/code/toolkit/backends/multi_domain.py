@@ -285,6 +285,15 @@ class MultiDomainBackend:
             raise FileNotFoundError(f"no backend owns path {path!r}")
         return backend.read(path)
 
+    def read_head(self, path: str, max_bytes: int = 8192) -> bytes:
+        name, backend = self._owner(path)
+        if backend is None:
+            raise FileNotFoundError(f"no backend owns path {path!r}")
+        fn = getattr(backend, "read_head", None)
+        if not callable(fn):
+            return b""
+        return fn(path, max_bytes)
+
     def write(self, path: str, content: str) -> None:
         name, backend = self._owner(path)
         if backend is None:
@@ -458,6 +467,36 @@ class MultiDomainBackend:
         if backend is None:
             return None
         return backend.filter_check(path, op)
+
+    def is_hidden(self, rel: str) -> bool:
+        """Delegate visibility to the owning sub-backend.
+
+        FS backends consult `.patchignore`; MCP has no such file and
+        returns False. Unknown owner -> False (do not hide silently).
+        """
+        name, backend = self._owner(rel)
+        if backend is None:
+            return False
+        fn = getattr(backend, "is_hidden", None)
+        if not callable(fn):
+            return False
+        try:
+            return fn(rel)
+        except Exception:
+            return False
+
+    def hidden_predicate(self):
+        """Preload visibility from the FS sub-backend (MCP has none)."""
+        for name, backend in self._pairs:
+            if name != "fs":
+                continue
+            fn = getattr(backend, "hidden_predicate", None)
+            if callable(fn):
+                try:
+                    return fn()
+                except Exception:
+                    break
+        return lambda rel: False
 
     def invoke_native(self, name: str, args: dict):
         """Delegate to the MCP sub-backend, if present and ready.

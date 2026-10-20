@@ -3,14 +3,14 @@
 All paths are relative to the root. Sandbox enforcement: any path that
 resolves outside the root is rejected before I/O.
 
-This class does **not** know about `.patchignore`. Hiding rules are a
-workspace concern: `MultiRootFsBackend` reads them from its own state_dir
-and applies them in `filter_check` before delegating. A bare
-RootDirBackend driven directly (tests, ad-hoc tools) sees everything
-inside its root and consults no policy.
+This class does **not** know about `.patchignore`. Visibility rules are
+a workspace concern: `MultiRootFsBackend` reads them from its own
+state_dir and exposes `is_hidden` / `filter_check`. A bare RootDirBackend
+driven directly (tests, ad-hoc tools) sees everything inside its root.
 """
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
 
@@ -42,14 +42,27 @@ class RootDirBackend:
 
     # --- helpers ----------------------------------------------------------
 
-    def _resolve(self, path: str) -> Path:
-        """Resolve a relative path against working_dir and enforce sandbox."""
-        target = (self._root / path).resolve()
-        try:
-            target.relative_to(self._root)
-        except ValueError:
+    def _resolve(self, path: str) -> Path:
+        """Resolve a relative path against working_dir and enforce sandbox.
+
+        Lexical containment check only: `os.path.normpath` collapses `..`
+        and `.` without touching the filesystem. `Path.resolve()` was a
+        syscall per path component and dominated `read()` on large scans
+        (~3.8x slower than a raw open). The root is resolved once in
+        `__init__`, so a lexically-clean join stays inside it.
+
+        Known limit: a symlink *inside* the root that points outside is
+        not detected here (that needed `resolve()`). Acceptable for a
+        local tool reading the user's own tree; revisit if roots ever
+        hold untrusted symlinks.
+        """
+        p = Path(path)
+        target = p if p.is_absolute() else (self._root / p)
+        norm = os.path.normpath(str(target))
+        root_s = str(self._root)
+        if norm != root_s and not norm.startswith(root_s + os.sep):
             raise PermissionError(f"Путь вне проекта: {path}")
-        return target
+        return Path(norm)
 
     @staticmethod
     def _count_lines(text: str) -> int:
@@ -72,6 +85,15 @@ class RootDirBackend:
     def read(self, path: str) -> str:
         with self._resolve(path).open("r", encoding="utf-8", newline="") as f:
             return f.read()
+
+    def read_head(self, path: str, max_bytes: int = 8192) -> bytes:
+        """Read the first `max_bytes` bytes without decoding.
+
+        Used for binary detection before the full read. Never raises on
+        invalid UTF-8; the caller decides what to do with the bytes.
+        """
+        with self._resolve(path).open("rb") as f:
+            return f.read(max_bytes)
 
     def create(self, path: str, content: str, class_name: str = "ModuleScript") -> None:
         """Create a new file. class_name is ignored (FS has no instance kinds)."""
@@ -111,7 +133,19 @@ class RootDirBackend:
         base = self._resolve(root) if root else self._root
         if not base.exists():
             return []
-        out: list[str] = []
+        # Fast path for the common `glob="*"`: os.walk skips the per-entry
+        # `Path.is_file()` stat that rglob does, which cost ~1.7 s on a
+        # 32k-file tree. Non-trivial globs keep the rglob path.
+        if glob == "*":
+            out: list[str] = []
+            root_s = str(self._root)
+            for dirpath, _dirnames, filenames in os.walk(base):
+                for name in filenames:
+                    full = os.path.join(dirpath, name)
+                    out.append(os.path.relpath(full, root_s).replace("\\", "/"))
+            out.sort()
+            return out
+        out = []
         for p in sorted(base.rglob(glob)):
             if not p.is_file():
                 continue
@@ -192,5 +226,13 @@ class RootDirBackend:
         in `_resolve`, called by every read/write method.
         """
         return None
+
+    def is_hidden(self, rel: str) -> bool:
+        """No `.patchignore` at the FS level — visibility is a workspace concern."""
+        return False
+
+    def hidden_predicate(self):
+        """No visibility rules at this level; see MultiRootFsBackend."""
+        return lambda rel: False
 
 

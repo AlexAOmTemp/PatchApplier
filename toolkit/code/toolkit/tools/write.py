@@ -22,14 +22,14 @@ from ..matching.text import find_all_text, similar_lines
 class ReplaceInFileTool:
     name = "replace_in_file"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         search: str,
         replace: str,
         occurrence: int | str = 1,
@@ -37,7 +37,7 @@ class ReplaceInFileTool:
         regex: bool = False,
         **_: Any,
     ) -> Result:
-        before_raw = backend.read(file_path)
+        before_raw = backend.read(path)
         # CRLF normalization: match in LF-space, restore on write.
         had_crlf = "\r\n" in before_raw
         before = before_raw.replace("\r\n", "\n") if had_crlf else before_raw
@@ -45,7 +45,7 @@ class ReplaceInFileTool:
         # --- regex mode ---------------------------------------------------
         if regex:
             return _replace_regex(
-                backend, file_path, before, before_raw, had_crlf,
+                backend, path, before, before_raw, had_crlf,
                 search, replace, occurrence,
             )
 
@@ -84,7 +84,7 @@ class ReplaceInFileTool:
                 )
             return Result(
                 status="error",
-                message=(f"\u0421\u0442\u0440\u043e\u043a\u0430 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430 \u0432 {file_path}"
+                message=(f"\u0421\u0442\u0440\u043e\u043a\u0430 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430 \u0432 {path}"
                          f"\n  Searched: {needle!r}"
                          f"{extra}"),
                 action="replace_in_file",
@@ -136,9 +136,9 @@ class ReplaceInFileTool:
             n_occurrences = 1
 
         after_out = after.replace("\n", "\r\n") if had_crlf else after
-        backend.write(file_path, after_out)
+        backend.write(path, after_out)
         delta = _delta(before_raw, after_out, n_occurrences)
-        msg = _delta_msg(file_path, delta, n_occurrences, total)
+        msg = _delta_msg(path, delta, n_occurrences, total)
         if tier == 2:
             msg += "  (matched with trailing-whitespace normalisation; verify the line above)"
         return Result(
@@ -156,21 +156,21 @@ class ReplaceInFileTool:
 class ReplaceRangeTool:
     name = "replace_range"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
             self,
             backend: Backend,
             fmt: Any,
-            file_path: str,
+            path: str,
             start_line: int,
             end_line: int,
             new_content: str,
             expected_first_line: str | None = None,
             **_: Any,
         ) -> Result:
-            before_raw = backend.read(file_path)
+            before_raw = backend.read(path)
             had_crlf = "\r\n" in before_raw
             before = before_raw.replace("\r\n", "\n") if had_crlf else before_raw
             lines = before.splitlines(keepends=True)
@@ -221,10 +221,10 @@ class ReplaceRangeTool:
             ]
 
             after_out = after.replace("\n", "\r\n") if had_crlf else after
-            backend.write(file_path, after_out)
+            backend.write(path, after_out)
             delta = _delta(block, new, 1)
             msg = (f"L{start_line}–L{end_line} → L{start_line}–L{start_line + _count_lines(new) - 1} "
-                   f"в {file_path} — {_sign_str(delta.lines)} стр., {_sign_str(delta.bytes)} Б")
+                   f"в {path} — {_sign_str(delta.lines)} стр., {_sign_str(delta.bytes)} Б")
             msg += expected_note
             return Result(
                 status="ok",
@@ -238,14 +238,14 @@ class ReplaceRangeTool:
 class ReplaceBetweenTool:
     name = "replace_between"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         start_anchor: str,
         end_anchor: str,
         new_content: str,
@@ -261,7 +261,7 @@ class ReplaceBetweenTool:
                 action="replace_between",
                 error_code="empty_input",
             )
-        before = backend.read(file_path)
+        before = backend.read(path)
         # Normalise anchor EOLs to match the file. A multi-line anchor written
         # with \n (LF) must still find a CRLF file, and vice versa. The file is
         # never modified by this — only the local copies of the anchors.
@@ -299,14 +299,14 @@ class ReplaceBetweenTool:
         prefix = before[:sm.start] if include_start else before[:sm.end]
         suffix = before[em.end:] if include_end else before[em.start:]
         after = prefix + new_content + suffix
-        backend.write(file_path, after)
+        backend.write(path, after)
         s_line = before.count("\n", 0, sm.start) + 1
         e_line = before.count("\n", 0, em.end) + 1
         new_lines = _count_lines(new_content)
         old_block = before[sm.start:em.end]
         delta = _delta(old_block, new_content, 1)
         msg = (f"L{s_line}\u2013L{e_line} \u2192 L{s_line}\u2013L{s_line + new_lines - 1} "
-               f"\u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411")
+               f"\u0432 {path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411")
         if not sm.is_exact or not em.is_exact:
             msg += "  (anchor matched with trailing-whitespace normalisation)"
         return Result(
@@ -321,14 +321,14 @@ class ReplaceBetweenTool:
 class InsertAtAnchorTool:
     name = "insert_at_anchor"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         anchor: str,
         position: str,
         new_content: str,
@@ -339,7 +339,7 @@ class InsertAtAnchorTool:
             return Result(status="error", message="anchor обязателен", action="insert_at_anchor", error_code="empty_input")
         if position not in ("before", "after"):
             return Result(status="error", message=f"position должен быть before|after, получено {position!r}", action="insert_at_anchor", error_code="bad_position")
-        before = backend.read(file_path)
+        before = backend.read(path)
         matches = find_all_text(before, anchor)
         if not matches:
             return Result(status="error", message=f"anchor не найден: {anchor!r}", action="insert_at_anchor", error_code="no_match")
@@ -364,11 +364,11 @@ class InsertAtAnchorTool:
                     and not content.endswith("\n")):
                 content = content + "\n"
         after = before[:insert_at] + content + before[insert_at:]
-        backend.write(file_path, after)
+        backend.write(path, after)
         delta = _delta(before, after, 1)
         s_line = before.count("\n", 0, insert_at) + 1
         where = "\u043f\u0435\u0440\u0435\u0434" if position == "before" else "\u043f\u043e\u0441\u043b\u0435"
-        msg = f"{where} L{s_line} \u0432 {file_path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411"
+        msg = f"{where} L{s_line} \u0432 {path} \u2014 {_sign_str(delta.lines)} \u0441\u0442\u0440., {_sign_str(delta.bytes)} \u0411"
         if not m.is_exact:
             msg += "  (anchor matched with trailing-whitespace normalisation)"
         return Result(
@@ -383,14 +383,14 @@ class InsertAtAnchorTool:
 class ReplaceSectionTool:
     name = "replace_section"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Format | None,
-        file_path: str,
+        path: str,
         section_number: str | None = None,
         section_title: str | None = None,
         new_content: str = "",
@@ -419,14 +419,14 @@ class ReplaceSectionTool:
                 error_code="bad_mode",
             )
 
-        before = backend.read(file_path)
+        before = backend.read(path)
         doc = fmt.parse(before)
         sec = doc.find(number=section_number, title=section_title)
         if sec is None:
             what = section_number if section_number is not None else section_title
             return Result(
                 status="error",
-                message=f"Секция '{what}' не найдена в {file_path}",
+                message=f"Секция '{what}' не найдена в {path}",
                 action="replace_section",
                 error_code="not_found",
             )
@@ -443,13 +443,13 @@ class ReplaceSectionTool:
             old_block = before[sec.body_start:full_end]
             new_text = before[:sec.body_start] + replacement + tail
 
-        backend.write(file_path, new_text)
+        backend.write(path, new_text)
         delta = _delta(old_block, replacement, 1)
 
         new_end = _count_lines(before[:sec.heading_start]) + _count_lines(replacement)
         start_line = _count_lines(before[:sec.heading_start]) + 1
         num_part = sec.number or "?"
-        msg = (f"§{num_part} {file_path} ({mode}): {_sign_str(delta.lines)} стр., "
+        msg = (f"§{num_part} {path} ({mode}): {_sign_str(delta.lines)} стр., "
                f"{_sign_str(delta.bytes)} Б")
         return Result(
             status="ok",
@@ -466,14 +466,14 @@ class ReplaceSectionTool:
 class SetSummaryTool:
     name = "set_summary"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Format | None,
-        file_path: str,
+        path: str,
         section_number: str | None = None,
         section_title: str | None = None,
         summary: str | None = None,
@@ -512,14 +512,14 @@ class SetSummaryTool:
         if tags_list == []:
             tags_list = None
 
-        before = backend.read(file_path)
+        before = backend.read(path)
         doc = fmt.parse(before)
         sec = doc.find(number=section_number, title=section_title)
         if sec is None:
             what = section_number if section_number is not None else section_title
             return Result(
                 status="error",
-                message=f"Секция '{what}' не найдена в {file_path}",
+                message=f"Секция '{what}' не найдена в {path}",
                 action="set_summary",
                 error_code="not_found",
             )
@@ -528,11 +528,11 @@ class SetSummaryTool:
         new_top = _rewrite_top(top, fmt, summary, tags_list)
         after = before[:sec.heading_end] + new_top + before[sec.body_start:]
 
-        backend.write(file_path, after)
+        backend.write(path, after)
         delta = _delta(before, after, 1)
         num_part = sec.number or "?"
         tag_note = f", tags={tags_list}" if tags_list is not None else ""
-        msg = f"§{num_part} в {file_path}: summary обновлён ({len(summary)} симв.{tag_note})"
+        msg = f"§{num_part} в {path}: summary обновлён ({len(summary)} симв.{tag_note})"
         return Result(
             status="ok",
             message=msg,
@@ -545,7 +545,7 @@ class SetSummaryTool:
 class VerifySectionTool:
     name = "verify_section"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     _default_index: str | None = None
@@ -559,7 +559,7 @@ class VerifySectionTool:
         self,
         backend: Backend,
         fmt: Format | None,
-        file_path: str,
+        path: str,
         section_number: str | None = None,
         section_title: str | None = None,
         **_: Any,
@@ -579,13 +579,13 @@ class VerifySectionTool:
                 error_code="no_selector",
             )
 
-        text = backend.read(file_path)
+        text = backend.read(path)
         try:
             doc = fmt.parse(text)
         except Exception as e:
             return Result(
                 status="error",
-                message=f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0440\u0430\u0437\u043e\u0431\u0440\u0430\u0442\u044c {file_path}: {e}",
+                message=f"\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0440\u0430\u0437\u043e\u0431\u0440\u0430\u0442\u044c {path}: {e}",
                 action="verify_section",
                 error_code="parse_error",
             )
@@ -594,7 +594,7 @@ class VerifySectionTool:
             what = section_number if section_number is not None else section_title
             return Result(
                 status="error",
-                message=f"\u0421\u0435\u043a\u0446\u0438\u044f '{what}' \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430 \u0432 {file_path}",
+                message=f"\u0421\u0435\u043a\u0446\u0438\u044f '{what}' \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u0430 \u0432 {path}",
                 action="verify_section",
                 error_code="not_found",
             )
@@ -619,7 +619,7 @@ class VerifySectionTool:
         else:
             key = f"{sec.number}. {sec.title}"
 
-        file_meta = meta.setdefault(file_path, {})
+        file_meta = meta.setdefault(path, {})
         import time as _time
         now_ts = _time.time()
         entry = file_meta.get(key) or {}
@@ -633,7 +633,7 @@ class VerifySectionTool:
         num_part = sec.number or "?"
         return Result(
             status="ok",
-            message=(f"\u00a7{num_part} \u0432 {file_path}: summary \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d "
+            message=(f"\u00a7{num_part} \u0432 {path}: summary \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043d "
                      f"(summary_changed_at \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d, \u0444\u0430\u0439\u043b \u043d\u0435 \u0442\u0440\u043e\u043d\u0443\u0442)"),
             action="verify_section",
             verified=True,
@@ -688,7 +688,7 @@ def _insert_annotation(top: str, new_line: str) -> str:
 # --- shared helpers --------------------------------------------------------
 
 
-def _replace_regex(backend: Backend, file_path: str,
+def _replace_regex(backend: Backend, path: str,
                    before: str, before_raw: str, had_crlf: bool,
                    pattern: str, replacement: str,
                    occurrence) -> Result:
@@ -718,7 +718,7 @@ def _replace_regex(backend: Backend, file_path: str,
             )
         return Result(
             status="error",
-            message=(f"Regex не нашёл совпадений в {file_path}"
+            message=(f"Regex не нашёл совпадений в {path}"
                      f"\n  Pattern: {pattern!r}"
                      f"{extra}"),
             action="replace_in_file",
@@ -758,9 +758,9 @@ def _replace_regex(backend: Backend, file_path: str,
         n_occurrences = 1
 
     after_out = after.replace("\n", "\r\n") if had_crlf else after
-    backend.write(file_path, after_out)
+    backend.write(path, after_out)
     delta = _delta(before_raw, after_out, n_occurrences)
-    msg = _delta_msg(file_path, delta, n_occurrences, total)
+    msg = _delta_msg(path, delta, n_occurrences, total)
     return Result(
         status="ok",
         message=msg,

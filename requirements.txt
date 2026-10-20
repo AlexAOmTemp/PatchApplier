@@ -10,6 +10,11 @@ keyboard>=0.13.5
 # Clipboard read/write for the patch box.
 pyperclip>=1.8.2
 
+# --- Binary detection (matching/binary.py) ---
+# Pure-Python, no libmagic. Trained on Windows code pages, so cp1251 text
+# is not mistaken for binary. Fallback to a null-byte check if absent.
+binaryornot>=0.6.0
+
 # --- C# unit adapter (tools/unit/adapter_cs.py) ---
 # Pinned as a pair: tree-sitter 0.22 changed the Language/Parser API, and
 # tree-sitter-c-sharp wheels are built against a specific ABI. Bump together.

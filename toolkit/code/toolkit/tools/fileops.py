@@ -39,57 +39,57 @@ def _check_content_syntax(file_path: str, content: str) -> str | None:
 class CreateFileTool:
     name = "create_file"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         file_content: str,
         class_name: str = "ModuleScript",
         **_: Any,
     ) -> Result:
-        if backend.exists(file_path):
+        if backend.exists(path):
             return Result(
                 status="error",
-                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
+                message=f"Файл уже существует: {path}. Используйте overwrite_file.",
                 action="create_file",
                 error_code="already_exists",
             )
-        err = _check_content_syntax(file_path, file_content)
+        err = _check_content_syntax(path, file_content)
         if err is not None:
             return Result(
                 status="error",
-                message=f"Не создаю {file_path}: {err}",
+                message=f"Не создаю {path}: {err}",
                 action="create_file",
                 error_code="content_syntax_error",
             )
         create_fn = getattr(backend, "create", None)
         try:
             if callable(create_fn):
-                create_fn(file_path, file_content, class_name=class_name)
+                create_fn(path, file_content, class_name=class_name)
             else:
-                backend.write(file_path, file_content)
+                backend.write(path, file_content)
         except FileExistsError:
             return Result(
                 status="error",
-                message=f"Файл уже существует: {file_path}. Используйте overwrite_file.",
+                message=f"Файл уже существует: {path}. Используйте overwrite_file.",
                 action="create_file",
                 error_code="already_exists",
             )
         except Exception as e:
             return Result(
                 status="error",
-                message=f"Не удалось создать {file_path}: {e}",
+                message=f"Не удалось создать {path}: {e}",
                 action="create_file",
                 error_code="create_failed",
             )
-        st = backend.stat(file_path)
+        st = backend.stat(path)
         return Result(
             status="ok",
-            message=f"Файл создан: {file_path} ({st.lines} стр., {st.size_bytes} Б)",
+            message=f"Файл создан: {path} ({st.lines} стр., {st.size_bytes} Б)",
             action="create_file",
         )
 
@@ -97,37 +97,37 @@ class CreateFileTool:
 class OverwriteFileTool:
     name = "overwrite_file"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         file_content: str,
         **_: Any,
     ) -> Result:
-        err = _check_content_syntax(file_path, file_content)
+        err = _check_content_syntax(path, file_content)
         if err is not None:
             return Result(
                 status="error",
-                message=f"Не перезаписываю {file_path}: {err}",
+                message=f"Не перезаписываю {path}: {err}",
                 action="overwrite_file",
                 error_code="content_syntax_error",
             )
-        existed = backend.exists(file_path)
+        existed = backend.exists(path)
         before_lines = 0
         before_bytes = 0
         if existed:
             try:
-                st = backend.stat(file_path)
+                st = backend.stat(path)
                 before_lines = st.lines
                 before_bytes = st.size_bytes
             except Exception:
                 pass
-        backend.write(file_path, file_content)
-        st_after = backend.stat(file_path)
+        backend.write(path, file_content)
+        st_after = backend.stat(path)
         verb = "перезаписан" if existed else "создан"
         delta_lines = st_after.lines - before_lines
         delta_bytes = st_after.size_bytes - before_bytes
@@ -135,7 +135,7 @@ class OverwriteFileTool:
         sign_b = f"+{delta_bytes}" if delta_bytes >= 0 else str(delta_bytes)
         return Result(
             status="ok",
-            message=f"Файл {verb}: {file_path} ({sign_l} стр., {sign_b} Б)",
+            message=f"Файл {verb}: {path} ({sign_l} стр., {sign_b} Б)",
             action="overwrite_file",
         )
 
@@ -143,34 +143,34 @@ class OverwriteFileTool:
 class DeleteFileTool:
     name = "delete_file"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        file_path: str,
+        path: str,
         **_: Any,
     ) -> Result:
-        if not backend.exists(file_path):
+        if not backend.exists(path):
             return Result(
                 status="error",
-                message=f"Файл не найден: {file_path}",
+                message=f"Файл не найден: {path}",
                 action="delete_file",
                 error_code="not_found",
             )
         try:
-            st = backend.stat(file_path)
+            st = backend.stat(path)
             size = st.size_bytes
             lines = st.lines
         except Exception:
             size = 0
             lines = 0
-        backend.delete(file_path)
+        backend.delete(path)
         return Result(
             status="ok",
-            message=f"Файл удалён: {file_path} ({lines} стр., {size} Б)",
+            message=f"Файл удалён: {path} ({lines} стр., {size} Б)",
             action="delete_file",
         )
 

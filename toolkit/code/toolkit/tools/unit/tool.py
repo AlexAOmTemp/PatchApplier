@@ -1,6 +1,6 @@
 """Runtime tools for the unit model — read only for now.
 
-`read_unit` and `list_units` take a `file_path` and read the source via
+`read_unit` and `list_units` take a `path` and read the source via
 the backend (path policy applies as for any read tool). The model itself
 is in `model.py` + `adapter_*.py` + `reader.py`; see `MODEL.md` in
 `manual/unit_proto/` for the specification.
@@ -17,29 +17,29 @@ from . import reader, writer
 class ReadUnitTool:
     name = "read_unit"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         part: str | list | None = None,
         block: int | str | list | None = None,
         max_bytes: int | None = None,
         **_: Any,
     ) -> Result:
-        if not file_path:
-            return Result(status="error", message="file_path required",
+        if not path:
+            return Result(status="error", message="path required",
                           action="read_unit", error_code="bad_input")
         if not isinstance(address, dict):
             return Result(status="error",
                           message="address must be a JSON object with qualname / section_number / section_title",
                           action="read_unit", error_code="bad_input")
         try:
-            src = backend.read(file_path)
+            src = backend.read(path)
         except FileNotFoundError as e:
             return Result(status="error", message=str(e),
                           action="read_unit", error_code="not_found")
@@ -47,7 +47,7 @@ class ReadUnitTool:
             return Result(status="blocked", message=str(e),
                           action="read_unit", error_code="filter")
         try:
-            text = reader.read_unit(src, file_path, address, part=part, block=block)
+            text = reader.read_unit(src, path, address, part=part, block=block)
         except KeyError as e:
             msg = e.args[0] if e.args else str(e)
             code = "not_found"
@@ -84,27 +84,27 @@ class ReadUnitTool:
 class SetAnnotationTool:
     name = "set_annotation"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         text: str = "",
         **_: Any,
     ) -> Result:
-        if not file_path:
-            return Result(status="error", message="file_path required",
+        if not path:
+            return Result(status="error", message="path required",
                           action="set_annotation", error_code="bad_input")
         if not isinstance(address, dict):
             return Result(status="error",
                           message="address must be a JSON object",
                           action="set_annotation", error_code="bad_input")
         try:
-            src = backend.read(file_path)
+            src = backend.read(path)
         except FileNotFoundError as e:
             return Result(status="error", message=str(e),
                           action="set_annotation", error_code="not_found")
@@ -112,7 +112,7 @@ class SetAnnotationTool:
             return Result(status="blocked", message=str(e),
                           action="set_annotation", error_code="filter")
         try:
-            new = writer.set_annotation(src, file_path, address, text)
+            new = writer.set_annotation(src, path, address, text)
         except KeyError as e:
             msg = e.args[0] if e.args else str(e)
             code = "not_found"
@@ -134,7 +134,7 @@ class SetAnnotationTool:
             return Result(status="error", message=msg,
                           action="set_annotation", error_code=code)
         try:
-            backend.write(file_path, new)
+            backend.write(path, new)
         except PermissionError as e:
             return Result(status="blocked", message=str(e),
                           action="set_annotation", error_code="filter")
@@ -146,7 +146,7 @@ class SetAnnotationTool:
                       occurrences=1)
         return Result(
             status="ok",
-            message=f"{file_path}: annotation обновлён",
+            message=f"{path}: annotation обновлён",
             delta=delta, verified=True, action="set_annotation",
         )
 
@@ -154,14 +154,14 @@ class SetAnnotationTool:
 class ReplaceUnitTool:
     name = "replace_unit"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         new_text: str = "",
         part=None,
@@ -169,131 +169,134 @@ class ReplaceUnitTool:
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "replace_unit", address,
+            backend, path, "replace_unit", address,
             lambda src: writer.replace_unit(
-                src, file_path, address, new_text, part, block),
+                src, path, address, new_text, part, block),
         )
 
 
 class ReplaceBlockTool:
     name = "replace_block"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         block=None,
         new_text: str = "",
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "replace_block", address,
-            lambda src: writer.replace_block(src, file_path, address, block, new_text),
+            backend, path, "replace_block", address,
+            lambda src: writer.replace_block(src, path, address, block, new_text),
         )
 
 
 class DeleteBlockTool:
     name = "delete_block"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         block=None,
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "delete_block", address,
-            lambda src: writer.replace_block(src, file_path, address, block, ""),
+            backend, path, "delete_block", address,
+            lambda src: writer.replace_block(src, path, address, block, ""),
         )
 
 
 class InsertBlockTool:
     name = "insert_block"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         new_text: str = "",
         position: str = "end",
-        anchor=None,
+        before_anchor=None,
+        after_anchor=None,
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "insert_block", address,
-            lambda src: writer.insert_block(src, file_path, address, new_text, position, anchor),
+            backend, path, "insert_block", address,
+            lambda src: writer.insert_block(
+                src, path, address, new_text,
+                position, before_anchor, after_anchor),
         )
 
 
 class RemoveUnitTool:
     name = "remove_unit"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         part=None,
         block=None,
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "remove_unit", address,
-            lambda src: writer.remove_unit(src, file_path, address, part, block),
+            backend, path, "remove_unit", address,
+            lambda src: writer.remove_unit(src, path, address, part, block),
         )
 
 
 class CreateUnitTool:
     name = "create_unit"
     op = "write"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: dict | None = None,
         part=None,
         new_text: str = "",
         **_: Any,
     ) -> Result:
         return _write_call(
-            backend, file_path, "create_unit", address,
-            lambda src: writer.create_unit(src, file_path, address, part, new_text),
+            backend, path, "create_unit", address,
+            lambda src: writer.create_unit(src, path, address, part, new_text),
         )
 
 
-def _write_call(backend, file_path, action, address, apply_fn) -> Result:
-    if not file_path:
-        return Result(status="error", message="file_path required",
+def _write_call(backend, path, action, address, apply_fn) -> Result:
+    if not path:
+        return Result(status="error", message="path required",
                       action=action, error_code="bad_input")
     if not isinstance(address, dict):
         return Result(status="error", message="address must be a JSON object",
                       action=action, error_code="bad_input")
     try:
-        src = backend.read(file_path)
+        src = backend.read(path)
     except FileNotFoundError as e:
         return Result(status="error", message=str(e),
                       action=action, error_code="not_found")
@@ -328,7 +331,7 @@ def _write_call(backend, file_path, action, address, apply_fn) -> Result:
                 break
         return Result(status="error", message=msg, action=action, error_code=code)
     try:
-        backend.write(file_path, new)
+        backend.write(path, new)
     except PermissionError as e:
         return Result(status="blocked", message=str(e),
                       action=action, error_code="filter")
@@ -338,29 +341,29 @@ def _write_call(backend, file_path, action, address, apply_fn) -> Result:
     delta = Delta(lines=new_lines - old_lines,
                   bytes=len(new.encode("utf-8")) - len(src.encode("utf-8")),
                   occurrences=1)
-    return Result(status="ok", message=f"{file_path}: {action} применён",
+    return Result(status="ok", message=f"{path}: {action} применён",
                   delta=delta, verified=True, action=action)
 
 
 class ListUnitsTool:
     name = "list_units"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         max_bytes: int | None = None,
         **_: Any,
     ) -> Result:
-        if not file_path:
-            return Result(status="error", message="file_path required",
+        if not path:
+            return Result(status="error", message="path required",
                           action="list_units", error_code="bad_input")
         try:
-            src = backend.read(file_path)
+            src = backend.read(path)
         except FileNotFoundError as e:
             return Result(status="error", message=str(e),
                           action="list_units", error_code="not_found")
@@ -368,7 +371,7 @@ class ListUnitsTool:
             return Result(status="blocked", message=str(e),
                           action="list_units", error_code="filter")
         try:
-            text = reader.list_units(src, file_path)
+            text = reader.list_units(src, path)
         except ValueError as e:
             return Result(status="error", message=str(e),
                           action="list_units", error_code="bad_argument")

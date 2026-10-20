@@ -10,14 +10,15 @@ remaining discovered-but-unvisited directories count as ``frontier_unexpanded``.
 Subdirectories below that frontier are unknown (we never descended), so the
 report says ``deeper: >=N`` rather than an exact number.
 
-Filesystem only. MCP-only backends yield ``wrong_domain``. Dotdirs are
-skipped by default (no `.patchignore` parsing here -- that lives in the
-backend; this tool is a read-only aggregate for reconnaissance).
+Filesystem only. MCP-only backends yield ``wrong_domain``. Hidden dirs
+(matched by the workspace `.patchignore` via `backend.is_hidden`) are
+skipped by default; pass `filter=false` to include them. Scope is
+applied on top, same as before.
 """
 from __future__ import annotations
 
 import os
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 from typing import Any
 
@@ -29,9 +30,9 @@ from .scope import read_scope
 # Backend-supported extensions first, in this fixed order; remaining
 # extensions follow by descending count.
 PRIORITY_EXTS = (".py", ".pyi", ".lua", ".luau", ".md", ".cs", ".xml")
-DEFAULT_MAX_DIRS = 500
+DEFAULT_MAX_LINES = 30
+DEFAULT_MAX_LINES_FILES = 100
 DEFAULT_MAX_TYPES = 7
-DEFAULT_MAX_DEPTH = 50
 
 
 def _human(n: int) -> str:
@@ -96,29 +97,31 @@ class TreeTool:
         backend: Backend,
         fmt: Any = None,
         path: str = "",
-        max_dirs: int = DEFAULT_MAX_DIRS,
+        max_lines: int | None = None,
+        show_files: bool = False,
         max_types: int = DEFAULT_MAX_TYPES,
-        max_depth: int = DEFAULT_MAX_DEPTH,
         show_types: bool = True,
         scoped: bool = True,
         recursive_sizes: bool = True,
+        filter: bool = True,
         **_: Any,
     ) -> Result:
         if not path:
             return Result(status="error", action="tree",
                           error_code="bad_input", message="path required")
+        if max_lines is None:
+            max_lines = DEFAULT_MAX_LINES_FILES if show_files else DEFAULT_MAX_LINES
         try:
-            max_dirs = int(max_dirs)
+            max_lines = int(max_lines)
             max_types = int(max_types)
-            max_depth = int(max_depth)
         except (TypeError, ValueError):
             return Result(status="error", action="tree",
                           error_code="bad_options",
-                          message="max_dirs / max_types / max_depth must be ints")
-        if max_dirs <= 0 or max_types <= 0 or max_depth < 0:
+                          message="max_lines / max_types must be ints")
+        if max_lines <= 0 or max_types <= 0:
             return Result(status="error", action="tree",
                           error_code="bad_options",
-                          message="max_dirs / max_types must be > 0; max_depth >= 0")
+                          message="max_lines / max_types must be > 0")
 
         rel = path.strip().strip("/")
 
@@ -126,6 +129,7 @@ class TreeTool:
         exempt: set[str] = set()
         scope_err: str | None = None
         hidden_count = 0
+        hidden_pi = 0
         hidden_by: dict[str, int] = {}
         if scoped:
             scope_obj, scope_err = read_scope(backend)
@@ -142,7 +146,7 @@ class TreeTool:
                         "MCP-only backend не поддерживается",
             )
 
-        stack: list[tuple[Path, str, int]] = []
+        queue: deque[tuple[Path, str, str, int]] = deque()
         implicit = roots[0][0] is None
         if implicit:
             _, root = roots[0]
@@ -152,12 +156,12 @@ class TreeTool:
                     status="error", action="tree", error_code="not_found",
                     message=f"path not found or not a directory: {path}",
                 )
-            stack.append((start, rel or ".", 0))
+            queue.append((start, rel or ".", "", 0))
         elif rel in ("", "."):
             for name, root in roots:
                 if root.is_dir():
-                    stack.append((root, name or ".", 0))
-            if not stack:
+                    queue.append((root, name or ".", "", 0))
+            if not queue:
                 return Result(
                     status="error", action="tree", error_code="not_found",
                     message=f"no roots available under {path!r}",
@@ -177,14 +181,14 @@ class TreeTool:
                 start = root / tail if tail else root
                 display = f"{name}/{tail}" if tail else name
                 if start.is_dir():
-                    stack.append((start, display, 0))
-            if not stack:
+                    queue.append((start, display, tail, 0))
+            if not queue:
                 return Result(
                     status="error", action="tree", error_code="not_found",
                     message=f"path not found or not a directory: {path}",
                 )
 
-        def _walk_recursive_totals(phys_root: Path) -> dict[str, dict]:
+        def _walk_recursive_totals(phys_root: Path, rel_base: str) -> dict[str, dict]:
             """Recursive totals per dir. Key: rel path ('' = root itself)."""
             stats: dict[str, dict] = {}
             def walk(phys: Path, relp: str) -> dict:
@@ -202,10 +206,11 @@ class TreeTool:
                             continue
                         n = e.name
                         if e.is_dir(follow_symlinks=False):
-                            if n.startswith("."):
+                            child_rel = f"{relp}/{n}" if relp else n
+                            if filter and backend.is_hidden(child_rel):
                                 continue
                             sub += 1
-                            child = walk(Path(e.path), f"{relp}/{n}" if relp else n)
+                            child = walk(Path(e.path), child_rel)
                             files += child["files"]
                             size += child["size"]
                             types.update(child["types"])
@@ -228,17 +233,15 @@ class TreeTool:
 
         totals_by_display: dict[str, dict] = {}
         if recursive_sizes:
-            for phys, display, _depth in stack:
-                subtree = _walk_recursive_totals(phys)
-                for relp, stat in subtree.items():
-                    full = f"{display}/{relp}" if relp else display
+            for phys, display, relp, _depth in queue:
+                subtree = _walk_recursive_totals(phys, relp)
+                for r, stat in subtree.items():
+                    full = f"{display}/{r}" if r else display
                     totals_by_display[full] = stat
 
         visited: list[dict] = []
-        while stack and len(visited) < max_dirs:
-            phys, display, depth = stack.pop()
-            if depth > max_depth:
-                continue
+        while queue and len(visited) < max_lines:
+            phys, display, relp, depth = queue.popleft()
             try:
                 entries = list(os.scandir(phys))
             except OSError:
@@ -247,15 +250,18 @@ class TreeTool:
             direct_files = 0
             direct_size = 0
             direct_types: Counter = Counter()
+            direct_file_names: list[str] = []
             for e in entries:
                 try:
                     if e.is_symlink():
                         continue
                     if e.is_dir(follow_symlinks=False):
                         n = e.name
-                        if n.startswith("."):
-                            continue
                         child_display = f"{display}/{n}"
+                        child_rel = f"{relp}/{n}" if relp else n
+                        if filter and backend.is_hidden(child_rel):
+                            hidden_pi += 1
+                            continue
                         if scope_obj is not None:
                             if scope_obj.is_hidden_ex(child_display, exempt):
                                 hidden_count += 1
@@ -267,16 +273,23 @@ class TreeTool:
                                         hidden_by[r.glob] = hidden_by.get(r.glob, 0) + 1
                                         break
                                 continue
-                        subdirs.append((Path(e.path), child_display, depth + 1))
+                        subdirs.append((Path(e.path), child_display, child_rel, depth + 1))
                     elif e.is_file(follow_symlinks=False):
+                        n = e.name
+                        child_rel = f"{relp}/{n}" if relp else n
+                        if filter and backend.is_hidden(child_rel):
+                            hidden_pi += 1
+                            continue
                         direct_files += 1
                         try:
                             direct_size += e.stat(follow_symlinks=False).st_size
                         except OSError:
                             pass
-                        ext = Path(e.name).suffix.lower()
+                        ext = Path(n).suffix.lower()
                         if ext:
                             direct_types[ext] += 1
+                        if show_files:
+                            direct_file_names.append(n)
                 except OSError:
                     continue
 
@@ -298,9 +311,10 @@ class TreeTool:
                 "types": direct_types,
                 "rec_files": rec_files, "rec_size": rec_size,
                 "rec_types": rec_types, "subdirs_count": n_subdirs,
+                "file_names": direct_file_names,
             })
             subdirs.sort(key=lambda x: x[0].name.lower())
-            stack.extend(reversed(subdirs))
+            queue.extend(subdirs)
 
         if not visited:
             return Result(status="error", action="tree",
@@ -310,7 +324,7 @@ class TreeTool:
         total_files = sum(d["rec_files"] for d in visited if d["depth"] == 0)
         total_size = sum(d["rec_size"] for d in visited if d["depth"] == 0)
         max_seen = max((d["depth"] for d in visited), default=0)
-        capped = len(stack) > 0
+        capped = len(queue) > 0
         scope_bits = ""
         if scope_err:
             scope_bits = f", scope ERR: {scope_err}"
@@ -321,8 +335,12 @@ class TreeTool:
             f"({len(visited)} dirs, {total_files} files, {_human(total_size)}"
             f"{' (partial)' if capped else ''}{scope_bits}) ==="
         )
-        lines = [header]
+        by_depth: dict[int, list[dict]] = {}
         for d in visited:
+            by_depth.setdefault(d["depth"], []).append(d)
+        max_D = max(by_depth.keys()) if by_depth else 0
+
+        def _dir_line(d: dict) -> str:
             indent = "  " * d["depth"]
             types_str = ""
             show_t = d["rec_types"] if recursive_sizes else d["types"]
@@ -335,19 +353,83 @@ class TreeTool:
                 sub_note = f", {d['subdirs_count']} subdirs"
             size_n = d["rec_size"] if recursive_sizes else d["size"]
             files_n = d["rec_files"] if recursive_sizes else d["files"]
-            lines.append(
+            return (
                 f"{indent}{d['display']}  "
                 f"({_human(size_n)}, {files_n} files{sub_note}{types_str})"
             )
-        if capped:
-            lines.append(
-                f"=== stopped: max_dirs={max_dirs} reached at depth {max_seen}; "
-                f"frontier_unexpanded={len(stack)} (deeper: >={len(stack)}) ==="
-            )
+
+        body: list[str] = []
+        budget = max_lines
+        files_available = sum(len(d.get("file_names") or []) for d in visited)
+        dirs_shown = 0
+        files_shown = 0
+
+        # Root line (no N label). Its files render at N0.
+        root_entry = by_depth.get(0, [None])[0] if by_depth.get(0) else None
+        if root_entry is not None and budget > 0:
+            body.append(_dir_line(root_entry))
+            budget -= 1
+            dirs_shown += 1
+
+        # Level D block contains: dirs at depth D, then files of dirs at depth D-1.
+        # So N0 = {dirs at depth 1} ∪ {files of root}, matching the BFS model.
+        for D in range(1, max_D + 2):
+            if budget <= 0:
+                break
+            dirs_at_D = by_depth.get(D, [])
+            files_at_D: list[str] = []
+            if show_files:
+                for parent in by_depth.get(D - 1, []):
+                    pdisp = parent["display"]
+                    for fname in (parent.get("file_names") or []):
+                        files_at_D.append(f"{pdisp}/{fname}")
+            if not dirs_at_D and not files_at_D:
+                continue
+            body.append(f"N{D - 1}:")
+            indent_D = "  " * D
+            for d in dirs_at_D:
+                if budget <= 0:
+                    break
+                body.append(_dir_line(d))
+                budget -= 1
+                dirs_shown += 1
+            for f in files_at_D:
+                if budget <= 0:
+                    break
+                body.append(f"{indent_D}{f}")
+                budget -= 1
+                files_shown += 1
+
+        dirs_cut = len(visited) - dirs_shown
+        files_cut = (files_available - files_shown) if show_files else 0
+        truncated = bool(capped or dirs_cut or files_cut)
+
+        header_final = (
+            f"=== tree: {rel or '[' + ', '.join(n or '.' for n, _ in roots) + ']'} "
+            f"({len(visited)} dirs, {total_files} files, {_human(total_size)}"
+            f"{' (partial)' if truncated else ''}{scope_bits}) ==="
+        )
+        lines = [header_final] + body
+
+        if truncated:
+            bits: list[str] = [f"max_lines={max_lines}"]
+            if dirs_shown or dirs_cut:
+                bits.append(f"dirs {dirs_shown} of {len(visited)}")
+            if files_available or files_shown:
+                bits.append(f"files {files_shown} of {files_available}")
+            frontier = len(queue) + dirs_cut
+            if frontier > 0:
+                bits.append(f"frontier+{frontier}")
+            lines.append("=== stopped: " + "; ".join(bits) + " ===")
+
         if hidden_by and not scope_err:
             total_h = sum(hidden_by.values())
             parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
             lines.append(
                 f"[{total_h} dir(s) hidden by scope ({parts}); pass scoped=false to include]"
+            )
+        if hidden_pi and not scope_err:
+            lines.append(
+                f"[{hidden_pi} path(s) hidden by .patchignore; pass filter=false to include]"
             )
         return Result(status="ok", action="tree", message="\n".join(lines))

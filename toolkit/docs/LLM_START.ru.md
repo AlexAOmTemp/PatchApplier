@@ -54,15 +54,17 @@ Patch Applier — правка проекта JSON-патчами. Один от
 - `read_file(path, [section_number|section_title|start_line+end_line], max_bytes?, numbered?, escape?)`
 - `read_unit(path, address{qualname|title_match}, [part|block], max_bytes?)`
 - `list_units(path)` · `file_stat(path)` · `file_exists(path)`
-- `list_files(directory, glob?, show_size?, recursive?, show_hidden?, scoped?)`
-- `survey_dir(path, ext?, top?, scoped?)` · `tree(path, max_dirs?, max_types?, max_depth?, scoped?)`
-- `grep(pattern, [paths[]|directory+file_glob], regex?, ignore_case?, before?, after?, max_results?, scoped?)`
+- `list_files(path, glob?, show_size?, recursive?, show_hidden?, scoped?, filter?)`
+- `survey_dir(path, ext?, top?, scoped?)` · `tree(path, max_lines?, show_files?, max_types?, scoped?, filter?)` — BFS по уровням, каталоги вперёд файлов; `show_files=true` (дефолт `max_lines=100`) показывает имена файлов
+- `grep(pattern, paths, recursive?, file_glob?, exclude_glob?, regex?, ignore_case?, before?, after?, max_results?, scoped?, filter?)` — `paths` обязателен: файл, каталог или список (ripgrep-модель)
 - `grep_mcp(pattern, directory, ignore_case?, before?, after?, max_results?)`
 
 **Unit**
 - `replace_unit(path, address, [part|block], new_text)`
-- `insert_block(path, address, new_text, position, anchor?)`
+- `insert_block(path, address, new_text, position?, before_anchor?, after_anchor?)` — `position` = `start`\|`end`; якоря взаимоисключающие, `address` = контейнер, якорь = точка внутри
 - `remove_unit(path, address, [part|block])` · `create_unit(path, address, part, new_text)`
+
+> **Аргументы:** один путь — `path`, много — `paths`. Неверный аргумент — явная ошибка `unknown_arg` со списком валидных.
 
 **Запись (escape hatch)**
 - `replace_in_file(path, search, replace, occurrence?, regex?)`
@@ -75,7 +77,7 @@ Patch Applier — правка проекта JSON-патчами. Один от
 - `delete_file(path)` · `move_file(src, dst)` · `copy_file(src, dst)`
 
 **Индекс**
-- `get_index(kind, max_bytes?, limit?, path?, sort?, scoped?)` — `kind` обязателен
+- `get_index(kind, max_bytes?, limit?, path?, sort?, scoped?, sections?)` — `kind` обязателен; по умолчанию overview (одна строка на файл), `sections=true` — полный список секций
 - `get_status(sections?)`
 - `rebuild_index(...)` · `rebuild_code_index(...)` · `rebuild_csharp_index(...)` — аргументы одинаковы, см. `REF_TOOLS.md`
 

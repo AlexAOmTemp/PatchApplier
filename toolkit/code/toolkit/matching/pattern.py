@@ -57,7 +57,15 @@ class Pattern:
             self._needle = pattern.lower() if self.ignore_case else pattern
 
     def search(self, line: str) -> bool:
-        """True if the line has at least one match."""
+        """True if the line has at least one match.
+
+        Fast path: in regex mode without a word-boundary check the compiled
+        pattern answers directly. `finditer` allocates a generator per line
+        (millions of calls on a large scan) and costs ~3x more for the same
+        boolean answer.
+        """
+        if self.regex_mode and not self.word_boundary:
+            return self._compiled.search(line) is not None
         for _ in self.finditer(line):
             return True
         return False

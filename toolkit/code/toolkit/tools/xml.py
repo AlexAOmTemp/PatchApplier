@@ -187,14 +187,14 @@ class XmlInsertTool:
 
     name = "xml_insert"
     op = "write"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: str = "",
         fragment: str = "",
         position: str = "before",
@@ -202,9 +202,9 @@ class XmlInsertTool:
         source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(status="error", action="xml_insert",
-                          error_code="bad_input", message="file_path required")
+                          error_code="bad_input", message="path required")
         if not address:
             return Result(status="error", action="xml_insert",
                           error_code="bad_input", message="address required")
@@ -233,10 +233,10 @@ class XmlInsertTool:
                           error_code="bad_address", message=str(e))
 
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(status="error", action="xml_insert",
-                          error_code="not_found", message=f"file not found: {file_path}")
+                          error_code="not_found", message=f"file not found: {path}")
         except Exception as e:
             return Result(status="error", action="xml_insert",
                           error_code="read_failed",
@@ -294,7 +294,7 @@ class XmlInsertTool:
                           error_code="result_syntax_error",
                           message=f"resulting XML is not well-formed: {e.message}")
 
-        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        err = XmlModifyTool._write_bytes(backend, path, new_bytes)
         if err is not None:
             return Result(status="error", action="xml_insert",
                           error_code="write_failed", message=err)
@@ -303,7 +303,7 @@ class XmlInsertTool:
         return Result(
             status="ok", action="xml_insert",
             message=(
-                f"{file_path}  <{target.tag}> {position} inserted  ({delta:+d} B)"
+                f"{path}  <{target.tag}> {position} inserted  ({delta:+d} B)"
             ),
         )
 
@@ -665,23 +665,23 @@ class XmlDeleteTool:
 
     name = "xml_delete"
     op = "write"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: str = "",
         occurrence: int | None = None,
         source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(
                 status="error", action="xml_delete",
-                error_code="bad_input", message="file_path required",
+                error_code="bad_input", message="path required",
             )
         if not address:
             return Result(
@@ -706,11 +706,11 @@ class XmlDeleteTool:
             )
 
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(
                 status="error", action="xml_delete",
-                error_code="not_found", message=f"file not found: {file_path}",
+                error_code="not_found", message=f"file not found: {path}",
             )
         except Exception as e:
             return Result(
@@ -768,7 +768,7 @@ class XmlDeleteTool:
                 message=f"resulting XML is not well-formed: {e.message}",
             )
 
-        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        err = XmlModifyTool._write_bytes(backend, path, new_bytes)
         if err is not None:
             return Result(
                 status="error", action="xml_delete",
@@ -778,7 +778,7 @@ class XmlDeleteTool:
         delta = len(new_bytes) - len(data)
         return Result(
             status="ok", action="xml_delete",
-            message=f"{file_path}  <{resolved.element.tag}> deleted  ({delta:+d} B)",
+            message=f"{path}  <{resolved.element.tag}> deleted  ({delta:+d} B)",
         )
 
 
@@ -791,24 +791,24 @@ class XmlReplaceTool:
 
     name = "xml_replace"
     op = "write"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: str = "",
         fragment: str = "",
         occurrence: int | None = None,
         source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(
                 status="error", action="xml_replace",
-                error_code="bad_input", message="file_path required",
+                error_code="bad_input", message="path required",
             )
         if not address:
             return Result(
@@ -838,11 +838,11 @@ class XmlReplaceTool:
             )
 
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(
                 status="error", action="xml_replace",
-                error_code="not_found", message=f"file not found: {file_path}",
+                error_code="not_found", message=f"file not found: {path}",
             )
         except Exception as e:
             return Result(
@@ -893,7 +893,7 @@ class XmlReplaceTool:
                 message=f"resulting XML is not well-formed: {e.message}",
             )
 
-        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        err = XmlModifyTool._write_bytes(backend, path, new_bytes)
         if err is not None:
             return Result(
                 status="error", action="xml_replace",
@@ -903,7 +903,7 @@ class XmlReplaceTool:
         delta = len(new_bytes) - len(data)
         return Result(
             status="ok", action="xml_replace",
-            message=f"{file_path}  <{resolved.element.tag}> replaced  ({delta:+d} B)",
+            message=f"{path}  <{resolved.element.tag}> replaced  ({delta:+d} B)",
         )
 
 
@@ -923,23 +923,23 @@ class XmlAppendTool:
 
     name = "xml_append"
     op = "write"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         parent: str = "",
         fragment: str = "",
         source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(
                 status="error", action="xml_append",
-                error_code="bad_input", message="file_path required",
+                error_code="bad_input", message="path required",
             )
         if not parent:
             return Result(
@@ -961,11 +961,11 @@ class XmlAppendTool:
             )
 
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(
                 status="error", action="xml_append",
-                error_code="not_found", message=f"file not found: {file_path}",
+                error_code="not_found", message=f"file not found: {path}",
             )
         except Exception as e:
             return Result(
@@ -1014,7 +1014,7 @@ class XmlAppendTool:
                 message=f"resulting XML is not well-formed: {e.message}",
             )
 
-        err = XmlModifyTool._write_bytes(backend, file_path, new_bytes)
+        err = XmlModifyTool._write_bytes(backend, path, new_bytes)
         if err is not None:
             return Result(
                 status="error", action="xml_append",
@@ -1025,7 +1025,7 @@ class XmlAppendTool:
         return Result(
             status="ok", action="xml_append",
             message=(
-                f"{file_path}  child appended under <{resolved.element.tag}>  "
+                f"{path}  child appended under <{resolved.element.tag}>  "
                 f"({delta:+d} B)"
             ),
         )
@@ -1050,24 +1050,24 @@ class XmlModifyTool:
 
     name = "xml_modify"
     op = "write"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: str = "",
         ops: list | None = None,
         occurrence: int | None = None,
         source_hash: str | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(
                 status="error", action="xml_modify",
-                error_code="bad_input", message="file_path required",
+                error_code="bad_input", message="path required",
             )
         if not address:
             return Result(
@@ -1107,11 +1107,11 @@ class XmlModifyTool:
 
         # --- read current bytes ------------------------------------------
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(
                 status="error", action="xml_modify",
-                error_code="not_found", message=f"file not found: {file_path}",
+                error_code="not_found", message=f"file not found: {path}",
             )
         except Exception as e:
             return Result(
@@ -1216,7 +1216,7 @@ class XmlModifyTool:
             )
 
         # --- write via backend write-bytes -------------------------------
-        err = self._write_bytes(backend, file_path, current_bytes)
+        err = self._write_bytes(backend, path, current_bytes)
         if err is not None:
             return Result(
                 status="error", action="xml_modify",
@@ -1228,7 +1228,7 @@ class XmlModifyTool:
         return Result(
             status="ok", action="xml_modify",
             message=(
-                f"{file_path}  <{el.tag}>  {len(ops)} op(s) applied  "
+                f"{path}  <{el.tag}>  {len(ops)} op(s) applied  "
                 f"({delta:+d} B)"
             ),
         )
@@ -1625,22 +1625,22 @@ class XmlReadTool:
 
     name = "xml_read"
     op = "read"
-    path_args: list[str] = ["file_path"]
+    path_args: list[str] = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any = None,
-        file_path: str = "",
+        path: str = "",
         address: str = "",
         occurrence: int | None = None,
         **_kwargs: Any,
     ) -> Result:
-        if not file_path:
+        if not path:
             return Result(
                 status="error", action="xml_read",
-                error_code="bad_input", message="file_path required",
+                error_code="bad_input", message="path required",
             )
         if not address:
             return Result(
@@ -1664,11 +1664,11 @@ class XmlReadTool:
             )
 
         try:
-            data = _read_bytes(backend, file_path)
+            data = _read_bytes(backend, path)
         except FileNotFoundError:
             return Result(
                 status="error", action="xml_read",
-                error_code="not_found", message=f"file not found: {file_path}",
+                error_code="not_found", message=f"file not found: {path}",
             )
         except Exception as e:
             return Result(
@@ -1705,7 +1705,7 @@ class XmlReadTool:
         first, last = _line_range(doc.source_bytes, el.start, el.end)
         src_hash = _hash_bytes(data)
         header = (
-            f"{file_path}  <{el.tag}>  L{first}-L{last}  "
+            f"{path}  <{el.tag}>  L{first}-L{last}  "
             f"({len(src)} B)  #{src_hash}"
         )
         return Result(

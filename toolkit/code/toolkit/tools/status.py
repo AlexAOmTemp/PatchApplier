@@ -43,7 +43,7 @@ class GetStatusTool:
     path_args: list[str] = []
     path_list_args: list[str] = []
 
-    DEFAULT_SECTIONS = ("session", "indexes", "policy", "scope")
+    DEFAULT_SECTIONS = ("session", "layout", "indexes", "policy", "scope")
 
     _context: dict = {}
 
@@ -121,6 +121,8 @@ class GetStatusTool:
         blocks: list[str] = []
         if "session" in secs:
             blocks.append(self._render_session())
+        if "layout" in secs:
+            blocks.append(self._render_layout(backend))
         if "indexes" in secs:
             blocks.append(self._render_indexes(backend))
         if "policy" in secs:
@@ -216,6 +218,45 @@ class GetStatusTool:
                     lines.append(f"native:   enabled  ({allow_s})")
                 else:
                     lines.append("native:   disabled")
+        return "\n".join(lines)
+
+    # --- layout -----------------------------------------------------------
+
+    def _render_layout(self, backend: Backend) -> str:
+        """Compact map of each root: directories via `tree`, root files directly.
+
+        Directories: `tree(max_dirs=12, max_types=5)` — bounded, one line
+        per directory. Root files: `os.scandir` on the resolved physical
+        path — one level only, so a huge root (RimWorld, 36k files) costs
+        one readdir, not a full walk. Without this block the LLM cannot see
+        that `requirements.txt` / `AUDIT.md` live at the project root: they
+        are neither docs nor code, so they appear in no index.
+        """
+        import os
+        ctx = self._context
+        roots = ctx.get("roots") or []
+        if not roots:
+            return "## Layout\n(no roots)"
+        from .tree import TreeTool
+        lines = ["## Layout"]
+        for root in roots:
+            lines.append("")
+            lines.append(f"### {root}")
+            from ..core.tool_call import call_tool
+            try:
+                r = call_tool(
+                    TreeTool, backend, path=root,
+                    max_lines=20, show_files=True, max_types=5,
+                )
+                if r.status == "ok" and r.message:
+                    for ln in r.message.splitlines():
+                        if ln.startswith("=== "):
+                            continue
+                        lines.append(ln)
+                else:
+                    lines.append(f"  (tree: {r.message})")
+            except Exception as e:
+                lines.append(f"  (tree failed: {type(e).__name__}: {e})")
         return "\n".join(lines)
 
     # --- indexes ----------------------------------------------------------

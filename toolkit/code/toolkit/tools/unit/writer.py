@@ -310,16 +310,28 @@ def replace_block(source: str, path: str, address: dict,
 
 def insert_block(source: str, path: str, address: dict,
                  new_text: str, position: str = "end",
-                 anchor: int | str | None = None) -> str:
+                 before_anchor: int | str | None = None,
+                 after_anchor: int | str | None = None) -> str:
     """Insert a block into a unit's body.
 
-    `position` — "start" | "end" | "before" | "after". "before"/"after"
-    require `anchor` (block index or qualname of a block-unit).
-    "start"/"end" place at the first/last block boundary; "end" appends
-    after the last block.
+    Two axes:
+      * `position` — "start" | "end" — unit boundary (first / last block).
+      * `before_anchor` / `after_anchor` — block index or qualname of a
+        block-unit; insert immediately before / after that block.
+        At most one may be set.
+
+    `address` names the **container**; anchors name a **reference point
+    inside** it. To add a sibling member (a method after another method),
+    pass the parent class as `address` and the sibling's qualname as
+    `before_anchor` / `after_anchor`.
+
+    If an anchor is set, `position` is ignored; otherwise `position`
+    selects the first/last block boundary.
     """
     if not new_text or not new_text.strip():
         raise ValueError("empty_input")
+    if before_anchor is not None and after_anchor is not None:
+        raise ValueError("bad_anchor: pass at most one of before_anchor/after_anchor")
     ext = Path(path).suffix.lower()
     unit = reader.resolve(source, path, address)
     if not unit.blocks:
@@ -327,7 +339,13 @@ def insert_block(source: str, path: str, address: dict,
     by_index = {b.index: b for b in unit.blocks}
     lines = source.splitlines()
 
-    if position in ("start", "end"):
+    if before_anchor is not None or after_anchor is not None:
+        is_before = before_anchor is not None
+        anchor_val = before_anchor if is_before else after_anchor
+        ref = _find_anchor_block(by_index, anchor_val)
+        indent = _line_indent(lines[ref.start - 1])
+        insert_at = ref.start if is_before else ref.end + 1
+    elif position in ("start", "end"):
         if position == "start":
             ref = by_index[1]
             insert_at = ref.start
@@ -336,14 +354,9 @@ def insert_block(source: str, path: str, address: dict,
             ref = by_index[max(by_index)]
             insert_at = ref.end + 1
             indent = _line_indent(lines[ref.start - 1])
-    elif position in ("before", "after"):
-        if anchor is None:
-            raise ValueError("anchor_required: before/after need an anchor")
-        ref = _find_anchor_block(by_index, anchor)
-        indent = _line_indent(lines[ref.start - 1])
-        insert_at = ref.start if position == "before" else ref.end + 1
     else:
-        raise ValueError(f"bad_position: {position!r}")
+        raise ValueError(f"bad_position: {position!r} "
+                         f"(use start|end, or before_anchor/after_anchor)")
 
     new_lines = _apply_indent(new_text, indent)
     out_lines = lines[:insert_at - 1] + new_lines + lines[insert_at - 1:]
@@ -354,7 +367,6 @@ def insert_block(source: str, path: str, address: dict,
         new_source += eol
 
     _check_parses(new_source, path, unit, ext, source)
-    return new_source
     return new_source
 
 

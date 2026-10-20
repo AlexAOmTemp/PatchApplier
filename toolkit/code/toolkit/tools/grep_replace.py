@@ -25,7 +25,7 @@ from ..matching import Pattern, is_word
 class GrepReplaceTool:
     name = "grep_replace"
     op = "write"
-    path_args = ["directory"]
+    path_args = ["paths"]
     path_list_args = ["paths"]
 
     def execute(
@@ -35,8 +35,8 @@ class GrepReplaceTool:
         pattern: str | None = None,
         replacement: str | None = None,
         mappings: list[dict[str, str]] | None = None,
-        paths: list[str] | None = None,
-        directory: str = "",
+        paths: str | list[str] | None = None,
+        recursive: bool = True,
         file_glob: str = "*",
         exclude_glob: str | list[str] | None = None,
         regex: bool = True,
@@ -45,17 +45,31 @@ class GrepReplaceTool:
         word_boundary: bool = False,
         max_replacements: int = 1000,
         dry_run: bool = True,
+        scoped: bool = True,
+        filter: bool = True,
+        force: bool = False,
         **_: Any,
     ) -> Result:
         action = "grep_replace"
 
-        if directory and is_mcp_path(directory) and not paths:
+        _given = paths
+        if isinstance(_given, str):
+            _given = [_given]
+        if not _given:
             return Result(
-                status="error", action=action, error_code="wrong_domain",
-                message=(f"grep_replace работает только с файловой системой; "
-                         f"для Roblox-путей используй `grep_replace_mcp`. "
-                         f"Дано: {directory!r}"),
+                status="error", action=action, error_code="missing_arg",
+                message=("paths is required: pass a file, a directory, or a "
+                         "list of both; grep_replace does not scan the whole "
+                         "workspace by default"),
             )
+        for _p in _given:
+            if is_mcp_path(_p):
+                return Result(
+                    status="error", action=action, error_code="wrong_domain",
+                    message=(f"grep_replace работает только с файловой системой; "
+                             f"для Roblox-путей используй `grep_replace_mcp`. "
+                             f"Дано: {_p!r}"),
+                )
 
         has_pattern = pattern is not None and pattern != ""
         has_mappings = mappings is not None
@@ -127,30 +141,72 @@ class GrepReplaceTool:
                               error_code="bad_regex",
                               message=f"Некорректная регулярка: {e}")
 
-        if paths:
-            candidates = list(paths)
-            if exclude_glob is None:
-                excludes: list[str] = []
-            elif isinstance(exclude_glob, str):
-                excludes = [exclude_glob] if exclude_glob else []
+        # Each element of `paths` is resolved by type (ripgrep model),
+        # identical to `grep`: file -> address access; dir -> scan with
+        # `recursive`, `.patchignore` and scope.
+        explicit_files: list[str] = []
+        scan_dirs: list[str] = []
+        for _p in _given:
+            _p = normalize_path(_p)
+            try:
+                _st = backend.stat(_p)
+            except Exception:
+                _st = None
+            if _st is not None and _st.is_file:
+                explicit_files.append(_p)
             else:
-                excludes = list(exclude_glob)
+                scan_dirs.append(_p)
+
+        if exclude_glob is None:
+            excludes: list[str] = ["INDEX.md"] if scan_dirs else []
+        elif isinstance(exclude_glob, str):
+            excludes = [exclude_glob] if exclude_glob else []
         else:
-            directory = normalize_path(directory)
-            candidates = backend.list(directory or "", file_glob)
-            if isinstance(exclude_glob, str):
-                excludes = [exclude_glob] if exclude_glob else []
-            elif isinstance(exclude_glob, list):
-                excludes = list(exclude_glob)
-            else:
-                excludes = ["INDEX.md"]
+            excludes = list(exclude_glob)
 
         def _excluded(p: str) -> bool:
             name = p.rsplit("/", 1)[-1]
             return any(fnmatch.fnmatch(name, e) or fnmatch.fnmatch(p, e)
                        for e in excludes)
 
-        candidates = [p for p in candidates if not _excluded(p)]
+        scan_files: list[str] = []
+        for _d in scan_dirs:
+            _batch = backend.list(_d, file_glob)
+            if not recursive:
+                _pfx = (_d.rstrip("/") + "/") if _d else ""
+                _batch = [p for p in _batch
+                          if "/" not in (p[len(_pfx):] if _pfx and p.startswith(_pfx) else p)]
+            scan_files.extend(_batch)
+        scan_files = [p for p in scan_files if not _excluded(p)]
+
+        if filter and scan_files:
+            _get_pred = getattr(backend, "hidden_predicate", None)
+            _hidden = _get_pred() if callable(_get_pred) else backend.is_hidden
+            _visible: list[str] = []
+            for p in scan_files:
+                rel = p
+                for _d in scan_dirs:
+                    _pfx = (_d.rstrip("/") + "/") if _d else ""
+                    if not _pfx or p.startswith(_pfx):
+                        rel = p[len(_pfx):] if _pfx else p
+                        break
+                if not _hidden(rel):
+                    _visible.append(p)
+            scan_files = _visible
+
+        if scoped and scan_files:
+            from .scope import read_scope as _rs_gr
+            _scope, _scope_err = _rs_gr(backend)
+            if not _scope_err and _scope.rules:
+                _exempt: set[str] = set()
+                for _d in scan_dirs:
+                    if _d:
+                        _exempt |= _scope.exemptions_for(_d)
+                _visible_s, _hidden_gr = _scope.partition(scan_files, exempt=_exempt)
+                _keep = set(_visible_s)
+                scan_files = [p for p in scan_files if p in _keep]
+
+        candidates = explicit_files + scan_files
         if not candidates:
             return Result(status="ok", action=action,
                           message="Совпадений не найдено: файлов не найдено")
@@ -158,12 +214,24 @@ class GrepReplaceTool:
         per_file: list[tuple[str, int, str, str]] = []
         skipped: list[str] = []
         blocked: list[str] = []
+        binary_skipped = 0
         total = 0
+
+        # Binary files are only relevant for scan results. Explicit paths
+        # are address access — the caller named the file, so read it.
+        # Extension check only, no I/O: the file is read below anyway, so
+        # a content check would cost more than the read it saves.
+        from ..matching import has_binary_extension
+        scan_set = set(scan_files)
 
         for p in candidates:
             check = backend.filter_check(p, "write")
             if check is not None:
-                blocked.append(p)
+                if not (force and check[0] == "hidden_path"):
+                    blocked.append(p)
+                    continue
+            if p in scan_set and has_binary_extension(p):
+                binary_skipped += 1
                 continue
             try:
                 text = backend.read(p)

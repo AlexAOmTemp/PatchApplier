@@ -43,9 +43,9 @@ class MultiRootFsBackend:
     def open(self) -> None:
         if self._opened:
             return
-        # One FS backend per root. Their own `.patchignore` (created by
-        # RootDirBackend.open) is separate from the workspace-level one
-        # in state_dir — the latter is what filter_check consults.
+        # One FS backend per root. There is no per-root `.patchignore`:
+        # visibility rules live only in the workspace-level file at
+        # state_dir, read below and consulted by filter_check / is_hidden.
         for name, root in self.ws.roots.items():
             fb = RootDirBackend(root.path)
             fb.open()
@@ -149,6 +149,10 @@ class MultiRootFsBackend:
     def read(self, path: str) -> str:
         _, rel, fb = self._resolve_root(path)
         return fb.read(rel)
+
+    def read_head(self, path: str, max_bytes: int = 8192) -> bytes:
+        _, rel, fb = self._resolve_root(path)
+        return fb.read_head(rel, max_bytes)
 
     def exists(self, path: str) -> bool:
         try:
@@ -349,7 +353,11 @@ class MultiRootFsBackend:
         Rules (see WORKSPACE_BACKEND.md §5):
           0. State prefix (`.patch_applier/`) is always OK.
           1. Root must exist in workspace.
-          2. `.patchignore` from state_dir applies to ``rel`` inside the root.
+          2. `.patchignore` from state_dir is a soft, scan-time filter:
+             it applies to `index_*` and `write`, but NOT to `read` —
+             address access works for hidden paths. Write-tool callers
+             may pass `force=true` to bypass `hidden_path` (PathPolicy
+             still applies — that is a hard rule).
           3. Per-path policy applies: nearest override under the root,
              otherwise the root default, otherwise all-True.
 
@@ -366,9 +374,50 @@ class MultiRootFsBackend:
                     f"путь должен начинаться с: {valid}")
         self._maybe_reload_patterns()
         rel_norm = rel.replace("\\", "/")
-        if rel_norm and patchignore.path_hidden(rel_norm, self._patterns):
+        # Visibility is a soft, scan-time filter. Address access (`read`)
+        # ignores it by design: naming the path is the caller's consent.
+        # `write` still consults it here until per-tool `force=true` lands.
+        # `index_*` consults it so a full rebuild skips hidden dirs.
+        if op != "read" and rel_norm and patchignore.path_hidden(rel_norm, self._patterns):
             return ("hidden_path", f"Скрытая папка: {path}")
         pol = self.ws.policy_for(name, rel_norm)
         if not bool(getattr(pol, op, True)):
             return ("filter", f"Запрещено политикой: {path}")
         return None
+
+    def is_hidden(self, rel: str) -> bool:
+        """True if `rel` matches an enabled `.patchignore` pattern.
+
+        Soft visibility filter for scan tools (tree / list_files /
+        survey_dir / grep / index rebuild). Address access (read_file,
+        stat) does NOT call this — the caller names the path explicitly.
+
+        `rel` is relative to the query root, not the workspace root:
+        `tree(".git")` shows `.git` itself (root exemption) but not
+        `.git/.somethinginner` (its segment matches `.*`).
+        """
+        if not rel:
+            return False
+        self._maybe_reload_patterns()
+        return patchignore.path_hidden(rel.replace("\\", "/"), self._patterns)
+
+    def hidden_predicate(self):
+        """Return a cheap per-path visibility check for scan loops.
+
+        Loads `.patchignore` once (one stat + reload check) and returns a
+        closure. Calling `is_hidden` per file pays a stat per file via
+        `_maybe_reload_patterns`; on a few thousand files that dominates
+        grep/tree wall time. Scan tools should fetch the predicate once
+        before the loop and pay only fnmatch per path.
+        """
+        self._maybe_reload_patterns()
+        pats = self._patterns
+        if not pats:
+            return lambda rel: False
+
+        def _check(rel: str) -> bool:
+            if not rel:
+                return False
+            return patchignore.path_hidden(rel.replace("\\", "/"), pats)
+
+        return _check

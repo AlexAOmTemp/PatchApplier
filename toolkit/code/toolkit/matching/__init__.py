@@ -10,6 +10,13 @@ Pure functions over (text, pattern) — no I/O, no backend, no format.
   `replace_between` / `insert_at_anchor`. Shared so all three tools
   have identical tier semantics by construction.
 """
+from .binary import (
+    get_timings,
+    has_binary_extension,
+    is_binary,
+    is_binary_file,
+    reset_timings,
+)
 from .pattern import Pattern
 from .word import is_word
 from .text import (
@@ -21,6 +28,11 @@ from .text import (
 )
 
 __all__ = [
+    "has_binary_extension",
+    "is_binary",
+    "is_binary_file",
+    "get_timings",
+    "reset_timings",
     "Pattern",
     "is_word",
     "TextMatch",

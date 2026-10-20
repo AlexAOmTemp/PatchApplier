@@ -35,6 +35,14 @@ class Backend(Protocol):
         """Read full text. Raises on failure."""
         ...
 
+    def read_head(self, path: str, max_bytes: int = 8192) -> bytes:
+        """Read the first `max_bytes` bytes without decoding.
+
+        Used for binary detection before the full read (grep scan,
+        read_file on a binary target). Never raises on invalid UTF-8.
+        """
+        ...
+
     def write(self, path: str, content: str) -> None:
         """Write text. Creates parent directories if needed."""
         ...
@@ -73,4 +81,17 @@ class Backend(Protocol):
         The two had no distinguishing signal before; the GUI/LLM saw
         only `■ blocked` and could not tell which rule fired.
         """
+        ...
+
+    def is_hidden(self, rel: str) -> bool:
+        """Soft visibility filter for scan tools (`.patchignore`).
+
+        Not consulted by address access (`read` / `stat`): naming a path
+        explicitly is the caller's consent. Scan tools (tree / list_files /
+        survey_dir / grep / index rebuild) use this to skip hidden entries.
+        """
+        ...
+
+    def hidden_predicate(self):
+        """Preloaded `is_hidden` for loops: one stat, then fnmatch per path."""
         ...

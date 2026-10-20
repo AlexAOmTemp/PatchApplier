@@ -214,7 +214,8 @@ def _build_status_block(session) -> str:
         return "\n\n---\n\n(status unavailable: session not ready)"
     try:
         from ...tools.status import GetStatusTool
-        r = GetStatusTool().execute(backend=session.backend, fmt=session.fmt)
+        from ...core.tool_call import call_tool
+        r = call_tool(GetStatusTool, session.backend, session.fmt)
         if r.status == "ok":
             return "\n\n---\n\n" + r.message
         return f"\n\n---\n\n(status error: {r.message})"

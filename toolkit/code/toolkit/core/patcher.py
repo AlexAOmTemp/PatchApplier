@@ -260,6 +260,10 @@ class Patcher:
                 action=action,
             )
 
+        bad = self._validate_args(tool_cls, args, action)
+        if bad is not None:
+            return bad
+
         op = getattr(tool_cls, "op", "write")
 
         # For op in ("index_docs", "index_py", "index_lua") path_args typically
@@ -273,7 +277,8 @@ class Patcher:
                               error_code=code)
 
         try:
-            return tool_cls().execute(backend=self.backend, fmt=self.fmt, **dict(args))
+            from .tool_call import call_tool
+            return call_tool(tool_cls, self.backend, self.fmt, **dict(args))
         except PermissionError as e:
             return Result(status="blocked", message=str(e), action=action,
                           error_code="sandbox")
@@ -290,13 +295,21 @@ class Patcher:
                           message=f"\u0418\u0421\u041a\u041b\u042e\u0427\u0415\u041d\u0418\u0415: {type(e).__name__}: {e}",
                           action=action)
 
+    def _validate_args(self, tool_cls: type[Tool], args: dict,
+                       action: str) -> Result | None:
+        from .tool_call import validate_args
+        return validate_args(tool_cls, args, action)
+
     def _filter_paths(self, tool_cls: type[Tool], args: dict,
                       op: str) -> tuple[str, str] | None:
+        force = bool(args.get("force"))
         for key in getattr(tool_cls, "path_args", []) or []:
             val = args.get(key)
             if isinstance(val, str) and val:
                 err = self.backend.filter_check(val, op)
                 if err:
+                    if force and err[0] == "hidden_path":
+                        continue
                     return err
         for key in getattr(tool_cls, "path_list_args", []) or []:
             val = args.get(key)
@@ -305,5 +318,7 @@ class Patcher:
                     if isinstance(item, str) and item:
                         err = self.backend.filter_check(item, op)
                         if err:
+                            if force and err[0] == "hidden_path":
+                                continue
                             return err
         return None

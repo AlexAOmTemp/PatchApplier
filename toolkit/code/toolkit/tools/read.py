@@ -17,14 +17,14 @@ from ..matching import Pattern
 class ReadFileTool:
     name = "read_file"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Format | None,
-        file_path: str,
+        path: str = "",
         section_number: str | None = None,
         section_title: str | None = None,
         start_line: int | None = None,
@@ -35,7 +35,28 @@ class ReadFileTool:
         raw: str | None = None,
         **_: Any,
     ) -> Result:
-        text = backend.read(file_path)
+        # Binary check before the full read: a 12 MB .dll would blow up on
+        # UTF-8 decode after wasting the whole read. Address access still
+        # honours the call — the error names the file and its size, so the
+        # caller can switch to file_stat instead of guessing.
+        from ..matching import is_binary
+        try:
+            head = backend.read_head(path)
+        except Exception:
+            head = b""
+        if is_binary(head):
+            try:
+                st = backend.stat(path)
+                size_s = f"{st.size_bytes / 1024:.1f} KB"
+            except Exception:
+                size_s = "unknown size"
+            return Result(
+                status="error", action="read_file",
+                error_code="binary",
+                message=(f"{path} is binary ({size_s}); "
+                         f"use file_stat for size/mtime, or read_head for a hex dump"),
+            )
+        text = backend.read(path)
 
         # Two orthogonal axes:
         #   numbered — prefix each line with "N: " (for reading / replace_range)
@@ -114,13 +135,13 @@ class ReadFileTool:
                 what = section_number if section_number is not None else section_title
                 return Result(
                     status="error",
-                    message=f"Секция '{what}' не найдена в {file_path}",
+                    message=f"Секция '{what}' не найдена в {path}",
                     action="read_file",
                     error_code="not_found",
                 )
             end = ParsedDoc.section_full_end(sec)
             content = text[sec.heading_start:end]
-            header = self._section_header(file_path, sec)
+            header = self._section_header(path, sec)
             lines_keep = content.splitlines(keepends=True)
             first_no = text[: sec.heading_start].count("\n") + 1
             body = _render_block(lines_keep, first_no)
@@ -140,20 +161,20 @@ class ReadFileTool:
                     action="read_file",
                     error_code="bad_range",
                 )
-            header = f"{file_path} L{s + 1}–L{e}"
+            header = f"{path} L{s + 1}–L{e}"
             lines_keep = text.splitlines(keepends=True)[s:e]
             body = _render_block(lines_keep, s + 1)
             return self._render(header, body, max_bytes, "read_file")
 
         lines_keep = text.splitlines(keepends=True)
         body = _render_block(lines_keep, 1)
-        return self._render(file_path, body, max_bytes, "read_file")
+        return self._render(path, body, max_bytes, "read_file")
 
     @staticmethod
-    def _section_header(file_path: str, sec) -> str:
+    def _section_header(path: str, sec) -> str:
         hashes = "#" * sec.level
         num = f"{sec.number}. " if sec.number else ""
-        return f"{file_path} [{hashes} {num}{sec.title}]"
+        return f"{path} [{hashes} {num}{sec.title}]"
 
     @staticmethod
     def _render(header: str, body: str, max_bytes: int | None, action: str) -> Result:
@@ -177,13 +198,13 @@ class ReadFileTool:
 class FileExistsTool:
     name = "file_exists"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
-    def execute(self, backend: Backend, fmt: Any, file_path: str, **_: Any) -> Result:
+    def execute(self, backend: Backend, fmt: Any, path: str = "", **_: Any) -> Result:
         return Result(
             status="ok",
-            message=str(backend.exists(file_path)).lower(),
+            message=str(backend.exists(path)).lower(),
             action="file_exists",
         )
 
@@ -191,27 +212,27 @@ class FileExistsTool:
 class FileStatTool:
     name = "file_stat"
     op = "read"
-    path_args = ["file_path"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Format | None,
-        file_path: str,
+        path: str = "",
         **_: Any,
     ) -> Result:
-        st = backend.stat(file_path)
+        st = backend.stat(path)
         size_kb = st.size_bytes / 1024
         mtime_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(st.mtime))
         lines_out = [
-            file_path,
+            path,
             f"  {size_kb:.1f} KB, {st.lines} строк, mtime {mtime_str}",
         ]
 
         if fmt is not None:
             try:
-                text = backend.read(file_path)
+                text = backend.read(path)
                 doc = fmt.parse(text)
             except Exception:
                 doc = None
@@ -243,22 +264,23 @@ def _render_stat_section(s: Section, source: str, out: list[str]) -> None:
 class ListFilesTool:
     name = "list_files"
     op = "read"
-    path_args = ["directory"]
+    path_args = ["path"]
     path_list_args: list[str] = []
 
     def execute(
         self,
         backend: Backend,
         fmt: Any,
-        directory: str = "",
+        path: str = "",
         glob: str = "*",
         show_size: bool = True,
         scoped: bool = True,
         recursive: bool = False,
         show_hidden: bool = False,
+        filter: bool = True,
         **_: Any,
     ) -> Result:
-        directory = normalize_path(directory)
+        path = normalize_path(path)
         from .scope import read_scope as _rs_lf
         scope_obj = None
         hidden_by: dict[str, int] = {}
@@ -271,7 +293,7 @@ class ListFilesTool:
         def _filter(items: list[str]) -> list[str]:
             if scope_obj is None:
                 return items
-            exempt = scope_obj.exemptions_for(directory)
+            exempt = scope_obj.exemptions_for(path)
             visible, hid = scope_obj.partition(items, exempt=exempt)
             for k, v in hid.items():
                 hidden_by[k] = hidden_by.get(k, 0) + v
@@ -289,20 +311,22 @@ class ListFilesTool:
 
         fn = getattr(backend, "list_with_stat", None) if show_size else None
         if callable(fn):
-            rows_all = fn(directory or "", glob)
+            rows_all = fn(path or "", glob)
             stat_map = {p: (sz, ln) for p, sz, ln in rows_all}
             paths_all = [p for p, _, _ in rows_all]
         else:
             stat_map = {}
-            paths_all = backend.list(directory or "", glob)
+            paths_all = backend.list(path or "", glob)
 
         paths = _filter(paths_all)
-        if not show_hidden:
-            paths = [p for p in paths
-                     if not any(part.startswith(".") for part in p.split("/") if part)]
+        if not show_hidden and filter:
+            _pfx = (path.rstrip("/") + "/") if path else ""
+            def _rel_lf(p: str) -> str:
+                return p[len(_pfx):] if _pfx and p.startswith(_pfx) else p
+            paths = [p for p in paths if not backend.is_hidden(_rel_lf(p))]
 
         if not recursive:
-            prefix = (directory.rstrip("/") + "/") if directory else ""
+            prefix = (path.rstrip("/") + "/") if path else ""
             direct_files: list[str] = []
             subdirs: set[str] = set()
             for p in paths:
@@ -355,7 +379,7 @@ class ListFilesTool:
                 except Exception:
                     out.append(p)
         if len(out) > _LIST_FILES_CAP:
-            return _list_too_many(directory, len(out))
+            return _list_too_many(path, len(out))
         if len(out) > 100:
             out = out[:100] + [f"... и ещё {len(paths) - 100}"]
         return Result(status="ok", message="\n".join(out) + _footer(), action="list_files")
@@ -364,14 +388,14 @@ class ListFilesTool:
 _LIST_FILES_CAP = 2000
 
 
-def _list_too_many(directory: str, n: int) -> Result:
+def _list_too_many(path: str, n: int) -> Result:
     return Result(
         status="ok", action="list_files",
         message=(
-            f"{directory or '(root)'}: {n} файлов — слишком много для плоского списка.\n"
+            f"{path or '(root)'}: {n} файлов — слишком много для плоского списка.\n"
             f"Используй `recursive=False` (прямые дети) "
             f"или `survey_dir` (агрегат по расширениям и подкаталогам), "
-            f"или уточни `directory=` / `glob=`."
+            f"или уточни `path=` / `glob=`."
         ),
     )
 
@@ -397,6 +421,7 @@ class SurveyDirTool:
         top: int = 20,
         max_files: int = 200_000,
         scoped: bool = True,
+        filter: bool = True,
         **_: Any,
     ) -> Result:
         from collections import Counter
@@ -416,6 +441,12 @@ class SurveyDirTool:
                 status="ok", action="survey_dir",
                 message=f"{path or '(root)'}: (пусто)",
             )
+        if filter:
+            _pfx = (path.rstrip("/") + "/") if path else ""
+            def _rel_sd(p: str) -> str:
+                return p[len(_pfx):] if _pfx and p.startswith(_pfx) else p
+            all_paths = [p for p in all_paths if not backend.is_hidden(_rel_sd(p))]
+
         if len(all_paths) > max_files:
             return Result(
                 status="error", action="survey_dir",
@@ -510,7 +541,7 @@ def _ext_of(p: str) -> str:
 class GrepTool:
     name = "grep"
     op = "read"
-    path_args = ["directory"]
+    path_args = ["paths"]
     path_list_args = ["paths"]
 
     def execute(
@@ -518,8 +549,8 @@ class GrepTool:
         backend: Backend,
         fmt: Any,
         pattern: str,
-        paths: list[str] | None = None,
-        directory: str = "",
+        paths: str | list[str],
+        recursive: bool = True,
         file_glob: str = "*",
         exclude_glob: str | list[str] | None = None,
         regex: bool = True,
@@ -530,74 +561,121 @@ class GrepTool:
         after: int = 0,
         max_results: int = 200,
         scoped: bool = True,
+        filter: bool = True,
+        debug_timing: bool = False,
         **_: Any,
     ) -> Result:
+        import time as _time
+        _timings: list[tuple[str, float]] = []
+        _t_prev = [_time.perf_counter()]
+        def _mark(label: str) -> None:
+            if not debug_timing:
+                return
+            _now = _time.perf_counter()
+            _timings.append((label, _now - _t_prev[0]))
+            _t_prev[0] = _now
+        def _timing_footer() -> str:
+            if not debug_timing or not _timings:
+                return ""
+            total = sum(dt for _, dt in _timings)
+            parts = "  ".join(f"{lbl}={dt*1000:.0f}ms" for lbl, dt in _timings)
+            return f"\n[timing: {parts}  total={total*1000:.0f}ms]"
         from ..core.paths import is_mcp_path
         from .scope import read_scope as _read_scope
-        if directory and is_mcp_path(directory) and not paths:
+        _given = paths
+        if isinstance(_given, str):
+            _given = [_given]
+        if not _given:
             return Result(
-                status="error", action="grep", error_code="wrong_domain",
-                message=(f"grep работает только с файловой системой; "
-                         f"для Roblox-путей используй `grep_mcp`. "
-                         f"Дано: {directory!r}"),
+                status="error", action="grep", error_code="missing_arg",
+                message=("paths is required: pass a file, a directory, or a "
+                         "list of both; grep does not scan the whole workspace "
+                         "by default"),
             )
-        # Explicit `paths` are taken literally: the default
-        # exclude_glob (INDEX.md and friends) is meant for directory
-        # scans, where skipping index artifacts avoids grep-ing the
-        # index itself. When the caller names files explicitly, they
-        # mean them — only a caller-supplied exclude_glob narrows that.
-        if paths:
-            # Reject directory entries in `paths` -- they would be silently
-            # skipped by the per-file read loop below, yielding a false
-            # "no matches". Recursive scans go through `directory`.
-            for _p in paths:
-                try:
-                    _st = backend.stat(_p)
-                except Exception:
-                    _st = None
-                if _st is not None and not _st.is_file:
-                    return Result(
-                        status="error", action="grep",
-                        error_code="bad_options",
-                        message=(
-                            f"`paths` содержит каталог: {_p!r} — "
-                            f"используй `directory` для рекурсивного поиска"
-                        ),
-                    )
-            candidates = list(paths)
-            if exclude_glob is None:
-                excludes = []
-            elif isinstance(exclude_glob, str):
-                excludes = [exclude_glob] if exclude_glob else []
+        for _p in _given:
+            if is_mcp_path(_p):
+                return Result(
+                    status="error", action="grep", error_code="wrong_domain",
+                    message=(f"grep работает только с файловой системой; "
+                             f"для Roblox-путей используй `grep_mcp`. "
+                             f"Дано: {_p!r}"),
+                )
+
+        # Each element of `paths` is resolved by type (ripgrep model):
+        #   * file -> address access: read directly, no scan filters;
+        #   * dir  -> scan: `recursive` decides depth, .patchignore and
+        #            scope apply. Mixed lists are allowed.
+        explicit_files: list[str] = []
+        scan_dirs: list[str] = []
+        for _p in _given:
+            _p = normalize_path(_p)
+            try:
+                _st = backend.stat(_p)
+            except Exception:
+                _st = None
+            if _st is not None and _st.is_file:
+                explicit_files.append(_p)
             else:
-                excludes = list(exclude_glob)
+                scan_dirs.append(_p)
+
+        # Scan dirs get the default index-artifact exclusion; explicit
+        # files do not (naming a file means you mean it).
+        if exclude_glob is None:
+            excludes = ["INDEX.md"] if scan_dirs else []
+        elif isinstance(exclude_glob, str):
+            excludes = [exclude_glob] if exclude_glob else []
         else:
-            directory = normalize_path(directory)
-            candidates = backend.list(directory or "", file_glob)
-            if isinstance(exclude_glob, str):
-                excludes = [exclude_glob] if exclude_glob else []
-            elif isinstance(exclude_glob, list):
-                excludes = list(exclude_glob)
-            else:
-                excludes = ["INDEX.md"]
+            excludes = list(exclude_glob)
 
         def _excluded(p: str) -> bool:
             name = p.rsplit("/", 1)[-1]
             return any(fnmatch.fnmatch(name, e) or fnmatch.fnmatch(p, e) for e in excludes)
 
-        candidates = [p for p in candidates if not _excluded(p)]
+        scan_files: list[str] = []
+        for _d in scan_dirs:
+            _batch = backend.list(_d, file_glob)
+            if not recursive:
+                _pfx = (_d.rstrip("/") + "/") if _d else ""
+                _batch = [p for p in _batch
+                          if "/" not in (p[len(_pfx):] if _pfx and p.startswith(_pfx) else p)]
+            scan_files.extend(_batch)
 
-        # Scope applies to directory scans only. Explicit `paths` bypass it:
-        # the caller named the files, hiding them would be unhelpful.
+        scan_files = [p for p in scan_files if not _excluded(p)]
+        _mark("list")
+
+        # Visibility (.patchignore) applies to scan dirs only; explicit
+        # files are address access and ignore it, like `read_file` does.
+        if filter and scan_files:
+            _get_pred = getattr(backend, "hidden_predicate", None)
+            _hidden = _get_pred() if callable(_get_pred) else backend.is_hidden
+            _visible: list[str] = []
+            for p in scan_files:
+                rel = p
+                for _d in scan_dirs:
+                    _pfx = (_d.rstrip("/") + "/") if _d else ""
+                    if not _pfx or p.startswith(_pfx):
+                        rel = p[len(_pfx):] if _pfx else p
+                        break
+                if not _hidden(rel):
+                    _visible.append(p)
+            scan_files = _visible
+        _mark("hidden")
+
+        # Scope applies to scan dirs only. Explicit files bypass it.
         hidden_by: dict[str, int] = {}
         scope_err: str | None = None
-        if scoped and not paths:
+        if scoped and scan_files:
             scope, scope_err = _read_scope(backend)
             if not scope_err and scope.rules:
-                exempt = scope.exemptions_for(directory) if directory else set()
-                visible, hidden_by = scope.partition(candidates, exempt=exempt)
+                _exempt: set[str] = set()
+                for _d in scan_dirs:
+                    if _d:
+                        _exempt |= scope.exemptions_for(_d)
+                visible, hidden_by = scope.partition(scan_files, exempt=_exempt)
                 keep = set(visible)
-                candidates = [p for p in candidates if p in keep]
+                scan_files = [p for p in scan_files if p in keep]
+
+        candidates = explicit_files + scan_files
 
         try:
             pat = Pattern(
@@ -621,6 +699,24 @@ class GrepTool:
         # Prefer batch reads: on MCP this collapses N per-file round-trips
         # into a few execute_luau calls. read_many returns {path: text} and
         # silently omits paths it could not read (counted as skipped).
+        # Binary files are only relevant for scan results. Explicit paths
+        # are address access — the caller named the file, so read it.
+        # Extension check only, no I/O: grep reads the file anyway, and a
+        # full content check (512 B head + decision tree) costs more than
+        # the read it saves. Binary bytes in a text-extension file fail
+        # the read below and are counted as `skipped`.
+        from ..matching import has_binary_extension
+        scan_set = set(scan_files)
+        binary_skipped = 0
+        live = []
+        for p in candidates:
+            if p in scan_set and has_binary_extension(p):
+                binary_skipped += 1
+                continue
+            live.append(p)
+        candidates = live
+        _mark("binary")
+
         texts: dict[str, str] = {}
         read_many = getattr(backend, "read_many", None)
         if callable(read_many) and candidates:
@@ -655,16 +751,19 @@ class GrepTool:
                         results.append(f"{p}:{j + 1}: {mark} {lines[j].rstrip()}")
                 else:
                     results.append(f"{p}:{lineno}: {line.rstrip()}")
-                if len(results) >= max_results:
-                    results.append(f"... обрезано на {max_results} строк")
-                    header = f"Найдено {match_count}+ совпадений (обрезано):"
+                if match_count >= max_results:
+                    header = (f"Показано {match_count} совпадений "
+                              f"(лимит max_results={max_results}, скан остановлен; "
+                              f"реальное число может быть больше — увеличь max_results):")
                     tail = ""
                     if hidden_by:
                         n = sum(hidden_by.values())
                         parts = ", ".join(f"{k} {v}" for k, v in sorted(hidden_by.items()))
                         tail = (f"\n[{n} file(s) hidden by scope ({parts}); "
                                 f"pass scoped=false to include]")
-                    return Result(status="ok", message=header + "\n" + "\n".join(results) + tail,
+                    _mark("read+match")
+                    return Result(status="ok",
+                                  message=header + "\n" + "\n".join(results) + tail + _timing_footer(),
                                   action="grep")
 
         scope_footer = ""
@@ -676,11 +775,16 @@ class GrepTool:
             scope_footer = (f"\n[{n} file(s) hidden by scope ({parts}); "
                             f"pass scoped=false to include]")
 
+        _mark("read+match")
+
         if not results:
             msg = f"Совпадений не найдено: {pattern!r}"
             if skipped:
                 msg += f" (пропущено файлов: {skipped})"
-            return Result(status="ok", message=msg + scope_footer, action="grep")
+            if binary_skipped:
+                msg += f" (binary skipped: {binary_skipped})"
+            return Result(status="ok", message=msg + scope_footer + _timing_footer(), action="grep")
 
+        _mark("read+match")
         header = f"Найдено {match_count} совпадений:"
-        return Result(status="ok", message=header + "\n" + "\n".join(results) + scope_footer, action="grep")
+        return Result(status="ok", message=header + "\n" + "\n".join(results) + scope_footer + _timing_footer(), action="grep")

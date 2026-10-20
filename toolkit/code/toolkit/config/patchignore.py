@@ -11,8 +11,10 @@ Format (a simplification of `.gitignore`, tuned for our case):
   * Order matters — the last matching pattern wins.
   * A path is hidden if any of its directory segments is hidden.
 
-Hidden paths are refused by the filesystem backend before the policy is
-consulted, and not shown in the policy tree (unless "show hidden" is on).
+Hidden paths are excluded from scan-time walks (tree / list_files /
+survey_dir / grep / index rebuild). Address access is NOT blocked:
+`read_file(".git/config")` works. Writes to hidden paths will require
+`force=true` (handled by the write tools, not here).
 
 Where: `<project_dir>/.patchignore`. Each project has its own. If the
 file is missing when the backend opens, it is created with the default
@@ -160,3 +162,13 @@ def path_hidden(rel_str: str, patterns: list[Rule]) -> bool:
         if segment_hidden(seg, patterns):
             return True
     return False
+
+
+def is_hidden(rel_str: str, patterns: list[Rule]) -> bool:
+    """True if `rel_str` matches an enabled hiding pattern.
+
+    Name used by backends and scan tools. Alias of `path_hidden` for
+    callers that think in terms of visibility rather than path shape;
+    the semantics are identical (any segment matches, last rule wins).
+    """
+    return path_hidden(rel_str, patterns)

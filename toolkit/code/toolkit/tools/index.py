@@ -225,6 +225,7 @@ class GetIndexTool:
             path: str | None = None,
             sort: str = "path",
             scoped: bool = True,
+            sections: bool = False,
             **_: Any,
         ) -> Result:
             # -- 1. normalize kind ------------------------------------------
@@ -292,7 +293,7 @@ class GetIndexTool:
                         backend, k, mpath, limit, path, sort, per_kind, scoped))
                     continue
                 spath = self._paths[k]
-                blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind, path, limit))
+                blocks.append(f"{k}: " + _get_snapshot(backend, spath, per_kind, path, limit, sections=sections))
 
             return Result(
                 status="ok",
@@ -559,8 +560,16 @@ class _ModView:
 
 def _get_snapshot(backend, path: str, per_kind: int | None,
                   path_filter: str | None = None,
-                  limit: int | None = None) -> str:
-    """Read on-disk .md, optionally clip to per_kind bytes on a line boundary."""
+                  limit: int | None = None,
+                  sections: bool = True) -> str:
+    """Read on-disk .md, optionally clip to per_kind bytes on a line boundary.
+
+    `sections=True` returns the full per-section list (the on-disk format).
+    `sections=False` returns one line per file with a section count — the
+    overview mode, which `get_index(kind="docs")` defaults to. The format
+    legend (preamble) is only emitted in `sections=True` mode; in the
+    overview it would describe sections that are not shown.
+    """
     from ..indexers.state import read_seq
 
     def _split_blocks(src: str) -> list[str]:
@@ -583,6 +592,51 @@ def _get_snapshot(backend, path: str, per_kind: int | None,
     raw = text.encode("utf-8")
     total_b = len(raw)
     n_lines = text.count("\n") + (1 if text and not text.endswith("\n") else 0)
+
+    if not sections:
+        blocks = _split_blocks(text)
+        if blocks and blocks[0].startswith("# "):
+            blocks = blocks[1:]
+        matched_total = len(blocks)
+        if path_filter:
+            norm = path_filter.rstrip("/")
+            blocks = [b for b in blocks
+                      if _block_path(b) == norm
+                      or _block_path(b).startswith(norm + "/")]
+        matched = len(blocks)
+        lim = 500 if limit is None else int(limit)
+        shown = blocks if lim == 0 else blocks[:lim]
+        file_lines: list[str] = []
+        for b in shown:
+            blines = b.split("\n")
+            header = blines[0]
+            n_sec = sum(1 for ln in blines[1:] if ln.startswith("- "))
+            suffix = f"  [{n_sec} sections]" if n_sec else "  [no sections]"
+            file_lines.append(header + suffix)
+        sliced_fl = "\n".join(file_lines)
+        bits_fl = [f"{len(shown)} of {matched_total} files", "file-level"]
+        if path_filter:
+            bits_fl.append(f"path={path_filter} ({matched} match)")
+        if lim:
+            bits_fl.append(f"limit={lim}")
+        note_fl = ", " + ", ".join(bits_fl)
+        if path_filter and not shown:
+            head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note_fl})"
+            return head + (f"\n(0 files match path={path_filter!r}; "
+                           f"check path or pass limit=0 for all)")
+        raw_fl = sliced_fl.encode("utf-8")
+        total_fl = len(raw_fl)
+        if per_kind is None or total_fl <= per_kind:
+            head = f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note_fl})"
+            return head + "\n" + sliced_fl.rstrip("\n")
+        clipped_fl = raw_fl[:per_kind]
+        nl_fl = clipped_fl.rfind(b"\n")
+        if nl_fl > per_kind // 2:
+            clipped_fl = clipped_fl[:nl_fl]
+        clipped_text_fl = clipped_fl.decode("utf-8", errors="replace")
+        head = (f"{path} [v{ver}] ({total_b / 1024:.1f} KB, {n_lines} lines{note_fl}, "
+                f"clipped to {len(clipped_fl)} of {total_fl} bytes; pass larger max_bytes)")
+        return head + "\n" + clipped_text_fl.rstrip("\n")
 
     sliced = text
     note = ""
