@@ -399,7 +399,7 @@ Keep `replace_range` and `replace_in_file` for cases where no structural tool ex
 | Action | Arguments |
 |---|---|
 | `run_python` | one of `script` (a `.py` path inside the project) / `module` (dotted name); optional `args` (list of strings), `cwd`, `timeout`, `max_bytes`, `env`. **⚠ `module=` = `python -m` = `__main__`:** importing a module with `if __name__ == "__main__":` will run it. Incident: `module="toolkit.runner.gui.app"` spawned a second GUI and broke the bridge. For syntax-only verification without running — use `verify_syntax` |
-| `verify_syntax` | `paths` (list of `.py` files or directories) or `directory`; compiles via `compile(src, path, "exec")` with no imports and no side effects. Replaces the ad-hoc `run_python(script="manual/verify_syntax.py")`. Useful before a commit to confirm edits did not break the syntax |
+| `verify_syntax` | `paths` (list of `.py` files or directories) or `directory`; compiles via `compile(src, path, "exec")` with no imports and no side effects. Replaces the ad-hoc `run_python(path="manual/verify_syntax.py")`. Useful before a commit to confirm edits did not break the syntax |
 
 ### Native Roblox tools (when enabled)
 

@@ -54,12 +54,12 @@ def main():
         root = Path(td)
         GetIndexTool.set_paths(None)  # defaults
 
-        # --- 1. kind is required ---
+        # --- 1. kind is required (missing_arg from validate_args) ---
         print("== kind required ==")
         r = _run(root, [{"action": "get_index", "arguments": {}}])[0]
         t.expect("error status", r.status == "error", f"{r.status}: {r.message}")
-        t.expect("error_code == kind_required", r.error_code == "kind_required")
-        t.expect("names valid kinds", "docs" in r.message and "code" in r.message)
+        t.expect("error_code == missing_arg", r.error_code == "missing_arg")
+        t.expect("names kind arg", "kind" in r.message)
 
         # --- 1b. missing index -> not an error ---
         print()
@@ -74,7 +74,7 @@ def main():
         print("== present index ==")
         (root / "INDEX.md").write_text("# Index\n\nhello\n", encoding="utf-8")
         (root / "INDEX.md.version").write_text(json.dumps({"seq": 7}), encoding="utf-8")
-        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs"}}])[0]
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "sections": True}}])[0]
         t.expect("ok", r.status == "ok")
         t.expect("version shown", "[v7]" in r.message)
         t.expect("content shown", "hello" in r.message)
@@ -85,7 +85,7 @@ def main():
         print("== no max_bytes, small file (under 32 KB) -> full ==")
         big = "line\n" * 5000  # ~25 KB, well past old default 12 KB
         (root / "INDEX.md").write_text(big, encoding="utf-8")
-        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs"}}])[0]
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "sections": True}}])[0]
         t.expect("ok", r.status == "ok")
         t.expect("not clipped by default", "clipped" not in r.message)
         t.expect("full content present", r.message.count("line") >= 5000)
@@ -95,7 +95,7 @@ def main():
         print("== no max_bytes: large file (over 32 KB) -> clipped ==")
         big = "line\n" * 10000  # ~50 KB, over new 32 KB default
         (root / "INDEX.md").write_text(big, encoding="utf-8")
-        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs"}}])[0]
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "sections": True}}])[0]
         t.expect("large ok", r.status == "ok")
         t.expect("large clipped", "clipped to" in r.message)
         t.expect("large partial", r.message.count("line") < 10000)
@@ -103,7 +103,7 @@ def main():
         # --- 2d. max_bytes=0 -> explicit opt-out: full even if > 32 KB ---
         print()
         print("== max_bytes=0 -> full (explicit opt-out) ==")
-        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "max_bytes": 0}}])[0]
+        r = _run(root, [{"action": "get_index", "arguments": {"kind": "docs", "max_bytes": 0, "sections": True}}])[0]
         t.expect("opt-out ok", r.status == "ok")
         t.expect("opt-out not clipped", "clipped" not in r.message)
         t.expect("opt-out full content", r.message.count("line") >= 10000)
@@ -177,7 +177,7 @@ def main():
         big = "line\n" * 5000
         (root / "INDEX.md").write_text(big, encoding="utf-8")
         r = _run(root, [{"action": "get_index",
-                         "arguments": {"kind": "docs", "max_bytes": 1000}}])[0]
+                         "arguments": {"kind": "docs", "max_bytes": 1000, "sections": True}}])[0]
         t.expect("ok", r.status == "ok")
         t.expect("clipped marker", "clipped to" in r.message)
 

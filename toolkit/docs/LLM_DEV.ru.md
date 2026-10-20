@@ -401,7 +401,7 @@
 | Действие | Аргументы |
 |---|---|
 | `run_python` | одно из `script` (путь `.py` внутри проекта) / `module` (dotted-name); опц. `args` (список строк), `cwd`, `timeout`, `max_bytes`, `env`. **⚠ `module=` = `python -m` = `__main__`:** импорт модуля с `if __name__ == "__main__":` запустит его. Инцидент: `module="toolkit.runner.gui.app"` поднял второй GUI и поломал мост. Для проверки синтаксиса без запуска — `verify_syntax` |
-| `verify_syntax` | `paths` (список `.py` файлов или каталогов) или `directory`; компилирует через `compile(src, path, "exec")` без импорта и без побочных эффектов. Заменяет ad-hoc `run_python(script="manual/verify_syntax.py")`. Полезно перед коммитом, когда надо убедиться, что правки не сломали синтаксис |
+| `verify_syntax` | `paths` (список `.py` файлов или каталогов) или `directory`; компилирует через `compile(src, path, "exec")` без импорта и без побочных эффектов. Заменяет ad-hoc `run_python(path="manual/verify_syntax.py")`. Полезно перед коммитом, когда надо убедиться, что правки не сломали синтаксис |
 
 ### Native Roblox tools (если разрешены)
 

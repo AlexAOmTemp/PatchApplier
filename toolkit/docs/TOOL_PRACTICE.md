@@ -144,7 +144,7 @@ replace_in_file(search='"RootPolicy",', replace='"PathPolicy", "RootPolicy",')
 ### Прогон «всё ли импортируется»
 
 ```python
-run_python(script="toolkit/code/manual/_smoke_imports.py")
+run_python(path="toolkit/code/manual/_smoke_imports.py")
 ```
 
 Скрипт-однострочник, печатает `[OK]` / `[FAIL]` для каждого модуля. Позволяет **не запускать GUI** после каждой волны правок. Сэкономил десятки рестартов.
@@ -152,7 +152,7 @@ run_python(script="toolkit/code/manual/_smoke_imports.py")
 ### Прогон теста
 
 ```python
-run_python(script="toolkit/code/toolkit/tests/test_X.py")
+run_python(path="toolkit/code/toolkit/tests/test_X.py")
 ```
 
 Каждый тест — самодостаточный скрипт с `main()`. Печатает `[OK]` / `[FAIL]` построчно. Единственный способ поймать регрессии до GUI.
@@ -160,7 +160,7 @@ run_python(script="toolkit/code/toolkit/tests/test_X.py")
 ### Git-чекпоинт
 
 ```python
-run_python(script="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
+run_python(path="toolkit/code/manual/_git.py", args=["commit", "<msg>"])
 ```
 
 `_git.py` — обёртка над git. `commit`, `log`, `status`, `reset-hard`, `show-file`. Использую `commit` перед каждой большой волной; `reset-hard HEAD~1` при катастрофе (не пригодилось, но держу в резерве).

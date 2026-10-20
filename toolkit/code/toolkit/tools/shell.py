@@ -94,7 +94,7 @@ class RunPythonTool:
 
     name = "run_python"
     op = "write"
-    path_args: list[str] = []          # `script` is checked inside execute
+    path_args: list[str] = []          # `path` is checked inside execute
     path_list_args: list[str] = []
 
     _config: dict = {}
@@ -176,7 +176,6 @@ class RunPythonTool:
         path: str | None = None,
         module: str | None = None,
         code: str | None = None,
-        script: str | None = None,  # legacy alias for `path`
         args: list[str] | None = None,
         cwd: str | None = None,
         timeout: int | None = None,
@@ -197,9 +196,6 @@ class RunPythonTool:
             )
 
         # -- 2. shape -------------------------------------------------------
-        # `script` is a legacy alias for `path`.
-        if path is None and script is not None:
-            path = script
         modes = [path, module, code]
         if sum(x is not None for x in modes) != 1:
             return Result(

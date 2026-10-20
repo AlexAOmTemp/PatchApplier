@@ -162,7 +162,7 @@ def main():
              _actions(plan) == ["rebuild_lua_code_index"], _actions(plan))
 
     plan = plan_rebuilds(
-        [_patch("run_python", script="tests/x.py")],
+        [_patch("run_python", path="tests/x.py")],
         [_ok("run_python")],
         TOOL_MAP,
         config=CFG_ALL_ON, supports_fs=True, supports_mcp=True)

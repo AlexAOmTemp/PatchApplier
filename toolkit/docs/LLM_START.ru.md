@@ -48,47 +48,56 @@ Patch Applier — правка проекта JSON-патчами. Один от
 4. Неясно — спросить, не гадать
 
 ## 5. Тулсет
-`?` — опционально, `|` — одно из. Полные схемы и редкие аргументы — `REF_TOOLS.md`.
+`?` — опционально. Сигнатуры сгенерированы из `TOOL_MAP` (источник истины — код); редкие аргументы, XML и MCP — `REF_TOOLS.md`.
 
 **Чтение**
-- `read_file(path, [section_number|section_title|start_line+end_line], max_bytes?, numbered?, escape?)`
-- `read_unit(path, address{qualname|title_match}, [part|block], max_bytes?)`
-- `list_units(path)` · `file_stat(path)` · `file_exists(path)`
-- `list_files(path, glob?, show_size?, recursive?, show_hidden?, scoped?, filter?)`
-- `survey_dir(path, ext?, top?, scoped?)` · `tree(path, max_lines?, show_files?, max_types?, scoped?, filter?)` — BFS по уровням, каталоги вперёд файлов; `show_files=true` (дефолт `max_lines=100`) показывает имена файлов
-- `grep(pattern, paths, recursive?, file_glob?, exclude_glob?, regex?, ignore_case?, before?, after?, max_results?, scoped?, filter?)` — `paths` обязателен: файл, каталог или список (ripgrep-модель)
-- `grep_mcp(pattern, directory, ignore_case?, before?, after?, max_results?)`
+- `read_file(path?, section_number?, section_title?, start_line?, end_line?, max_bytes?, numbered?, escape?, raw?)`
+- `read_unit(path?, address?, part?, block?, max_bytes?)` · `list_units(path?, max_bytes?)`
+- `file_stat(path?)` · `file_exists(path?)`
+- `list_files(path?, glob?, show_size?, scoped?, recursive?, show_hidden?, filter?)`
+- `survey_dir(path?, ext?, top?, max_files?, scoped?, filter?)`
+- `tree(path?, max_lines?, show_files?, max_types?, show_types?, scoped?, recursive_sizes?, filter?)`
+- `grep(pattern, paths, recursive?, file_glob?, exclude_glob?, regex?, fixed_strings?, ignore_case?, word_boundary?, before?, after?, max_results?, scoped?, filter?, debug_timing?)` — `paths` обязателен
 
 **Unit**
-- `replace_unit(path, address, [part|block], new_text)`
-- `insert_block(path, address, new_text, position?, before_anchor?, after_anchor?)` — `position` = `start`\|`end`; якоря взаимоисключающие, `address` = контейнер, якорь = точка внутри
-- `remove_unit(path, address, [part|block])` · `create_unit(path, address, part, new_text)`
+- `replace_unit(path?, address?, new_text?, part?, block?)`
+- `insert_block(path?, address?, new_text?, position?, before_anchor?, after_anchor?)` — `position` = `start`\|`end`; якоря взаимоисключающие, `address` = контейнер, якорь = точка внутри
+- `remove_unit(path?, address?, part?, block?)` · `create_unit(path?, address?, part?, new_text?)` · `copy_unit(source_file, target_file, selector?, position?, anchor?, container?)`
 
 > **Аргументы:** один путь — `path`, много — `paths`. Неверный аргумент — явная ошибка `unknown_arg` со списком валидных.
 
 **Запись (escape hatch)**
-- `replace_in_file(path, search, replace, occurrence?, regex?)`
+- `replace_in_file(path, search, replace, occurrence?, search_repr?, regex?)`
 - `replace_range(path, start_line, end_line, new_content, expected_first_line?)`
 - `replace_between(path, start_anchor, end_anchor, new_content, include_start?, include_end?, occurrence?)`
 - `insert_at_anchor(path, anchor, position, new_content, occurrence?)`
 
 **Файлы**
-- `create_file(path, content, class_name?)` · `overwrite_file(path, content)`
-- `delete_file(path)` · `move_file(src, dst)` · `copy_file(src, dst)`
+- `create_file(path, file_content, class_name?)` · `overwrite_file(path, file_content)`
+- `delete_file(path)` · `move_file(source_path, destination_path)` · `copy_file(source_path, destination_path)`
 
 **Индекс**
-- `get_index(kind, max_bytes?, limit?, path?, sort?, scoped?, sections?)` — `kind` обязателен; по умолчанию overview (одна строка на файл), `sections=true` — полный список секций
+- `get_index(kind, max_bytes?, limit?, path?, sort?, scoped?, sections?)` — `kind` обязателен (в сигнатуре; без него `missing_arg`); по умолчанию overview, `sections=true` — полный список секций
 - `get_status(sections?)`
-- `rebuild_index(...)` · `rebuild_code_index(...)` · `rebuild_csharp_index(...)` — аргументы одинаковы, см. `REF_TOOLS.md`
+- `rebuild_index(docs_dir?, output?, skip_files?)`
+- `rebuild_code_index(code_dir?, output?, manifest_output?, skip_files?, skip_dirs?)`
+- `rebuild_csharp_index(...)` — те же аргументы
+- `rebuild_lua_code_index(output?, manifest_output?, roots?, local_root?)`
 
 **Граф**
-- `find_symbol(query, kind?, limit?, max_bytes?, scoped?)`
-- `find_usages(query, limit?, scoped?)` · `symbol_graph(qualname, occurrence?, depth?, max_nodes?, kind?)`
+- `find_symbol(query, manifest_path?, kind?, limit?, local?, scoped?)`
+- `find_usages(query, manifest_path?, kind?, limit?, local?, scoped?)`
+- `symbol_graph(qualname, occurrence?, depth?, max_nodes?, manifest_path?, kind?, local?)`
 
 **Прочее**
-- `run_python([script|module], args?, timeout?, max_bytes?)` · `verify_syntax([paths|directory])`
-- `get_scope()` · `exclude(patterns, reason?)` · `include(patterns, reason?)` · `set_scope(text)` · `clear_scope()`
-- `grep_replace` · `grep_replace_mcp` · `copy_unit` — схемы в `REF_TOOLS.md`
+- `run_python(path\|module\|code, args?, cwd?, timeout?, max_bytes?, env?)` — ровно один из `path`/`module`/`code`
+- `verify_syntax(paths?, directory?)`
+- `get_scope()` · `exclude(patterns?, reason?)` · `include(patterns?, reason?)` · `set_scope(text?)` · `clear_scope()`
+- `grep_replace(pattern?, replacement?, mappings?, paths?, recursive?, file_glob?, exclude_glob?, regex?, fixed_strings?, ignore_case?, word_boundary?, max_replacements?, dry_run?, scoped?, filter?, force?)`
+
+**Условно включённые**
+- MCP (Roblox): `grep_mcp(pattern, directory?, ...)` · `grep_replace_mcp(...)` · `grep_lua(...)` — схемы в `REF_TOOLS.md`
+- XML: `xml_read`, `xml_find`, `xml_map`, `xml_insert`, `xml_replace`, `xml_modify`, `xml_append`, `xml_delete`, `xml_copy`, `xml_move` — `XML_START.md` / `REF_TOOLS.md`
 
 ## 6. Пример
 Один фенс, три массива, `id` у каждого. `patterns` — строка или список; `reason` опционален (по умолчанию `llm-session`).

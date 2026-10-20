@@ -110,7 +110,7 @@ LLM_START — стабильная инструкция. DECISIONS — поче�
 - **`survey_dir` — новый тул.** Первый контакт с незнакомым корнем: агрегат по расширениям + подкаталоги первого уровня. `list_files` при >2000 файлов отдаёт счётчик вместо плоского списка.
 - **GUI Project settings — три уровня оптимизации.** (1) `scan_subdirs_ex` с `DEFAULT_SCAN_MAX_ROWS=200` — RimWorld останавливается на depth 2, не уходит в глубину каждого мода; (2) скан всегда с `show_hidden=True` (superset), фильтр в памяти — toggle без повторного диска; (3) чанковый рендер через `after` + кэш подписи в `PolicyTree.render`. Census в корневой строке (`[RimWorld] (115 dirs, 3 hidden)`).
 - **Корневая политика отображается по эффективному значению,** не по наличию override. У корня нет родителя — точка «не задано» бессмысленна.
-- **`verify_syntax` как тул.** `compile(src, path, "exec")` по тексту из backend, без импорта. Заменяет ad-hoc `run_python(script="manual/verify_syntax.py")`.
+- **`verify_syntax` как тул.** `compile(src, path, "exec")` по тексту из backend, без импорта. Заменяет ad-hoc `run_python(path="manual/verify_syntax.py")`.
 - **`⚠ no summary` — только на `##`.** В проектах, где summary только на верхнем уровне, метка на `###`/`####` была 90% шума.
 - **`run_python module=` = `python -m` = `__main__`.** Инцидент: `module="toolkit.runner.gui.app"` поднял второй GUI. Явное предупреждение в LLM_START §Execution (ru+en).
 

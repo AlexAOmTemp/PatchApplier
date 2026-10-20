@@ -108,7 +108,7 @@ def main():
                 r = s.apply_patches([{
                     "action": "create_file",
                     "arguments": {
-                        "file_path": "proj/nested/y.py",
+                        "path": "proj/nested/y.py",
                         "file_content": "print('CREATED_OK')\n",
                     },
                 }])[0]
@@ -121,13 +121,13 @@ def main():
                 t.expect("run created ok", r.status == "ok", r.message)
                 t.expect("stdout CREATED_OK", "CREATED_OK" in r.message, r.message)
 
-                # 3. Legacy alias: script= still works.
-                print("== run_python(script=) legacy alias ==")
+                # 3. path= resolves nested script from project root
+                print("== run_python(path=) nested ==")
                 r = s.apply_patches([{
                     "action": "run_python",
-                    "arguments": {"script": "proj/nested/x.py"},
+                    "arguments": {"path": "proj/nested/x.py"},
                 }])[0]
-                t.expect("script alias ok", r.status == "ok", r.message)
+                t.expect("path nested ok", r.status == "ok", r.message)
 
                 # 4. code= inline: tempfile cleaned up.
                 print("== run_python(code=) inline ==")

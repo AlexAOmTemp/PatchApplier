@@ -1,8 +1,8 @@
 """Compile-only smoke check.
 
 Usage:
-  run_python(script="toolkit/code/manual/verify_syntax.py")
-  run_python(script="toolkit/code/manual/verify_syntax.py",
+  run_python(path="toolkit/code/manual/verify_syntax.py")
+  run_python(path="toolkit/code/manual/verify_syntax.py",
              args=["toolkit/code/toolkit/indexers/lua_runner.py",
                    "toolkit/code/toolkit/runner/gui"])
 

@@ -218,8 +218,8 @@ class GetIndexTool:
     def execute(
             self,
             backend: Backend,
+            kind: str | list,
             fmt: Any = None,
-            kind: str | list | None = None,
             max_bytes: int | None = None,
             limit: int | None = 500,
             path: str | None = None,

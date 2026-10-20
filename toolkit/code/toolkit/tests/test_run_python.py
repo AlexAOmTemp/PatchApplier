@@ -87,7 +87,7 @@ def main():
         _write(root, "hello.py", "print('hi')\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "hello.py"}},
+             "arguments": {"path": "hello.py"}},
         ])[0]
         t.expect("blocked", r.status == "blocked", f"{r.status}: {r.message}")
         t.expect("error_code == exec_disabled", r.error_code == "exec_disabled")
@@ -99,7 +99,7 @@ def main():
         _cfg(root)
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "../outside.py"}},
+             "arguments": {"path": "../outside.py"}},
         ])[0]
         t.expect("blocked", r.status == "blocked", f"{r.status}: {r.message}")
         t.expect("error_code == script_outside_project",
@@ -112,7 +112,7 @@ def main():
         _write(root, "notes.txt", "x")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "notes.txt"}},
+             "arguments": {"path": "notes.txt"}},
         ])[0]
         t.expect("error", r.status == "error", f"{r.status}: {r.message}")
         t.expect("error_code == script_not_python",
@@ -124,7 +124,7 @@ def main():
         _cfg(root)
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "missing.py"}},
+             "arguments": {"path": "missing.py"}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == script_not_found",
@@ -159,7 +159,7 @@ def main():
         _cfg(root)
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "hello.py", "module": "platform"}},
+             "arguments": {"path": "hello.py", "module": "platform"}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == ambiguous_input", r.error_code == "ambiguous_input")
@@ -170,7 +170,7 @@ def main():
         _cfg(root)
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "hello.py", "cwd": ".."}},
+             "arguments": {"path": "hello.py", "cwd": ".."}},
         ])[0]
         t.expect("blocked", r.status == "blocked", f"{r.status}: {r.message}")
         t.expect("error_code == cwd_outside_project",
@@ -182,7 +182,7 @@ def main():
         _cfg(root, max_timeout=5)
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "hello.py", "timeout": 30}},
+             "arguments": {"path": "hello.py", "timeout": 30}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == timeout_too_large",
@@ -196,7 +196,7 @@ def main():
                "print('привет ⚠ → всё ок')\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "nonascii.py"}},
+             "arguments": {"path": "nonascii.py"}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("exit=0 in message", "exit=0" in r.message)
@@ -211,7 +211,7 @@ def main():
         _write(root, "fail.py", "import sys; sys.exit(3)\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "fail.py"}},
+             "arguments": {"path": "fail.py"}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == nonzero_exit", r.error_code == "nonzero_exit")
@@ -224,7 +224,7 @@ def main():
         _write(root, "slow.py", "import time; time.sleep(20)\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "slow.py", "timeout": 1}},
+             "arguments": {"path": "slow.py", "timeout": 1}},
         ])[0]
         t.expect("error", r.status == "error")
         t.expect("error_code == timeout", r.error_code == "timeout")
@@ -237,7 +237,7 @@ def main():
         _write(root, "loud.py", "print('x' * 5000)\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "loud.py"}},
+             "arguments": {"path": "loud.py"}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("stdout_truncated flag", "stdout_truncated" in r.message)
@@ -250,7 +250,7 @@ def main():
                "import os; print(os.environ.get('MY_TOKEN', '<unset>'))\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "envcheck.py",
+             "arguments": {"path": "envcheck.py",
                            "env": {"MY_TOKEN": "should-not-leak"}}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
@@ -265,7 +265,7 @@ def main():
                "import os; print(os.environ.get('PYTHONIOENCODING', '<unset>'))\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "envenc.py"}},
+             "arguments": {"path": "envenc.py"}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("PYTHONIOENCODING=utf-8 in child", "utf-8" in r.message)
@@ -278,7 +278,7 @@ def main():
                "import sys; print('ARG=' + sys.argv[1])\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "argdump.py",
+             "arguments": {"path": "argdump.py",
                            "args": ["; rm -rf / && echo pwned"]}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
@@ -293,7 +293,7 @@ def main():
         _write(root, "cp.py", "print('привет')\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "cp.py"}},
+             "arguments": {"path": "cp.py"}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("cp1251 round-trip reads back", "привет" in r.message)
@@ -306,7 +306,7 @@ def main():
                "import os; print(os.environ.get('PYTHONUTF8', '<unset>'))\n")
         r = _run(root, [
             {"action": "run_python",
-             "arguments": {"script": "utf8flag.py"}},
+             "arguments": {"path": "utf8flag.py"}},
         ])[0]
         t.expect("ok", r.status == "ok", f"{r.status}: {r.message}")
         t.expect("PYTHONUTF8=0 for non-utf8 encoding", "=0" in r.message or "<unset>" in r.message)
