@@ -23,6 +23,9 @@ Patch Applier — правка проекта JSON-патчами. Один от
 - **R-UNIT-1** — `.py`/`.lua`/`.luau`/`.md` — unit-тулами (`replace_unit`/`insert_block`), не текстом
 - **R-UNIT-2** — `replace_in_file`/`replace_range`/`replace_between`/`insert_at_anchor` — только если unit-модель не адресует (комментарии между unit'ами, отдельные строки, fenced-код)
 - **R-UNIT-3** — `replace_range` — снизу вверх и до других write на тот же файл
+- **R-UNIT-4** — адрес: `{"qualname": "Foo.bar"}` (py/lua), `{"qualname": "3"}` (md), `{"qualname": "<module>"}`. Неоднозначность → `occurrence` **внутри** `address`, не аргумент тула
+- **R-UNIT-5** — `replace_unit`: ровно одно из `part`/`block` (иначе `scope_required`/`scope_conflict`); `part="body"` сохраняет head+annotation, `"all"` — целиком. Пустой `new_text` = `empty_input`, не удаление — удалять `remove_unit(part="all")`
+- **R-UNIT-6** — `block` — только внутри body (`not_applicable` иначе); в Lua blocks внутри функций не нумеруются (`blocks=0`) — править `part="body"`
 
 **Безопасность (R-SAFE)**
 - **R-SAFE-1** — `blocked` не retry: это политика, не transient

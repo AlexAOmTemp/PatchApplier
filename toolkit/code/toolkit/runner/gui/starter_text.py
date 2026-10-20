@@ -32,7 +32,9 @@ def scan_langs() -> list[str]:
 def read_text(lang: str) -> tuple[str | None, str | None]:
     """Return (text, used_lang) or (None, None). Falls back to 'en'."""
     d = docs_dir()
-    for cand in (lang, "en"):
+    candidates = [lang] if lang else []
+    candidates += [c for c in scan_langs() if c not in candidates]
+    for cand in candidates:
         if not cand:
             continue
         p = d / f"LLM_START.{cand}.md"

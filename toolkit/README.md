@@ -74,6 +74,6 @@ GUI-процесс держит модули утилиты (`tools/*.py`, `inde
 - [LIFECYCLE.md](LIFECYCLE.md) — Session, Backend lifecycle, composite.
 - [CONFIG.md](CONFIG.md) — два конфига: tool-wide `<toolkit_root>/.patch_applier.json` + per-project `<project>/.patch_applier/config.json`.
 
-**Для LLM:** `LLM_START.ru.md` / `LLM_START.en.md` — инструкция, вкладывается в стартовое сообщение сессии кнопкой «Стартовый текст» в GUI. Обновляется часто.
+**Для LLM:** `LLM_START.ru.md` — инструкция, вкладывается в стартовое сообщение сессии кнопкой «Стартовый текст» в GUI. Обновляется часто.
 
 **Карта кода:** `CODE_INDEX.md` / `CODE_INDEX_LUA.md` / `INDEX.md` в служебном каталоге проекта (по умолчанию `<project>/.patch_applier/`).

@@ -7,14 +7,14 @@
 
 | Действие | Аргументы |
 |---|---|
-| `read_file` | `file_path` + одно из: `section_number` (`"4"`, `"4.1"`), `section_title` (подстрока), `start_line`+`end_line`; иначе весь файл. Опц. `numbered` (дефолт `true`), `escape` (`perline`/`blob`/`none`, дефолт `perline`), `max_bytes` (дефолт 32768; `0` — без капа) |
-| `file_stat` | `file_path` — размер и разбивка по секциям |
-| `file_exists` | `file_path` |
-| `list_files` | `directory`, опц. `show_size`, `scoped` (дефолт `true`), `recursive`, `show_hidden`. >2000 файлов — вернёт счётчик и подсказку `survey_dir` |
+| `read_file` | `path` + одно из: `section_number` (`"4"`, `"4.1"`), `section_title` (подстрока), `start_line`+`end_line`; иначе весь файл. Опц. `numbered` (дефолт `true`), `escape` (`perline`/`blob`/`none`, дефолт `perline`), `max_bytes` (дефолт 32768; `0` — без капа) |
+| `file_stat` | `path` — размер и разбивка по секциям |
+| `file_exists` | `path` |
+| `list_files` | `path`, опц. `show_size`, `scoped` (дефолт `true`), `recursive`, `show_hidden`. >2000 файлов — вернёт счётчик и подсказку `survey_dir` |
 | `survey_dir` | `path`, опц. `ext`, `top` (20), `scoped` (дефолт `true`) |
 | `tree` | `path`; опц. `max_dirs` (500), `max_types` (7), `max_depth` (50), `scoped`. **FS-only** |
-| `grep` | `pattern` + (`paths`: список файлов / `directory`+`file_glob`); опц. `regex` (дефолт `true`), `fixed_strings`, `ignore_case`, `word_boundary`, `before`, `after`, `max_results` (200), `exclude_glob`, `scoped`. **FS-only**; Roblox-путь → `wrong_domain` |
-| `grep_mcp` | `pattern` + `directory` (Roblox-путь); опц. `fixed_strings`, `ignore_case`, `before`, `after`, `max_results` (200). Паттерн — **Lua patterns**, не Python regex |
+| `grep` | `pattern` + `paths` (файл, каталог или их список); опц. `regex` (дефолт `true`), `fixed_strings`, `ignore_case`, `word_boundary`, `before`, `after`, `max_results` (200), `exclude_glob`, `scoped`. **FS-only**; Roblox-путь → `wrong_domain` |
+| `grep_mcp` | `pattern` + `path` (Roblox-путь); опц. `fixed_strings`, `ignore_case`, `before`, `after`, `max_results` (200). Паттерн — **Lua patterns**, не Python regex |
 
 `paths` в `grep` — файлы, не каталоги (`bad_options`). `grep_replace` использует тот же матчер.
 
@@ -24,10 +24,10 @@
 
 | Действие | Аргументы |
 |---|---|
-| `replace_in_file` | `file_path`, `search`, `replace`, опц. `occurrence` (число или `"all"`), `search_repr` (дефолт `true`), `regex` (дефолт `false`) |
-| `replace_range` | `file_path`, `start_line`, `end_line`, `new_content`, **настоятельно** `expected_first_line` |
-| `replace_between` | `file_path`, `start_anchor`, `end_anchor`, `new_content`, опц. `include_start`/`include_end` (`true`), `occurrence` (`1`) |
-| `insert_at_anchor` | `file_path`, `anchor`, `position` (`before`/`after`), `new_content`, опц. `occurrence` (`1`) |
+| `replace_in_file` | `path`, `search`, `replace`, опц. `occurrence` (число или `"all"`), `search_repr` (дефолт `true`), `regex` (дефолт `false`) |
+| `replace_range` | `path`, `start_line`, `end_line`, `new_content`, **настоятельно** `expected_first_line` |
+| `replace_between` | `path`, `start_anchor`, `end_anchor`, `new_content`, опц. `include_start`/`include_end` (`true`), `occurrence` (`1`) |
+| `insert_at_anchor` | `path`, `anchor`, `position` (`before`/`after`), `new_content`, опц. `occurrence` (`1`) |
 
 `search` копируй из вывода `read_file` (per-line repr), а не набирай вручную. `regex: true` — Python-regex с `\1`-backrefs.
 
@@ -51,12 +51,12 @@
 
 | Действие | Аргументы |
 |---|---|
-| `list_units` | `file_path` — карта: qualname + kind + L-range + число блоков |
-| `read_unit` | `file_path`, `address`; опц. `part` (`head,annotation`, `body`, `own_body`, `all`), `block` |
-| `replace_unit` | `file_path`, `address`, `new_text`, **ровно одно из** `part` / `block`. `part="all"` — целиком; `"body"` — тело; `"own_body"` — без подсекций; `"annotation"` — docstring |
-| `remove_unit` | `file_path`, `address`, ровно одно из `part` / `block` |
-| `create_unit` | `file_path`, `address`, `part`, `new_text`. Фаза 1: `part="annotation"` |
-| `insert_block` | `file_path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — номер блока или qualname |
+| `list_units` | `path` — карта: qualname + kind + L-range + число блоков |
+| `read_unit` | `path`, `address`; опц. `part` (`head,annotation`, `body`, `own_body`, `all`), `block` |
+| `replace_unit` | `path`, `address`, `new_text`, **ровно одно из** `part` / `block`. `part="all"` — целиком; `"body"` — тело; `"own_body"` — без подсекций; `"annotation"` — docstring. Пустой `new_text` → `empty_input` (удалять — `remove_unit`) |
+| `remove_unit` | `path`, `address`, ровно одно из `part` / `block` |
+| `create_unit` | `path`, `address`, `part`, `new_text`. Фаза 1: `part="annotation"` |
+| `insert_block` | `path`, `address`, `new_text`, `position` (`start`/`end`/`before`/`after`); `anchor` — номер блока или qualname |
 | `copy_unit` | `source_file`, `target_file`, `selector`, опц. `position`, `anchor`, `container` |
 
 **Lua.** Blocks внутри функций не нумеруются (`blocks=0`) — для правки тела `replace_unit part="body"`.
@@ -65,9 +65,9 @@
 
 | Действие | Аргументы |
 |---|---|
-| `create_file` | `file_path`, `file_content`; опц. `class_name` (`ModuleScript`/`Script`/`LocalScript`). Ошибка, если существует |
-| `overwrite_file` | `file_path`, `file_content` |
-| `delete_file` | `file_path` |
+| `create_file` | `path`, `file_content`; опц. `class_name` (`ModuleScript`/`Script`/`LocalScript`). Ошибка, если существует |
+| `overwrite_file` | `path`, `file_content` |
+| `delete_file` | `path` |
 | `move_file` | `source_path`, `destination_path`. **Кросс-домен запрещён** (FS ↔ Roblox) |
 | `copy_file` | `source_path`, `destination_path`. **Кросс-домен запрещён** |
 
@@ -106,7 +106,7 @@
 | `set_scope` | `text` — заменить целиком |
 | `clear_scope` | — |
 
-Что фильтруется: `get_index`, `tree`, `grep` (по `directory=`), `list_files`, `survey_dir`, `find_symbol`, `find_usages` — при `scoped=true` (дефолт). Что НЕ фильтруется: `read_file`/`read_unit`/`file_stat`/`file_exists` (явный путь), `grep(paths=[...])`, `find_*` с явным `manifest_path`.
+Что фильтруется: `get_index`, `tree`, `grep` (по каталогам в `paths=`), `list_files`, `survey_dir`, `find_symbol`, `find_usages` — при `scoped=true` (дефолт). Что НЕ фильтруется: `read_file`/`read_unit`/`file_stat`/`file_exists` (явный путь), `grep(paths=[<файл>])` — явный файл читается всегда, `find_*` с явным `manifest_path`.
 
 `scoped=false` — на один вызов, scope игнорируется, файл не меняется.
 
@@ -115,7 +115,7 @@
 | Действие | Аргументы |
 |---|---|
 | `run_python` | одно из `script` (путь `.py`) / `module` (dotted-name); опц. `args`, `cwd`, `timeout`, `max_bytes`, `env` |
-| `verify_syntax` | `paths` (файлы/каталоги `.py`) или `directory` |
+| `verify_syntax` | `paths` (файлы/каталоги `.py`) |
 
 ⚠ `module=` = `python -m` = `__main__`: модуль с `if __name__ == "__main__":` запустится. Для проверки синтаксиса — `verify_syntax`.
 
